@@ -36,6 +36,12 @@ import {
   ArrowUpDown,
   Landmark,
   Building2,
+  Radar,
+  Orbit,
+  Settings,
+  Network,
+  Users,
+  Cpu,
 } from 'lucide-react'
 import {
   AppCtx,
@@ -75,6 +81,8 @@ import { AnomaliesPage, CalendarPage, HarmonizerPage, MorningGapPage, TrendsPage
 import { AuthControl, CoverageCard, InventoryCard, LoginGate } from './completion'
 import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
 import { ExposurePanel } from './completion_final'
+import { ExposurePage, ForecastModelsPage, OrbitsPage, ReferencePage, ScoringPanel, SensorPage, SystemConfigPage, Viirs375Page, Viirs750Page } from './final_ops'
+import type { Alert, AlertList, AuthMe, CriticalItem, CriticalRegions, DashboardSummary, DataQuality, DataStatus, EvaluateResult, JobResponse, ReportCreated, ReportList, ReportRow, SatelliteSummary, ThresholdResponse, UploadResult } from './types'
 
 /* ==========================================================================
  * 1. All 17 PyroScope Sections for Argon Sidebar & Router
@@ -86,12 +94,21 @@ export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
   { idx: '04', path: '/harmonization', label: 'MODIS–VIIRS Harmonizer', group: 'Harmonization & QA', icon: <GitCompare className="h-4 w-4" /> },
   { idx: '05', path: '/uncertainty', label: 'Uncertainty Estimation', group: 'Harmonization & QA', icon: <Activity className="h-4 w-4" /> },
   { idx: '06', path: '/validation', label: 'Validation & Seam Test', group: 'Harmonization & QA', icon: <ShieldCheck className="h-4 w-4" /> },
+  { idx: '06a', path: '/reference', label: 'Historical & Operational Reference', group: 'Sensors & Products', icon: <Radar className="h-4 w-4" /> },
+  { idx: '06b', path: '/sensors/noaa-20', label: 'NOAA-20 VIIRS', group: 'Sensors & Products', icon: <Satellite className="h-4 w-4" /> },
+  { idx: '06c', path: '/sensors/noaa-21', label: 'NOAA-21 VIIRS', group: 'Sensors & Products', icon: <Satellite className="h-4 w-4" /> },
+  { idx: '06d', path: '/products/viirs375', label: 'VIIRS 375 m', group: 'Sensors & Products', icon: <Layers className="h-4 w-4" /> },
+  { idx: '06e', path: '/products/viirs750', label: 'VIIRS 750 m', group: 'Sensors & Products', icon: <Layers className="h-4 w-4" /> },
   { idx: '07', path: '/calendar', label: 'Burning Activity Calendar', group: 'Analytics & Forecast', icon: <Calendar className="h-4 w-4" /> },
   { idx: '08', path: '/historical-trends', label: 'Historical Trends', group: 'Analytics & Forecast', icon: <TrendingUp className="h-4 w-4" /> },
   { idx: '09', path: '/anomalies', label: 'Anomaly Detection', group: 'Analytics & Forecast', icon: <AlertOctagon className="h-4 w-4" /> },
   { idx: '10', path: '/forecast', label: 'Regional Fire Forecast', group: 'Analytics & Forecast', icon: <Sparkles className="h-4 w-4" /> },
+  { idx: '10a', path: '/forecast/models', label: 'Forecast Models by Sensor', group: 'Analytics & Forecast', icon: <Cpu className="h-4 w-4" /> },
   { idx: '11', path: '/critical-regions', label: 'Critical Regions', group: 'Analytics & Forecast', icon: <Flame className="h-4 w-4" /> },
   { idx: '12', path: '/observations', label: 'Observation Intelligence', group: 'Analytics & Forecast', icon: <Compass className="h-4 w-4" /> },
+  { idx: '12a', path: '/orbits', label: 'Orbital Opportunities', group: 'Analytics & Forecast', icon: <Orbit className="h-4 w-4" /> },
+  { idx: '12b', path: '/exposure/population', label: 'Population Exposure', group: 'Analytics & Forecast', icon: <Users className="h-4 w-4" /> },
+  { idx: '12c', path: '/exposure/infrastructure', label: 'Infrastructure Exposure', group: 'Analytics & Forecast', icon: <Network className="h-4 w-4" /> },
   { idx: '13', path: '/alerts', label: 'Alerts & Escalation', group: 'Decision Support', icon: <Bell className="h-4 w-4" /> },
   { idx: '14', path: '/government', label: 'Government Dashboard', group: 'Decision Support', icon: <Landmark className="h-4 w-4" /> },
   { idx: '15', path: '/organisation', label: 'Organisation Dashboard', group: 'Decision Support', icon: <Building2 className="h-4 w-4" /> },
@@ -99,6 +116,7 @@ export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
   { idx: '17', path: '/data', label: 'Data Management', group: 'Governance & Data', icon: <Database className="h-4 w-4" /> },
   { idx: '18', path: '/data/quality', label: 'Data Quality Report', group: 'Governance & Data', icon: <BarChart3 className="h-4 w-4" /> },
   { idx: '19', path: '/reports', label: 'Reports & Exports', group: 'Governance & Data', icon: <FileText className="h-4 w-4" /> },
+  { idx: '20', path: '/system', label: 'System Configuration', group: 'Governance & Data', icon: <Settings className="h-4 w-4" /> },
 ]
 
 /* ==========================================================================
@@ -106,13 +124,13 @@ export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
  * ========================================================================== */
 function OverviewDashboardPage() {
   const navigate = useNavigate()
-  const { data: summary, loading, error, reload } = useApi<any>('/api/dashboard/summary')
-  const { data: alertsResp } = useApi<any>('/api/alerts?open_only=true')
+  const { data: summary, loading, error, reload } = useApi<DashboardSummary>('/api/dashboard/summary')
+  const { data: alertsResp } = useApi<AlertList>('/api/alerts?open_only=true')
 
   const derived = useMemo(() => {
     if (!summary) return null
     const sats = summary.satellites || {}
-    const satEntries = Object.entries(sats) as [string, any][]
+    const satEntries = Object.entries(sats) as [string, SatelliteSummary][]
 
     const modisCount =
       summary.modis_count ??
@@ -450,7 +468,7 @@ function AlertsTablePage() {
     return `/api/alerts${qs ? `?${qs}` : ''}`
   }, [typeFilter, tierFilter, openOnly])
 
-  const { data, loading, error, reload } = useApi<any>(queryPath, [queryPath])
+  const { data, loading, error, reload } = useApi<AlertList>(queryPath, [queryPath])
 
   const handleRowAction = async (
     alertId: number | string,
@@ -459,7 +477,7 @@ function AlertsTablePage() {
     setBusyId(alertId)
     setActionMsg(null)
     try {
-      await api(`/api/alerts/${alertId}/${action}`, {
+      await api<unknown>(`/api/alerts/${alertId}/${action}`, {
         method: 'POST',
         body: {
           note: `Action ${action.toUpperCase()} executed via PyroScope Argon UI (Simulated – Prototype Only)`,
@@ -470,10 +488,10 @@ function AlertsTablePage() {
         text: `Alert #${alertId} updated via POST /api/alerts/${alertId}/${action} (Simulated – Prototype Only).`,
       })
       reload()
-    } catch (err: any) {
+    } catch (err) {
       setActionMsg({
         tone: 'danger',
-        text: `Failed to ${action} alert #${alertId}: ${err.message || String(err)}`,
+        text: `Failed to ${action} alert #${alertId}: ${err instanceof Error ? err.message : String(err)}`,
       })
     } finally {
       setBusyId(null)
@@ -484,23 +502,23 @@ function AlertsTablePage() {
     setEvalBusy(true)
     setActionMsg(null)
     try {
-      const res = await api('/api/alerts/evaluate', { method: 'POST', body: {} })
+      const res = await api<EvaluateResult>('/api/alerts/evaluate', { method: 'POST', body: {} })
       setActionMsg({
         tone: 'info',
         text: `Evaluated alert rules across current observations & forecast (${num(res?.created ?? res?.total ?? 0)} alert records processed).`,
       })
       reload()
-    } catch (err: any) {
+    } catch (err) {
       setActionMsg({
         tone: 'danger',
-        text: `Alert evaluation failed: ${err.message || String(err)}`,
+        text: `Alert evaluation failed: ${err instanceof Error ? err.message : String(err)}`,
       })
     } finally {
       setEvalBusy(false)
     }
   }
 
-  const items: any[] = data?.items || []
+  const items: Alert[] = data?.items || []
 
   const getAlertProvenance = (alertType?: string): ProvenanceType => {
     if (alertType === 'UNVERIFIED_SATELLITE_DETECTION') {
@@ -820,10 +838,10 @@ const PRIORITY_RANK_ORDER: Record<string, number> = {
 
 function CriticalRegionsPage() {
   const [sortDir, setSortDir] = useState<'desc' | 'asc'>('desc')
-  const { data, loading, error, reload } = useApi<any>('/api/critical-regions')
+  const { data, loading, error, reload } = useApi<CriticalRegions>('/api/critical-regions')
 
   const sortedItems = useMemo(() => {
-    const raw: any[] = data?.items || []
+    const raw: CriticalItem[] = data?.items || []
     const copy = [...raw]
     copy.sort((a, b) => {
       const keyA = normalizeRiskKey(a.priority)
@@ -937,16 +955,16 @@ function CriticalRegionsPage() {
                   : item.authorities?.contacts || []
                 const primaryJurisdiction =
                   item.jurisdiction ||
-                  item.authorities?.primary_authority ||
+                  (Array.isArray(item.authorities) ? undefined : item.authorities?.primary_authority) ||
                   authorities[0]?.organisation ||
                   authorities[0]?.role ||
                   (item.land_use ? `${item.land_use} Directorate` : 'State Nodal Authority')
 
                 const lastHotspot =
                   item.last_hotspot_date ||
-                  (item.recent7 > 0
+                  ((item.recent7 ?? 0) > 0
                     ? `≤ 7d (${num(item.recent7)} det, thru ${data?.issue_date || 'latest'})`
-                    : item.recent30 > 0
+                    : (item.recent30 ?? 0) > 0
                       ? `≤ 30d (${num(item.recent30)} det)`
                       : data?.issue_date
                         ? `No detections (30d prior to ${data.issue_date})`
@@ -1040,6 +1058,7 @@ function CriticalRegionsPage() {
           </CardBody>
         </Card>
       )}
+      <ScoringPanel />
       <ExposurePanel />
     </div>
   )
@@ -1049,7 +1068,7 @@ function CriticalRegionsPage() {
  * 5. Threshold Configuration Panel (`/thresholds`)
  * ========================================================================== */
 function ThresholdConfigurationPage() {
-  const { data, loading, error, reload } = useApi<any>('/api/thresholds/config')
+  const { data, loading, error, reload } = useApi<ThresholdResponse>('/api/thresholds/config')
 
   const [lowMaxPct, setLowMaxPct] = useState<number>(19)
   const [watchPct, setWatchPct] = useState<number>(20)
@@ -1072,7 +1091,7 @@ function ThresholdConfigurationPage() {
   useEffect(() => {
     if (!data?.configs?.length) return
     const def =
-      data.configs.find((c: any) => c.scope_type === 'default') ||
+      data.configs.find((c) => c.scope_type === 'default') ||
       data.configs[0]
     if (def) {
       const w = Math.round(Number(def.watch ?? 0.2) * 100)
@@ -1112,7 +1131,7 @@ function ThresholdConfigurationPage() {
 
     setSaving(true)
     try {
-      await api('/api/thresholds/config', {
+      await api<unknown>('/api/thresholds/config', {
         method: 'PUT',
         body: {
           scope_type: scopeType,
@@ -1131,10 +1150,10 @@ function ThresholdConfigurationPage() {
         text: 'Threshold configuration saved via PUT /api/thresholds/config.',
       })
       reload()
-    } catch (err: any) {
+    } catch (err) {
       setSaveBanner({
         tone: 'danger',
-        text: `Failed to save threshold config: ${err.message || String(err)}`,
+        text: `Failed to save threshold config: ${err instanceof Error ? err.message : String(err)}`,
       })
     } finally {
       setSaving(false)
@@ -1365,7 +1384,7 @@ function ThresholdConfigurationPage() {
               >
                 <select
                   value={scopeType}
-                  onChange={(e) => setScopeType(e.target.value as any)}
+                  onChange={(e) => setScopeType(e.target.value as 'default' | 'land_use' | 'state')}
                   className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
                 >
                   <option value="default">Default (National)</option>
@@ -1409,7 +1428,7 @@ function ThresholdConfigurationPage() {
       </Card>
 
       {/* Active Configurations List */}
-      {data?.configs?.length > 0 && (
+      {data && data.configs.length > 0 && (
         <Card>
           <CardHeader
             title="Stored Threshold Scopes"
@@ -1429,7 +1448,7 @@ function ThresholdConfigurationPage() {
                 'Updated By',
               ]}
             >
-              {data.configs.map((cfg: any) => (
+              {data.configs.map((cfg) => (
                 <tr key={cfg.id} className="hover:bg-[#172033]/60">
                   <td className="px-4 py-3 font-semibold text-white">
                     {cfg.scope_type}
@@ -1491,11 +1510,11 @@ const UPLOAD_SATELLITE_OPTIONS = [
 
 function DataManagementPage() {
   const { reloadMeta } = React.useContext(AppCtx)
-  const { data: statusData, reload: reloadStatus } = useApi<any>('/api/data/status')
+  const { data: statusData, reload: reloadStatus } = useApi<DataStatus>('/api/data/status')
 
   const [loadRepoBusy, setLoadRepoBusy] = useState(false)
   const [retrainFlag, setRetrainFlag] = useState(false)
-  const [loadRepoResponse, setLoadRepoResponse] = useState<any | null>(null)
+  const [loadRepoResponse, setLoadRepoResponse] = useState<JobResponse | null>(null)
   const [loadRepoError, setLoadRepoError] = useState<string | null>(null)
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -1503,7 +1522,7 @@ function DataManagementPage() {
   const [selectedProduct, setSelectedProduct] = useState<'375m' | '750m'>('375m')
   const isViirsUpload = !['Terra', 'Aqua'].includes(selectedSatellite)
   const [uploadBusy, setUploadBusy] = useState(false)
-  const [uploadResult, setUploadResult] = useState<any | null>(null)
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   const jobState = statusData?.job?.state || loadRepoResponse?.job?.state
@@ -1521,15 +1540,15 @@ function DataManagementPage() {
     setLoadRepoBusy(true)
     setLoadRepoError(null)
     try {
-      const res = await api(
+      const res = await api<JobResponse>(
         `/api/data/load-repo${retrainFlag ? '?retrain=true' : ''}`,
         { method: 'POST', body: {} }
       )
       setLoadRepoResponse(res)
       reloadStatus()
       reloadMeta()
-    } catch (err: any) {
-      setLoadRepoError(err.message || String(err))
+    } catch (err) {
+      setLoadRepoError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoadRepoBusy(false)
     }
@@ -1549,12 +1568,12 @@ function DataManagementPage() {
       form.append('file', selectedFile)
       form.append('satellite', selectedSatellite)
       form.append('product_type', isViirsUpload ? selectedProduct : '1km')
-      const res = await api('/api/data/upload', { method: 'POST', form })
+      const res = await api<UploadResult>('/api/data/upload', { method: 'POST', form })
       setUploadResult(res)
       reloadStatus()
       reloadMeta()
-    } catch (err: any) {
-      setUploadError(err.message || String(err))
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : String(err))
     } finally {
       setUploadBusy(false)
     }
@@ -1564,12 +1583,12 @@ function DataManagementPage() {
     setLoadRepoBusy(true)
     setLoadRepoError(null)
     try {
-      const res = await api('/api/data/process', { method: 'POST', body: {} })
+      const res = await api<JobResponse>('/api/data/process', { method: 'POST', body: {} })
       setLoadRepoResponse(res)
       reloadStatus()
       reloadMeta()
-    } catch (err: any) {
-      setLoadRepoError(err.message || String(err))
+    } catch (err) {
+      setLoadRepoError(err instanceof Error ? err.message : String(err))
     } finally {
       setLoadRepoBusy(false)
     }
@@ -1788,7 +1807,7 @@ function DataManagementPage() {
                             {titleCase(k)}
                           </div>
                           <div className="mt-0.5 text-sm font-bold text-white tabular-nums">
-                            {num(v as any)}
+                            {num(v)}
                           </div>
                         </div>
                       )
@@ -1824,7 +1843,7 @@ function DataManagementPage() {
  * ========================================================================== */
 function DataQualityReportPage() {
   const navigate = useNavigate()
-  const { data, loading, error, reload } = useApi<any>('/api/data/quality')
+  const { data, loading, error, reload } = useApi<DataQuality>('/api/data/quality')
 
   const metrics = useMemo(() => {
     if (!data) return null
@@ -1923,7 +1942,7 @@ function DataQualityReportPage() {
         />
       )}
 
-      {hasDatasets && metrics && (
+      {hasDatasets && metrics && data && (
         <>
           {/* Argon Quality Metric Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -2037,7 +2056,7 @@ function DataQualityReportPage() {
                   'FRP Issues',
                 ]}
               >
-                {(data.datasets || []).map((ds: any, i: number) => {
+                {(data.datasets || []).map((ds, i: number) => {
                   const q = ds.quality || {}
                   const dsFrp =
                     Number(q.frp_missing || 0) +
@@ -2101,7 +2120,7 @@ function DataQualityReportPage() {
                     'Zero-Detection Days',
                   ]}
                 >
-                  {data.sensors.map((s: any) => (
+                  {data.sensors.map((s) => (
                     <tr key={s.satellite} className="hover:bg-[#172033]/60">
                       <td className="px-4 py-3 font-semibold text-white">
                         {s.label || s.satellite}
@@ -2149,15 +2168,15 @@ function DataQualityReportPage() {
  * ========================================================================== */
 function ReportsPage() {
   const { meta } = React.useContext(AppCtx)
-  const { data, loading, error, reload } = useApi<any>('/api/reports')
+  const { data, loading, error, reload } = useApi<ReportList>('/api/reports')
 
   const [regionInput, setRegionInput] = useState<string>('country')
   const [reportType, setReportType] = useState<'full' | 'harmonized'>('full')
   const [generating, setGenerating] = useState<boolean>(false)
   const [genError, setGenError] = useState<string | null>(null)
   const [generatedPair, setGeneratedPair] = useState<{
-    pdf?: any
-    csv?: any
+    pdf: ReportCreated
+    csv: ReportCreated
     regionLabel: string
     kindLabel: string
   } | null>(null)
@@ -2196,7 +2215,7 @@ function ReportsPage() {
     const resolvedRegion = resolveRegionId(regionInput)
     try {
       const [pdfRes, csvRes] = await Promise.all([
-        api('/api/reports/generate', {
+        api<ReportCreated>('/api/reports/generate', {
           method: 'POST',
           body: {
             region_id: resolvedRegion,
@@ -2204,7 +2223,7 @@ function ReportsPage() {
             format: 'pdf',
           },
         }),
-        api('/api/reports/generate', {
+        api<ReportCreated>('/api/reports/generate', {
           method: 'POST',
           body: {
             region_id: resolvedRegion,
@@ -2221,14 +2240,14 @@ function ReportsPage() {
           reportType === 'full' ? 'Full Report' : 'Harmonized Summary',
       })
       reload()
-    } catch (err: any) {
-      setGenError(err.message || String(err))
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : String(err))
     } finally {
       setGenerating(false)
     }
   }
 
-  const reportsList: any[] = data?.items || []
+  const reportsList: ReportRow[] = data?.items || []
 
   return (
     <div className="space-y-5">
@@ -2477,7 +2496,7 @@ function ArgonShell() {
   const [region, setRegion] = useState<string>('country')
   const { data: meta, reload: reloadMeta } = useApi<Meta>('/api/meta')
   const [authVersion, setAuthVersion] = useState(0)
-  const me = useApi<any>('/api/auth/me', [authVersion, user])
+  const me = useApi<AuthMe>('/api/auth/me', [authVersion, user])
 
   const setUser = (u: string) => {
     setApiUser(u)
@@ -2595,6 +2614,16 @@ function ArgonShell() {
                 <Route path="/historical-trends" element={<TrendsPage />} />
                 <Route path="/anomalies" element={<AnomaliesPage />} />
                 <Route path="/forecast" element={<ForecastPage />} />
+                <Route path="/forecast/models" element={<ForecastModelsPage />} />
+                <Route path="/reference" element={<ReferencePage />} />
+                <Route path="/sensors/noaa-20" element={<SensorPage sensor="NOAA-20" />} />
+                <Route path="/sensors/noaa-21" element={<SensorPage sensor="NOAA-21" />} />
+                <Route path="/products/viirs375" element={<Viirs375Page />} />
+                <Route path="/products/viirs750" element={<Viirs750Page />} />
+                <Route path="/exposure/population" element={<ExposurePage kind="population" />} />
+                <Route path="/exposure/infrastructure" element={<ExposurePage kind="infrastructure" />} />
+                <Route path="/orbits" element={<OrbitsPage />} />
+                <Route path="/system" element={<SystemConfigPage />} />
                 <Route path="/observations" element={<ObservationsPage />} />
                 <Route path="/government" element={<GovernmentPage />} />
                 <Route path="/organisation" element={<OrganisationPage />} />
