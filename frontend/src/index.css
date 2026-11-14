@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
-html, body, #root { height: 100%; }
+:root {
+  color-scheme: dark;
+  --argon-bg-base: #0B0F19;
+  --argon-bg-surface: #111827;
+  --argon-bg-elevated: #172033;
+  --argon-border: #26324a;
+}
+html, body, #root { height: 100%; background-color: #0B0F19; }
 body { @apply bg-ink-950 text-slate-200 antialiased; font-feature-settings: 'tnum'; }
 * { scrollbar-width: thin; scrollbar-color: #2b3954 transparent; }
 .leaflet-container { background: #0B0F19; font-family: inherit; }
