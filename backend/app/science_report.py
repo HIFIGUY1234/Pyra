@@ -177,11 +177,11 @@ def build() -> str:
            "* Fewer than 12 months of MODIS precede VIIRS: the real seam test falls back to the simulated seam."),
           f"* NOAA-20: {caps['noaa20']}; NOAA-21 loaded. Neither is the default calibration target (kept as separate actual observations).",
           "* VIIRS 750 m (VNP14/VJ114/VJ214 v002, LP DAAC): granule search works without credentials, but download needs Earthdata Login, which is not configured here; no 750 m records are loaded and the 750 m calibration is not run.",
-          "* S-NPP VIIRS science-data delivery ceased 2026-11-02 (CMR collection metadata): the forecast reference stream will stop updating; a NOAA-20 retarget is future work.",
+          "* S-NPP VIIRS science-data delivery ceased 2026-11-02 (NOAA NESDIS / NASA Earthdata): S-NPP stays the historical reference; live forecasts use an independently trained, criteria-approved operational platform (section 5f). The legacy S-NPP forecast is labelled STALE_RETIRED_SENSOR.",
           f"* MODIS orbit drift years excluded from calibration: {', '.join(n for n in sh['notes'] if 'drift' in n) or 'none'}",
           "* Administrative intelligence (states, districts, land use) covers India only.",
           "* MODIS row `version` strings 6.03 (2000-2022) and 61.03 (2023 onward) are not defined in readable FIRMS documentation; they are kept verbatim and the collection (C6.1) is taken from the archive name.",
-          "* NOAA-21 archive records begin 2023-03 (pre-operational period, official FIRMS start 2024-01-17); kept as labelled actual observations, not a calibration target.",
+          "* NOAA-21 archive records begin 2023-03 (pre-operational period, official FIRMS start 2024-01-17); kept as labelled actual observations, excluded from NOAA-21 forecast labels, and not a calibration target.",
           "* NRT records are provisional and never used for calibration or validation.",
           f"* Month coverage: S-NPP months with full coverage {int((cov['Suomi NPP'] >= 0.999).sum())}; Aqua {int((cov['Aqua'] >= 0.999).sum())}; Terra {int((cov['Terra'] >= 0.999).sum())}."]
     return "\n".join(L) + "\n"
@@ -239,6 +239,55 @@ def _extra_sections() -> list:
             L.append("* Infrastructure (OpenStreetMap, ODbL): " + ", ".join(f"{k} {v.get('features', 0):,}" if v.get("status") == "loaded" else f"{k} {v.get('status')}" for k, v in cats.items()) + ".")
             L.append("* Not loaded (reported missing, never zero): " + ", ".join(im.get("not_loaded", {}) or ["roads", "railways", "transmission lines", "residential settlements"]) + ".")
         L += ["* A nearby population or facility count describes proximity to detected heat, not a prediction that people or assets will burn.", ""]
+    L += _transition_sections()
+    return L
+
+
+def _transition_sections() -> list:
+    """Operational sensor transition after the S-NPP cessation: platform evidence, per-sensor models, bridges, seam seasons."""
+    from . import bridge, forecast, harmonize, operational
+    L = ["## 5f. Operational sensor transition (S-NPP science data ended 2026-11-02)", "",
+         "* Historical harmonization reference: **Suomi NPP** (unchanged; its archive defines the VIIRS-equivalent scale).",
+         "* Operational candidates: NOAA-21 (NOAA primary successor), NOAA-20 (secondary). Criteria declared in `app/operational.py`.", ""]
+    sm = operational.summary()
+    L += [f"* Operational reference: **{sm['operational_reference'] or 'none'}** ({sm['operational_status']}, {sm['selection_mode']}).", ""]
+    if sm.get("unavailable_reason"):
+        L += [f"* Why unavailable: {sm['unavailable_reason']}", ""]
+    L += ["| Criterion | " + " | ".join(c["sensor"] for c in sm["candidates"]) + " |", "|---|" + "---|" * len(sm["candidates"])]
+    for k, lab in sm["criteria"].items():
+        L.append(f"| {k} {lab} | " + " | ".join("pass" if c["checks"].get(k) else "FAIL" for c in sm["candidates"]) + " |")
+    L += ["", "#### Independent per-sensor forecast models (each on its own chronological test period)", "",
+          "| Sensor | Model | Train ≤ | Calibrate ≤ | Test | Test rows | Brier | BSS vs climatology | ROC-AUC | PR-AUC | ECE | Status |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for snr in forecast.models_available():
+        m = forecast._meta(snr)
+        ev = m.get("evaluation") or {}
+        sp = m.get("split") or {}
+        L.append(f"| {snr} | {m.get('model_version')} | {sp.get('train_until')} | {sp.get('calibrate_until')} | {sp.get('test_from')} → {sp.get('test_until')} | "
+                 f"{(m.get('rows') or {}).get('test', 0):,} | {f(ev.get('brier', (m.get('test') or {}).get('brier')), 4)} | {f(ev.get('brier_skill', m.get('brier_skill_vs_climatology')), 3)} | "
+                 f"{f(ev.get('roc_auc', (m.get('test') or {}).get('roc_auc')), 3)} | {f(ev.get('pr_auc', (m.get('test') or {}).get('pr_auc')), 3)} | {f(ev.get('ece'), 4)} | {m['serving_status']['status']} |")
+    L += ["", "Metrics come from different test periods and base rates; compare each model with its own climatology baseline (BSS), not with each other.", "",
+          "#### Bridge calibrations (successor → reference scale)", "", "| Pair | Overlap | Raw reference/target ratio (D / N) | Status | Reason |", "|---|---|---|---|---|"]
+    for b in bridge.studies()["pairs"]:
+        rr = b.get("reference_per_target_ratio") or {}
+        L.append(f"| {b['target']} → {b['reference']} | {' → '.join(b.get('overlap') or [])} | {f(rr.get('D'), 3)} / {f(rr.get('N'), 3)} | {b['status']} | {(b.get('selection_reason') or b.get('reason') or '')[:220]} |")
+    t = operational.transition_report()
+    L += ["", f"Transition verdict: **{t['verdict']}**. {t['interpretation']}", ""]
+    for k, v in t["successors"].items():
+        rd = v.get("raw_discontinuity") or {}
+        L.append(f"* {k}: window {' → '.join(v.get('window') or [])}, S-NPP/{k} ratio {f(rd.get('snpp_per_successor_ratio'), 3)} "
+                 f"(monthly p05–p95 {' – '.join(f(x, 3) for x in (rd.get('monthly_ratio_p05_p95') or []))}); calibrated discontinuity: "
+                 f"{v.get('calibrated_discontinuity') if isinstance(v.get('calibrated_discontinuity'), str) else v.get('calibrated_discontinuity')}.")
+    seas = harmonize.seam_seasonal()
+    if seas:
+        sm2 = harmonize.seam_test()
+        L += ["", "#### 2012 seam: why PARTIAL, and seasonal sensitivity", "", f"* {sm2.get('verdict_explanation') or sm2.get('verdict')}",
+              f"* Genuine change: {sm2['genuine_change'].get('why') or sm2['genuine_change'].get('direction')}", "",
+              "| Season | Months each side | Raw step | Harmonized step | Aqua reference step | Jump before | Jump after |", "|---|---|---|---|---|---|---|"]
+        for r in seas:
+            L.append(f"| {r['season']} | {r['months_each_side']} | {f(r['step_raw'], 3)} | {f(r['step_harmonized'], 3)} | {f(r['step_reference_aqua'], 3)} | "
+                     f"{f(r['artificial_jump_before'], 3)} | {f(r['artificial_jump_after'], 3)} |")
+        L += ["", "Monsoon months carry the largest residual jump (few detections, cloud), which is where the harmonized step under-reads the Aqua reference.", ""]
     return L
 
 

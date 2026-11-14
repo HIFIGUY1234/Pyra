@@ -607,6 +607,14 @@ def seam_test(region_id: str = "country", split: int | None = None, window: int 
         verdict = "fail"
     res["verdict"] = verdict
     res["reference_in_band"] = ref_in_band
+    if verdict == "partial" and aj is not None:
+        parts = []
+        if aj > 0.10:
+            parts.append(f"the residual artificial jump {aj:.3f} ln-units exceeds the 0.10 pass limit")
+        if not ref_in_band:
+            parts.append(f"the unchanged reference-sensor step {target:.3f} lies outside the harmonized step band {hl:.3f}-{hh:.3f}")
+        res["verdict_explanation"] = ("PARTIAL because " + " and ".join(parts) + f". The jump was still reduced by {red_pct:.0f} %. "
+                                      "Thresholds are fixed in advance and are not tuned to obtain a pass.") if parts else None
     res["verdict_rule"] = ("pass: residual artificial jump <= 0.10 ln-units and the reference-sensor step lies inside the harmonized step band; "
                            "partial: residual jump <= 0.25 or >= 50% reduction; otherwise fail.")
     half = float(100 * (hh - hl) / 2 / harm) if harm else None
@@ -658,6 +666,35 @@ def seam_robustness(ref: str = VIIRS_REFERENCE, n_states: int = 8) -> dict:
                                                                     "reduction_pct", "verdict")}})
     vs = [s_["verdict"] for s_ in out["states"] if s_.get("verdict")]
     out["state_summary"] = {v: vs.count(v) for v in ("pass", "partial", "fail", "not_evaluable") if vs.count(v)}
+    out["seasons"] = seam_seasonal(ref)
+    return out
+
+
+SEASONS = {"winter": (12, 1, 2), "pre-monsoon": (3, 4, 5), "monsoon": (6, 7, 8, 9), "post-monsoon": (10, 11)}
+
+
+def seam_seasonal(ref: str = VIIRS_REFERENCE, window: int = 24) -> list[dict]:
+    """Seasonal sensitivity of the real seam: steps restricted to each season's months on both sides."""
+    r = seam_test("country", None, window, ref)
+    if r.get("mode") != "real":
+        return []
+    df = pd.DataFrame(r["series"])
+    df["date"] = pd.to_datetime(df["date"])
+    seam = pd.Timestamp(r["seam_month"])
+    w = r["window_months"]
+    b = df[(df["date"] < seam) & (df["date"] >= seam - pd.DateOffset(months=w))]
+    a = df[(df["date"] >= seam) & (df["date"] < seam + pd.DateOffset(months=w))]
+    out = []
+    for name, months in SEASONS.items():
+        bb, aa = b[b["date"].dt.month.isin(months)], a[a["date"].dt.month.isin(months)]
+        mv = lambda x: float(np.nanmean(x)) if len(x) and np.nanmean(x) > 0 else None
+        hb, va, ab, aaq, mb = mv(bb["veq"]), mv(aa["viirs"]), mv(bb["aqua"]), mv(aa["aqua"]), mv(bb["modis_total"])
+        harm = va / hb if hb and va else None
+        refs = aaq / ab if ab and aaq else None
+        raw = va / mb if mb and va else None
+        out.append({"season": name, "months_each_side": int(len(bb)), "step_raw": raw, "step_harmonized": harm, "step_reference_aqua": refs,
+                    "artificial_jump_before": float(abs(np.log(raw / refs))) if raw and refs else None,
+                    "artificial_jump_after": float(abs(np.log(harm / refs))) if harm and refs else None})
     return out
 
 

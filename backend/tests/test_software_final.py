@@ -458,3 +458,40 @@ def test_pipeline_dry_run_changes_nothing(tmp_path, capsys):
     assert "archives" in plan and "would_ingest" in plan
     after = {p.name: p.stat().st_mtime for p in PROCESSED.glob("*.json")}
     assert before == after
+
+
+# --------------------------------------------------------------------------- background jobs
+def test_jobs_visible_state_blocked_without_credentials(monkeypatch):
+    from app import jobs
+    monkeypatch.delenv("EARTHDATA_TOKEN", raising=False)
+    monkeypatch.setattr(viirs750, "_netrc_has_urs", lambda: False)
+    assert c.post("/api/jobs", json={"kind": "viirs750_fetch", "params": {"start": "2025-01-01", "end": "2025-01-02"}}, headers=GOV).status_code == 403
+    assert c.post("/api/jobs", json={"kind": "rm -rf", "params": {}}, headers=ADMIN).status_code == 400
+    j = jobs.submit("viirs750_fetch", {"start": "2025-01-01", "end": "2025-01-02"}, "admin", wait=True)
+    assert j["status"] == "FAILED" and "BLOCKED_BY_CREDENTIALS" in j["error"]
+    assert any(x["id"] == j["id"] for x in c.get("/api/jobs", headers=ANALYST).json()["items"])
+
+
+def test_jobs_cooperative_cancel_and_single_instance():
+    import time
+    from app import jobs
+    started = threading.Event()
+
+    def slow(kind, params, jid):
+        started.set()
+        for _ in range(200):
+            if jobs.cancelled(jid):
+                raise jobs.Cancelled()
+            time.sleep(0.02)
+        return {"ok": True}
+    j = jobs.submit("tle_refresh", {}, "admin", runner=slow)
+    started.wait(5)
+    with pytest.raises(PermissionError):
+        jobs.submit("tle_refresh", {}, "admin", runner=slow)       # one job per kind at a time
+    r = c.post(f"/api/jobs/{j['id']}/cancel", headers=ADMIN).json()
+    assert r["cancel_requested"] is True
+    for _ in range(100):
+        if jobs.get(j["id"])["status"] == "CANCELLED":
+            break
+        time.sleep(0.05)
+    assert jobs.get(j["id"])["status"] == "CANCELLED"

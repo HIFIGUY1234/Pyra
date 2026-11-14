@@ -1,15 +1,15 @@
 # PyroScope ingestion report
-Generated 2026-11-14T17:11:04+00:00 - AOI bbox (68.0, 6.0, 98.0, 36.0)
+Generated 2026-11-14T23:10:21+00:00 - AOI bbox (68.0, 6.0, 98.0, 36.0)
 
 ## Archives
 
 | File | Status | Collection | Size | SHA-256 | Members |
 |---|---|---|---|---|---|
-| DL_FIRE_J1V-C2_846938.zip | valid (zip_crc_ok) | VIIRS Collection 2 | 94.3 MB | `bf560d9071829726...` | fire_archive_J1V-C2_846938.csv (archive, 410.1 MB), fire_nrt_J1V-C2_846938.csv (nrt, 2.8 MB) |
-| DL_FIRE_J2V-C2_846939.zip | valid (zip_crc_ok) | VIIRS Collection 2 | 40.0 MB | `a5916fbb704f9a0f...` | fire_archive_J2V-C2_846939.csv (archive, 171.4 MB), fire_nrt_J2V-C2_846939.csv (nrt, 2.5 MB) |
-| DL_FIRE_M-C61_846937.zip | valid (zip_crc_ok) | MODIS Collection 6.1 | 21.8 MB | `abe840b5277297af...` | fire_archive_M-C61_846937.csv (archive, 96.2 MB), fire_nrt_M-C61_846937.csv (nrt, 0.3 MB) |
-| DL_FIRE_M-C61_848456.zip | valid (zip_crc_ok) | MODIS Collection 6.1 | 11.9 MB | `3491e9398b7a8629...` | fire_archive_M-C61_848456.csv (archive, 53.2 MB) |
-| DL_FIRE_SV-C2_846940.zip | valid (zip_crc_ok) | VIIRS Collection 2 | 159.9 MB | `258cbbf1c4748358...` | fire_archive_SV-C2_846940.csv (archive, 700.3 MB), fire_nrt_SV-C2_846940.csv (nrt, 2.5 MB) |
+| DL_FIRE_J1V-C2_846938.zip | lfs_pointer (not_downloaded) | -  | 0.0 MB | `bf560d9071829726...` | Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`. |
+| DL_FIRE_J2V-C2_846939.zip | lfs_pointer (not_downloaded) | -  | 0.0 MB | `a5916fbb704f9a0f...` | Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`. |
+| DL_FIRE_M-C61_846937.zip | lfs_pointer (not_downloaded) | -  | 0.0 MB | `abe840b5277297af...` | Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`. |
+| DL_FIRE_M-C61_848456.zip | lfs_pointer (not_downloaded) | -  | 0.0 MB | `3491e9398b7a8629...` | Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`. |
+| DL_FIRE_SV-C2_846940.zip | lfs_pointer (not_downloaded) | -  | 0.0 MB | `258cbbf1c4748358...` | Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`. |
 
 ## Sources (per CSV member)
 

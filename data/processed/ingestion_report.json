@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T17:11:04+00:00",
+ "generated_at": "2026-11-14T23:10:21+00:00",
  "aoi_bbox": [
   68.0,
   6.0,
@@ -9,232 +9,110 @@
  "archives": [
   {
    "file": "DL_FIRE_J1V-C2_846938.zip",
-   "status": "valid",
-   "integrity": "zip_crc_ok",
-   "bytes": 94262123,
-   "members": [
-    {
-     "name": "fire_archive_J1V-C2_846938.csv",
-     "bytes": 410079818,
-     "kind": "archive"
-    },
-    {
-     "name": "fire_nrt_J1V-C2_846938.csv",
-     "bytes": 2845149,
-     "kind": "nrt"
-    },
-    {
-     "name": "Readme.txt",
-     "bytes": 89,
-     "kind": "other"
-    }
-   ],
-   "csv_members": [
-    "fire_archive_J1V-C2_846938.csv",
-    "fire_nrt_J1V-C2_846938.csv"
-   ],
-   "archive_tag": "J1V-C2",
-   "instrument": "VIIRS",
-   "collection": "Collection 2",
-   "product": "VJ114IMGT",
-   "row_versions": [],
-   "collection_source": "archive file name (FIRMS Readme convention)",
-   "sha256": "bf560d9071829726676853900286f7064ea637470b82223fe164d7b6dde4cf8f"
+   "status": "lfs_pointer",
+   "expected_sha256": "bf560d9071829726676853900286f7064ea637470b82223fe164d7b6dde4cf8f",
+   "expected_bytes": 94262123,
+   "bytes": 133,
+   "integrity": "not_downloaded",
+   "message": "Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`."
   },
   {
    "file": "DL_FIRE_J2V-C2_846939.zip",
-   "status": "valid",
-   "integrity": "zip_crc_ok",
-   "bytes": 39960895,
-   "members": [
-    {
-     "name": "fire_archive_J2V-C2_846939.csv",
-     "bytes": 171428296,
-     "kind": "archive"
-    },
-    {
-     "name": "fire_nrt_J2V-C2_846939.csv",
-     "bytes": 2538945,
-     "kind": "nrt"
-    },
-    {
-     "name": "Readme.txt",
-     "bytes": 89,
-     "kind": "other"
-    }
-   ],
-   "csv_members": [
-    "fire_archive_J2V-C2_846939.csv",
-    "fire_nrt_J2V-C2_846939.csv"
-   ],
-   "archive_tag": "J2V-C2",
-   "instrument": "VIIRS",
-   "collection": "Collection 2",
-   "product": "VJ214IMGT",
-   "row_versions": [],
-   "collection_source": "archive file name (FIRMS Readme convention)",
-   "sha256": "a5916fbb704f9a0f8f612ed2111c28ebc8628c0859cc1fba9f6c9ca3c25ba71e"
+   "status": "lfs_pointer",
+   "expected_sha256": "a5916fbb704f9a0f8f612ed2111c28ebc8628c0859cc1fba9f6c9ca3c25ba71e",
+   "expected_bytes": 39960895,
+   "bytes": 133,
+   "integrity": "not_downloaded",
+   "message": "Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`."
   },
   {
    "file": "DL_FIRE_M-C61_846937.zip",
-   "status": "valid",
-   "integrity": "zip_crc_ok",
-   "bytes": 21761475,
-   "members": [
-    {
-     "name": "fire_archive_M-C61_846937.csv",
-     "bytes": 96179318,
-     "kind": "archive"
-    },
-    {
-     "name": "fire_nrt_M-C61_846937.csv",
-     "bytes": 332917,
-     "kind": "nrt"
-    },
-    {
-     "name": "Readme.txt",
-     "bytes": 89,
-     "kind": "other"
-    }
-   ],
-   "csv_members": [
-    "fire_archive_M-C61_846937.csv",
-    "fire_nrt_M-C61_846937.csv"
-   ],
-   "archive_tag": "M-C61",
-   "instrument": "MODIS",
-   "collection": "Collection 6.1",
-   "product": "MCD14ML",
-   "row_versions": [],
-   "collection_source": "archive file name (FIRMS Readme convention)",
-   "sha256": "abe840b5277297af1b2412dc7ceefdde348a9dfd3f5b0f5d7eec894cd49b26e4"
+   "status": "lfs_pointer",
+   "expected_sha256": "abe840b5277297af1b2412dc7ceefdde348a9dfd3f5b0f5d7eec894cd49b26e4",
+   "expected_bytes": 21761475,
+   "bytes": 133,
+   "integrity": "not_downloaded",
+   "message": "Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`."
   },
   {
    "file": "DL_FIRE_M-C61_848456.zip",
-   "status": "valid",
-   "integrity": "zip_crc_ok",
-   "bytes": 11909796,
-   "members": [
-    {
-     "name": "fire_archive_M-C61_848456.csv",
-     "bytes": 53158010,
-     "kind": "archive"
-    },
-    {
-     "name": "Readme.txt",
-     "bytes": 89,
-     "kind": "other"
-    }
-   ],
-   "csv_members": [
-    "fire_archive_M-C61_848456.csv"
-   ],
-   "archive_tag": "M-C61",
-   "instrument": "MODIS",
-   "collection": "Collection 6.1",
-   "product": "MCD14ML",
-   "row_versions": [],
-   "collection_source": "archive file name (FIRMS Readme convention)",
-   "sha256": "3491e9398b7a862928c0940155fb5f49f9e80c6115dbbc402ea0b218abae36a6"
+   "status": "lfs_pointer",
+   "expected_sha256": "3491e9398b7a862928c0940155fb5f49f9e80c6115dbbc402ea0b218abae36a6",
+   "expected_bytes": 11909796,
+   "bytes": 133,
+   "integrity": "not_downloaded",
+   "message": "Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`."
   },
   {
    "file": "DL_FIRE_SV-C2_846940.zip",
-   "status": "valid",
-   "integrity": "zip_crc_ok",
-   "bytes": 159863811,
-   "members": [
-    {
-     "name": "fire_archive_SV-C2_846940.csv",
-     "bytes": 700313861,
-     "kind": "archive"
-    },
-    {
-     "name": "fire_nrt_SV-C2_846940.csv",
-     "bytes": 2503251,
-     "kind": "nrt"
-    },
-    {
-     "name": "Readme.txt",
-     "bytes": 89,
-     "kind": "other"
-    }
-   ],
-   "csv_members": [
-    "fire_archive_SV-C2_846940.csv",
-    "fire_nrt_SV-C2_846940.csv"
-   ],
-   "archive_tag": "SV-C2",
-   "instrument": "VIIRS",
-   "collection": "Collection 2",
-   "product": "VNP14IMGT",
-   "row_versions": [],
-   "collection_source": "archive file name (FIRMS Readme convention)",
-   "sha256": "258cbbf1c474835839435c2859c954f403c0f564656bcd570c55f8aacefe6b27"
+   "status": "lfs_pointer",
+   "expected_sha256": "258cbbf1c474835839435c2859c954f403c0f564656bcd570c55f8aacefe6b27",
+   "expected_bytes": 159863811,
+   "bytes": 134,
+   "integrity": "not_downloaded",
+   "message": "Git LFS pointer, archive not downloaded. Run `git lfs pull` or `python -m app.acquire lfs`."
   }
  ],
  "sources": [
   {
-   "key": "fire_archive_J1V-C2_846938",
+   "key": "DL_FIRE_J1V-C2_846938",
    "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J1V-C2_846938.zip",
-   "member": "fire_archive_J1V-C2_846938.csv",
-   "bytes": 410079818
+   "container": "/home/claude/pyra/DL_FIRE_J1V-C2_846938.zip",
+   "member": null,
+   "bytes": 0,
+   "lfs_pointer": {
+    "oid": "bf560d9071829726676853900286f7064ea637470b82223fe164d7b6dde4cf8f",
+    "size": 94262123
+   },
+   "error": "Git LFS pointer (archive of 94.3 MB not downloaded): run `git lfs pull` or `python -m app.acquire lfs`"
   },
   {
-   "key": "fire_nrt_J1V-C2_846938",
+   "key": "DL_FIRE_J2V-C2_846939",
    "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J1V-C2_846938.zip",
-   "member": "fire_nrt_J1V-C2_846938.csv",
-   "bytes": 2845149
+   "container": "/home/claude/pyra/DL_FIRE_J2V-C2_846939.zip",
+   "member": null,
+   "bytes": 0,
+   "lfs_pointer": {
+    "oid": "a5916fbb704f9a0f8f612ed2111c28ebc8628c0859cc1fba9f6c9ca3c25ba71e",
+    "size": 39960895
+   },
+   "error": "Git LFS pointer (archive of 40.0 MB not downloaded): run `git lfs pull` or `python -m app.acquire lfs`"
   },
   {
-   "key": "fire_archive_J2V-C2_846939",
+   "key": "DL_FIRE_M-C61_846937",
    "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J2V-C2_846939.zip",
-   "member": "fire_archive_J2V-C2_846939.csv",
-   "bytes": 171428296
+   "container": "/home/claude/pyra/DL_FIRE_M-C61_846937.zip",
+   "member": null,
+   "bytes": 0,
+   "lfs_pointer": {
+    "oid": "abe840b5277297af1b2412dc7ceefdde348a9dfd3f5b0f5d7eec894cd49b26e4",
+    "size": 21761475
+   },
+   "error": "Git LFS pointer (archive of 21.8 MB not downloaded): run `git lfs pull` or `python -m app.acquire lfs`"
   },
   {
-   "key": "fire_nrt_J2V-C2_846939",
+   "key": "DL_FIRE_M-C61_848456",
    "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J2V-C2_846939.zip",
-   "member": "fire_nrt_J2V-C2_846939.csv",
-   "bytes": 2538945
+   "container": "/home/claude/pyra/DL_FIRE_M-C61_848456.zip",
+   "member": null,
+   "bytes": 0,
+   "lfs_pointer": {
+    "oid": "3491e9398b7a862928c0940155fb5f49f9e80c6115dbbc402ea0b218abae36a6",
+    "size": 11909796
+   },
+   "error": "Git LFS pointer (archive of 11.9 MB not downloaded): run `git lfs pull` or `python -m app.acquire lfs`"
   },
   {
-   "key": "fire_archive_M-C61_846937",
+   "key": "DL_FIRE_SV-C2_846940",
    "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_M-C61_846937.zip",
-   "member": "fire_archive_M-C61_846937.csv",
-   "bytes": 96179318
-  },
-  {
-   "key": "fire_nrt_M-C61_846937",
-   "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_M-C61_846937.zip",
-   "member": "fire_nrt_M-C61_846937.csv",
-   "bytes": 332917
-  },
-  {
-   "key": "fire_archive_M-C61_848456",
-   "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_M-C61_848456.zip",
-   "member": "fire_archive_M-C61_848456.csv",
-   "bytes": 53158010
-  },
-  {
-   "key": "fire_archive_SV-C2_846940",
-   "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_SV-C2_846940.zip",
-   "member": "fire_archive_SV-C2_846940.csv",
-   "bytes": 700313861
-  },
-  {
-   "key": "fire_nrt_SV-C2_846940",
-   "origin": "repository",
-   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_SV-C2_846940.zip",
-   "member": "fire_nrt_SV-C2_846940.csv",
-   "bytes": 2503251
+   "container": "/home/claude/pyra/DL_FIRE_SV-C2_846940.zip",
+   "member": null,
+   "bytes": 0,
+   "lfs_pointer": {
+    "oid": "258cbbf1c474835839435c2859c954f403c0f564656bcd570c55f8aacefe6b27",
+    "size": 159863811
+   },
+   "error": "Git LFS pointer (archive of 159.9 MB not downloaded): run `git lfs pull` or `python -m app.acquire lfs`"
   }
  ],
  "satellites": {

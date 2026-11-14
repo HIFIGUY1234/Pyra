@@ -1,6 +1,6 @@
 # PyroScope - Scientific Validation Report
 
-Generated 2026-11-14T19:23:06+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
+Generated 2026-11-14T23:10:22+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
 
 ## 1. Sensor coverage actually loaded
 
@@ -180,24 +180,24 @@ State verdicts: {'pass': 5, 'partial': 3}.
 
 ## 5. Seven-day hotspot-probability forecast
 
-* Target: At least one Suomi NPP VIIRS 375 m presumed-vegetation detection in the 0.25 deg cell within 7 days of the issue date — probability of a detectable satellite hotspot (NOT a verified ground ignition).
-* Split: train ≤ 2021-12-31, isotonic calibration ≤ 2023-12-31, test 2024-01-01 → 2026-11-07.
-* Test rows 629,104; base rate 0.268.
+* Target: At least one NOAA-21 VIIRS 375 m presumed-vegetation detection in the 0.25 deg cell within 7 days of the issue date — probability of a detectable satellite hotspot (NOT a verified ground ignition).
+* Split: train ≤ 2025-03-31, isotonic calibration ≤ 2025-09-30, test 2025-10-01 → 2026-07-25.
+* Test rows 194,661; base rate 0.341.
 
 | Metric | Calibrated model | Climatology baseline |
 |---|---|---|
-| Brier | 0.0971 | 0.1067 |
-| ROC-AUC | 0.920 | 0.902 |
-| PR-AUC | 0.823 | 0.776 |
+| Brier | 0.1223 | 0.1477 |
+| ROC-AUC | 0.895 | 0.851 |
+| PR-AUC | 0.830 | 0.735 |
 
-Brier skill vs climatology: 0.090.
+Brier skill vs climatology: 0.172.
 
 | Threshold | Precision | Recall | False-alarm rate | Missed-event rate |
 |---|---|---|---|---|
-| 60 % (HIGH) | 0.836 | 0.581 | 0.0419 | 0.419 |
-| 80 % (VERY HIGH) | 0.925 | 0.367 | 0.0109 | 0.633 |
+| 60 % (HIGH) | 0.859 | 0.553 | 0.0471 | 0.447 |
+| 80 % (VERY HIGH) | 0.949 | 0.300 | 0.0084 | 0.700 |
 
-Regional aggregation: `P(any detection in region) = 1 - prod(1 - p_cell) ** alpha` with α = 0.73 (fitted on calibration years).
+Regional aggregation: `P(any detection in region) = 1 - prod(1 - p_cell) ** alpha` with α = 0.68 (fitted on calibration years).
 
 ### 5a. Forecast candidate-model comparison
 
@@ -255,16 +255,69 @@ Residual = recorded FIRMS acq_time − predicted closest approach; recorded time
 * Not loaded (reported missing, never zero): roads, railways, transmission_lines, residential_settlements.
 * A nearby population or facility count describes proximity to detected heat, not a prediction that people or assets will burn.
 
+## 5f. Operational sensor transition (S-NPP science data ended 2026-11-02)
+
+* Historical harmonization reference: **Suomi NPP** (unchanged; its archive defines the VIIRS-equivalent scale).
+* Operational candidates: NOAA-21 (NOAA primary successor), NOAA-20 (secondary). Criteria declared in `app/operational.py`.
+
+* Operational reference: **NOAA-21** (APPROVED, evidence_default).
+
+| Criterion | NOAA-21 | NOAA-20 |
+|---|---|---|
+| C1 Platform officially operational | pass | pass |
+| C2 Last observation within 14 days of the newest loaded observation | pass | pass |
+| C3 >= 24 months of science-quality archive | pass | pass |
+| C4 Missing-day share <= 5% | pass | pass |
+| C5 Independent forecast model trained on this sensor exists | pass | pass |
+| C6 Own test period: >= 50,000 rows, Brier skill > 0 vs climatology, ROC-AUC >= 0.8, ECE <= 0.05 | pass | pass |
+
+#### Independent per-sensor forecast models (each on its own chronological test period)
+
+| Sensor | Model | Train ≤ | Calibrate ≤ | Test | Test rows | Brier | BSS vs climatology | ROC-AUC | PR-AUC | ECE | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Suomi NPP | suomi-npp-xgb-legacy | 2021-12-31 | 2023-12-31 | 2024-01-01 → 2026-11-07 | 629,104 | 0.0971 | 0.090 | 0.920 | 0.823 | – | STALE_RETIRED_SENSOR |
+| NOAA-20 | noaa-20-xgb-349f66348d | 2022-12-31 | 2024-06-30 | 2024-07-01 → 2026-07-25 | 493,884 | 0.0926 | 0.097 | 0.926 | 0.836 | 0.0078 | CURRENT |
+| NOAA-21 | noaa-21-xgb-092cc21714 | 2025-03-31 | 2025-09-30 | 2025-10-01 → 2026-07-25 | 194,661 | 0.1223 | 0.172 | 0.895 | 0.830 | 0.0344 | CURRENT |
+
+Metrics come from different test periods and base rates; compare each model with its own climatology baseline (BSS), not with each other.
+
+#### Bridge calibrations (successor → reference scale)
+
+| Pair | Overlap | Raw reference/target ratio (D / N) | Status | Reason |
+|---|---|---|---|---|
+| NOAA-20 → Suomi NPP | 2018-04-01 → 2026-07-31 | 0.993 / 0.980 | not_calibrated | no candidate met the declared criteria: state_season_ratio: forward: WAPE 5.35 not >= 1 point better than identity 5.49; forward: not >= 1 point better than national ratio; forward: band coverage 33.3 % < 80 % | state_ra |
+| NOAA-21 → Suomi NPP | 2024-01-17 → 2026-07-31 | 1.050 / 1.022 | not_calibrated | no candidate met the declared criteria: state_season_ratio: forward: WAPE 7.52 not >= 1 point better than identity 7.93; forward: not >= 1 point better than national ratio; forward: band coverage 66.7 % < 80 % | state_ra |
+| NOAA-21 → NOAA-20 | 2024-01-17 → 2026-07-31 | 1.061 / 1.056 | not_calibrated | no candidate met the declared criteria: state_season_ratio: forward: not >= 1 point better than national ratio; forward: band coverage 41.7 % < 80 %; backward: not >= 1 point better than national ratio | state_ratio: for |
+
+Transition verdict: **NOT_BRIDGED**. Month-to-month S-NPP/successor ratios measure the sensor difference during simultaneous observation; the spread (p05-p95) shows how much of an apparent step can be sensor noise. Genuine burning changes must appear in BOTH platforms. No continuation of the S-NPP-equivalent record past 2026-07-31 is produced unless a bridge passes its acceptance rule.
+
+* NOAA-21: window 2025-08 → 2026-07, S-NPP/NOAA-21 ratio 0.963 (monthly p05–p95 0.738 – 1.048); calibrated discontinuity: not computed: no bridge calibration passed its acceptance rule, so no calibrated continuation is produced.
+* NOAA-20: window 2025-08 → 2026-07, S-NPP/NOAA-20 ratio 0.923 (monthly p05–p95 0.715 – 1.014); calibrated discontinuity: not computed: no bridge calibration passed its acceptance rule, so no calibrated continuation is produced.
+
+#### 2012 seam: why PARTIAL, and seasonal sensitivity
+
+* PARTIAL because the unchanged reference-sensor step 1.103 lies outside the harmonized step band 0.938-1.093. The jump was still reduced by 96 %. Thresholds are fixed in advance and are not tuned to obtain a pass.
+* Genuine change: The reference sensor shows +10% but the harmonized step is +3% (band -6%..+9%): the harmonization damps part of this genuine change. Reported as a limitation rather than adjusted away.
+
+| Season | Months each side | Raw step | Harmonized step | Aqua reference step | Jump before | Jump after |
+|---|---|---|---|---|---|---|
+| winter | 6 | 8.600 | 1.244 | 1.444 | 1.784 | 0.149 |
+| pre-monsoon | 6 | 7.195 | 0.964 | 1.008 | 1.966 | 0.044 |
+| monsoon | 8 | 14.200 | 1.273 | 1.818 | 2.055 | 0.356 |
+| post-monsoon | 4 | 5.211 | 1.065 | 1.121 | 1.536 | 0.052 |
+
+Monsoon months carry the largest residual jump (few detections, cloud), which is where the harmonized step under-reads the Aqua reference.
+
 ## 6. Data limitations
 
 * Real Terra-only morning-gap correction is applied to the loaded Terra-only months; there is no ground truth for those months, so its skill is measured only by the simulated withheld-Aqua experiment (3b).
 * Real 2012 seam test uses the loaded pre-2012 MODIS record.
 * NOAA-20: loaded; NOAA-21 loaded. Neither is the default calibration target (kept as separate actual observations).
 * VIIRS 750 m (VNP14/VJ114/VJ214 v002, LP DAAC): granule search works without credentials, but download needs Earthdata Login, which is not configured here; no 750 m records are loaded and the 750 m calibration is not run.
-* S-NPP VIIRS science-data delivery ceased 2026-11-02 (CMR collection metadata): the forecast reference stream will stop updating; a NOAA-20 retarget is future work.
+* S-NPP VIIRS science-data delivery ceased 2026-11-02 (NOAA NESDIS / NASA Earthdata): S-NPP stays the historical reference; live forecasts use an independently trained, criteria-approved operational platform (section 5f). The legacy S-NPP forecast is labelled STALE_RETIRED_SENSOR.
 * MODIS orbit drift years excluded from calibration: MODIS orbit drift detected in the loaded records (mean day-time local overpass time moved more than 0.25 h from its early baseline): Terra [2023, 2024, 2025, 2026], Aqua [2023, 2024, 2025, 2026]. Those years are excluded from calibration because their diurnal sampling differs from the historical MODIS era.
 * Administrative intelligence (states, districts, land use) covers India only.
 * MODIS row `version` strings 6.03 (2000-2022) and 61.03 (2023 onward) are not defined in readable FIRMS documentation; they are kept verbatim and the collection (C6.1) is taken from the archive name.
-* NOAA-21 archive records begin 2023-03 (pre-operational period, official FIRMS start 2024-01-17); kept as labelled actual observations, not a calibration target.
+* NOAA-21 archive records begin 2023-03 (pre-operational period, official FIRMS start 2024-01-17); kept as labelled actual observations, excluded from NOAA-21 forecast labels, and not a calibration target.
 * NRT records are provisional and never used for calibration or validation.
 * Month coverage: S-NPP months with full coverage 168; Aqua 289; Terra 305.

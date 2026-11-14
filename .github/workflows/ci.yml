@@ -39,6 +39,13 @@ jobs:
         run: |
           python -m app.pipeline --dry-run --only-new
           if python -m app.pipeline --definitely-not-an-option; then exit 1; fi
+      - name: Production configuration validation (test-only values, never real secrets)
+        working-directory: backend
+        run: |
+          PYROSCOPE_AUTH_MODE=production PYROSCOPE_CORS_ORIGINS=https://pyroscope.example.org \
+            PYROSCOPE_ADMIN_PASSWORD=CI-only-Test-Passw0rd python -m app.system_config > /dev/null
+          if PYROSCOPE_AUTH_MODE=production PYROSCOPE_CORS_ORIGINS='*' python -m app.system_config > /dev/null; then
+            echo "wildcard CORS / missing admin must be rejected in production"; exit 1; fi
       - name: Unit, integration and science tests
         working-directory: backend
         run: python -m pytest tests -q
@@ -76,8 +83,8 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-      - name: Dependency audit (high and critical)
-        run: npm audit --omit=dev --audit-level=high
+      - name: Dependency audit (all dependencies, moderate and above)
+        run: npm audit --audit-level=moderate
 
   e2e:
     name: Browser end-to-end journeys (Playwright)

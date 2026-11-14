@@ -867,6 +867,50 @@ def linear_within(lat: float = Query(..., ge=-90, le=90), lon: float = Query(...
     return ok(linear_gis.within(lat, lon, radius_km, category))
 
 
+@app.get("/api/viirs750/search")
+def viirs750_search(satellite: str = Query("NOAA-21"), start: str = Query(...), end: str = Query(...), limit: int = Query(50, ge=1, le=500)):
+    """Public CMR granule search (no login). Network failures are reported, never replaced with made-up granules."""
+    from . import viirs750
+    try:
+        g = viirs750.search(satellite, start, end, max_pages=5)
+    except ValueError:
+        raise
+    except Exception as exc:
+        return ok({"status": "search_failed", "error": viirs750._redact(f"{type(exc).__name__}: {exc}"), "granules": []})
+    return ok({"status": "ok", "satellite": satellite, "count": len(g), "granules": g[:limit], "truncated": len(g) > limit,
+               "credentials": viirs750.credentials_status()})
+
+
+# --------------------------------------------------------------------------- background data jobs
+class JobBody(BaseModel):
+    kind: str
+    params: dict = Field(default_factory=dict)
+
+
+@app.get("/api/jobs")
+def jobs_list(a: Actor = Depends(require("gov_officer", "analyst"))):
+    from . import jobs
+    return ok({"items": jobs.listing(), "kinds": jobs.KINDS})
+
+
+@app.post("/api/jobs", dependencies=[Depends(limited("processing"))])
+def jobs_submit(body: JobBody, a: Actor = Depends(require())):
+    from . import jobs
+    return ok(jobs.submit(body.kind, body.params, a.username))
+
+
+@app.get("/api/jobs/{job_id}")
+def jobs_get(job_id: int, a: Actor = Depends(require("gov_officer", "analyst"))):
+    from . import jobs
+    return ok(jobs.get(job_id))
+
+
+@app.post("/api/jobs/{job_id}/cancel")
+def jobs_cancel(job_id: int, a: Actor = Depends(require())):
+    from . import jobs
+    return ok(jobs.cancel(job_id, a.username))
+
+
 @app.get("/api/viirs750/credentials")
 def viirs750_credentials():
     """Configured / method / last access only. Never returns the token or netrc contents."""
