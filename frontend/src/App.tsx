@@ -74,6 +74,7 @@ import {
 import { AnomaliesPage, CalendarPage, HarmonizerPage, MorningGapPage, TrendsPage, UncertaintyPage, ValidationPage } from './science'
 import { AuthControl, CoverageCard, InventoryCard, LoginGate } from './completion'
 import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
+import { ExposurePanel } from './completion_final'
 
 /* ==========================================================================
  * 1. All 17 PyroScope Sections for Argon Sidebar & Router
@@ -1039,6 +1040,7 @@ function CriticalRegionsPage() {
           </CardBody>
         </Card>
       )}
+      <ExposurePanel />
     </div>
   )
 }

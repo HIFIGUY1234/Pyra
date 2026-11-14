@@ -10,6 +10,7 @@ import { Series, StatusBars } from './charts'
 import { BaseMap, BoxDraw, CellLayer, PointLayer, Swatch, seq } from './map'
 import { enc, Load, PageHead, Panel, Td } from './science'
 import { NotificationLogCard } from './completion'
+import { ExposurePanel, ForecastComparisonPanel, OrbitPanel } from './completion_final'
 
 const esc = (s: any) => String(s ?? '–').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 const isoDay = (d: Date) => d.toISOString().slice(0, 10)
@@ -239,6 +240,7 @@ export function ForecastPage() {
         </>)}
       </Load>
       {m?.available && <ModelCard m={m} />}
+      <ForecastComparisonPanel />
     </div>
   )
 }
@@ -408,6 +410,7 @@ export function ObservationsPage() {
           </div>
         </>}
       </Load>
+      <OrbitPanel />
     </div>
   )
 }
@@ -526,6 +529,7 @@ export function GovernmentPage() {
         </Load>
       </Panel>}
       <NotificationLogCard />
+      <ExposurePanel compactView />
     </div>
   )
 }

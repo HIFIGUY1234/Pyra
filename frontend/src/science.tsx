@@ -9,6 +9,7 @@ import { Series, StatusBars, LogScatter, withBand } from './charts'
 import { seq } from './map'
 import { KindBadge, ValidationMethod } from './completion'
 import { ModelSelectionPanel, SeamRobustnessPanel, SeamVerdict, type Seam } from './validation_extra'
+import { Noaa21Panel, Viirs750Panel } from './completion_final'
 
 /* ------------------------------------------------------------------ shared helpers */
 export const enc = (r: string) => encodeURIComponent(r)
@@ -232,6 +233,7 @@ export function HarmonizerPage() {
       {tab === 'timeline' && <HarmTimeline region={region} split={split} />}
       {tab === 'compare' && <HarmCompare region={region} />}
       {tab === 'calib' && <HarmCalib split={split} />}
+      <Viirs750Panel />
     </div>
   )
 }
@@ -476,6 +478,7 @@ export function ValidationPage() {
       </Load>
       {!split && region === 'country' && <SeamRobustnessPanel />}
       <ModelSelectionPanel />
+      <Noaa21Panel />
     </div>
   )
 }

@@ -2,15 +2,19 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { GeoJSON, MapContainer, Rectangle, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import type { GeoJsonObject } from 'geojson'
 import { api } from './lib'
+
+export type CellLike = { west?: number; south?: number; east?: number; north?: number; lat?: number; lon?: number }
+export type PointLike = { latitude: number; longitude: number }
 
 const canvas = L.canvas({ padding: 0.4 })
 export const mapRenderer = canvas
-let statesCache: any = null
+let statesCache: GeoJsonObject | null = null
 
 export function useStates() {
-  const [g, setG] = useState<any>(statesCache)
-  useEffect(() => { if (!statesCache) api('/api/geo/states').then((d) => { statesCache = d; setG(d) }).catch(() => undefined) }, [])
+  const [g, setG] = useState<GeoJsonObject | null>(statesCache)
+  useEffect(() => { if (!statesCache) api<GeoJsonObject>('/api/geo/states').then((d) => { statesCache = d; setG(d) }).catch(() => undefined) }, [])
   return g
 }
 
@@ -54,14 +58,16 @@ export function BaseMap({ children, height = 560, bbox, showStates = true, class
 }
 
 /** Grid cells as rectangles on the shared canvas renderer. `cells` need west/south/east/north or lat/lon (0.25 deg). */
-export function CellLayer({ cells, colorOf, opacityOf, onClick, popup, stroke }: {
-  cells: any[]; colorOf: (c: any) => string; opacityOf?: (c: any) => number; onClick?: (c: any) => void; popup?: (c: any) => string; stroke?: (c: any) => string | undefined
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callers pass several API row shapes; the layer only reads CellLike fields
+export function CellLayer<T extends CellLike = any>({ cells, colorOf, opacityOf, onClick, popup, stroke }: {
+  cells: readonly T[]; colorOf: (c: T) => string; opacityOf?: (c: T) => number; onClick?: (c: T) => void; popup?: (c: T) => string; stroke?: (c: T) => string | undefined
 }) {
   const map = useMap()
   useEffect(() => {
     const group = L.layerGroup()
     for (const c of cells) {
-      const w = c.west ?? c.lon - 0.125, s = c.south ?? c.lat - 0.125, e = c.east ?? c.lon + 0.125, n = c.north ?? c.lat + 0.125
+      const lon = c.lon ?? 0, lat = c.lat ?? 0
+      const w = c.west ?? lon - 0.125, s = c.south ?? lat - 0.125, e = c.east ?? lon + 0.125, n = c.north ?? lat + 0.125
       const sc = stroke?.(c)
       const r = L.rectangle([[s, w], [n, e]], { renderer: canvas, stroke: !!sc, color: sc, weight: sc ? 1.5 : 0, fillColor: colorOf(c), fillOpacity: opacityOf ? opacityOf(c) : 0.6 })
       if (popup) r.bindPopup(() => popup(c), { maxWidth: 300 })
@@ -75,20 +81,21 @@ export function CellLayer({ cells, colorOf, opacityOf, onClick, popup, stroke }:
 }
 
 /** Point markers with a distinct shape per instrument (circle = VIIRS, square = MODIS) so identity is not colour-only. */
-export function PointLayer({ points, colorOf, isSquare, popup, onClick, radius = 3.5 }: { points: any[]; colorOf: (p: any) => string; isSquare: (p: any) => boolean; popup?: (p: any) => string; onClick?: (p: any) => void; radius?: number }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see CellLayer
+export function PointLayer<T extends PointLike = any>({ points, colorOf, isSquare, popup, onClick, radius = 3.5 }: { points: readonly T[]; colorOf: (p: T) => string; isSquare: (p: T) => boolean; popup?: (p: T) => string; onClick?: (p: T) => void; radius?: number }) {
   const map = useMap()
   useEffect(() => {
     const group = L.layerGroup()
     for (const p of points) {
       const col = colorOf(p)
-      let m: L.Layer
+      let m: L.Rectangle | L.CircleMarker
       if (isSquare(p)) {
         const d = 0.012
         m = L.rectangle([[p.latitude - d, p.longitude - d], [p.latitude + d, p.longitude + d]], { renderer: canvas, color: col, weight: 1.5, fillColor: col, fillOpacity: 0.55 })
       } else {
         m = L.circleMarker([p.latitude, p.longitude], { renderer: canvas, radius, color: '#0B0F19', weight: 0.6, fillColor: col, fillOpacity: 0.85 })
       }
-      if (popup) (m as any).bindPopup(() => popup(p), { maxWidth: 320 })
+      if (popup) m.bindPopup(() => popup(p), { maxWidth: 320 })
       if (onClick) m.on('click', () => onClick(p))
       group.addLayer(m)
     }
