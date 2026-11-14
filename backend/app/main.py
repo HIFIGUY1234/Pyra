@@ -275,7 +275,20 @@ def _split(v: Optional[int]) -> Optional[int]:
 # --------------------------------------------------------------------------- meta / geography
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "has_data": store.has_data(), "forecast": forecast.available()}
+    """Liveness + dependency checks: database reachable, data present, free disk space."""
+    import shutil
+    from sqlalchemy import text
+    db_ok, db_err = True, None
+    try:
+        with M.Session() as s:
+            s.execute(text("SELECT 1"))
+    except Exception as exc:  # never leak connection strings
+        db_ok, db_err = False, type(exc).__name__
+    du = shutil.disk_usage(str(PROCESSED))
+    free_gb = du.free / 1e9
+    status = "ok" if db_ok else "degraded"
+    return {"status": status, "has_data": store.has_data(), "forecast": forecast.available(),
+            "database": {"ok": db_ok, "error": db_err}, "storage": {"free_gb": round(free_gb, 2), "low": free_gb < 2.0}}
 
 
 @app.get("/api/meta")
@@ -670,6 +683,22 @@ def validation(region: str = "country", split: Optional[int] = None, product: Op
 @app.get("/api/validation/seam-test", dependencies=[Depends(need_data)])
 def seam(region: str = "country", split: Optional[int] = None, window: int = Query(24, ge=12, le=60), product: Optional[str] = None):
     return ok(harmonize.seam_test(region, _split(split), window, _ref(product)))
+
+
+@app.get("/api/validation/model-selection", dependencies=[Depends(need_data)])
+def model_selection(stage: str = Query("mg", pattern="^(mg|sh)$"), product: Optional[str] = None):
+    """Held-out comparison of calibration model forms (LOYO, 20-month block, rolling origin) and the selection decision."""
+    return ok(harmonize.model_selection(stage, _ref(product)))
+
+
+@app.get("/api/validation/seam-robustness", dependencies=[Depends(need_data)])
+def seam_robust(product: Optional[str] = None):
+    return ok(harmonize.seam_robustness(_ref(product)))
+
+
+@app.get("/api/validation/extrapolation-stress-test", dependencies=[Depends(need_data)])
+def stress_test(product: Optional[str] = None):
+    return ok(harmonize.extrapolation_stress_test(_ref(product)) or {"status": "unavailable"})
 
 
 @app.get("/api/harmonization/products", dependencies=[Depends(need_data)])

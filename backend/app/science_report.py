@@ -72,11 +72,57 @@ def build() -> str:
         L.append(f"| {MONTHS[r['month'] - 1]} | {r['n']} | {f(r.get('wape_pct'), 1, '%')} | {f(r.get('bias_pct'), 1, '%')} |")
     mgv = v["morning_gap"]
     L += ["", "### 3b. Morning-gap step (SIMULATED experiment, not the real 2000–2002 correction)", "",
-          f"Real Aqua months {mgv['period'][0]}–{mgv['period'][1]} hidden; Terra used to estimate them.", "",
+          "20-month blocks of real Aqua (the length of the real Terra-only era) are hidden in turn; the Terra→Aqua calibration is refitted "
+          "on every other overlap year (whole years removed) and the hidden Aqua months are the answer key. "
+          f"Blocks: {', '.join(f'{a}–{b}' for a, b in mgv.get('blocks', [])) or mgv.get('period')}.", "",
           "| Method | n | MAE | RMSE | WAPE | Bias | R² |", "|---|---|---|---|---|---|---|",
-          _mrow("Calibrated Terra→Aqua", mgv["metrics"]), _mrow("Constant Aqua/Terra ratio", mgv["baseline_constant_ratio"]), "",
-          f"Band coverage: {f(mgv.get('band_coverage_pct'), 1, '%')}.", "",
-          f"## 4. 2012 seam test ({s.get('validation_kind')})", ""]
+          _mrow(f"Calibrated Terra→Aqua ({mgv.get('selected_model', 'cell_silent')})", mgv["metrics"]),
+          _mrow("Constant Aqua/Terra ratio", mgv["baseline_constant_ratio"])]
+    if mgv.get("baseline_national_ratio"):
+        L.append(_mrow("National month/day-night ratio", mgv["baseline_national_ratio"]))
+    L += ["", f"Band coverage (nominal 90 %): **{f(mgv.get('band_coverage_pct'), 1, '%')}**; median relative band width "
+              f"{f(mgv.get('band_relative_width_pct'), 0, '%')}.", ""]
+    if mgv.get("backward_extrapolation_warning"):
+        L += [f"> **Limitation.** {mgv['backward_extrapolation_warning']}", ""]
+    ch = mgv.get("chain_experiment")
+    if ch and ch.get("period"):
+        L += [f"Chain experiment (Aqua hidden {ch['period'][0]}–{ch['period'][1]}, calibration trained only on years ≥ split): "
+              f"WAPE {f(ch['metrics'].get('wape_pct'), 1, '%')}, bias {f(ch['metrics'].get('bias_pct'), 1, '%')}, R² {f(ch['metrics'].get('r2'), 3)} "
+              f"vs constant ratio WAPE {f(ch['baseline_constant_ratio'].get('wape_pct'), 1, '%')}.", ""]
+    L += ["### 3c. Calibration model selection (held-out, year-blocked)", "",
+          "Earlier versions of this report scored the morning-gap step with a design that, once pre-2012 MODIS was loaded, hid Aqua for "
+          "135 months (2002-07 → 2013-09) and trained only on 2017–2022. Its +33 % bias was a property of that decade-long backward "
+          "extrapolation, not of the operational fit (which trains on all overlap years). That design is kept below as a labelled stress test.", ""]
+    for stage in ("mg", "sh"):
+        ms = harmonize.model_selection(stage)
+        L += [f"**{ms['pair']}** — selected: `{ms.get('selected')}` ({ms.get('reason')}). Rule: {ms.get('selection_rule', '')}", "",
+              "| Design | folds | " + " | ".join(ms["candidates"]) + " |", "|---|---|" + "---|" * len(ms["candidates"])]
+        for dname, d in ms.get("designs", {}).items():
+            cells = []
+            for c in ms["candidates"]:
+                st, nat = d["scores"][c]["state"], d["scores"][c]["national"]
+                cells.append(f"{f(st.get('wape_pct'), 1)} / {f(st.get('bias_pct'), 1)} / {f(st.get('r2'), 2)} (nat {f(nat.get('wape_pct'), 1)})")
+            L.append(f"| {dname} | {d['n_folds']} | " + " | ".join(cells) + " |")
+        b, bb = ms.get("band", {}), ms.get("band_backward", {})
+        L += ["", "Cells: state-month WAPE % / bias % / R² (national-month WAPE %).",
+              f"Band coverage of the selected model: block design {f(b.get('empirical_coverage_pct'), 1, '%')}, backward rolling-origin "
+              f"{f(bb.get('empirical_coverage_pct'), 1, '%')} (nominal 90 %).", ""]
+        dg = ms.get("diagnostics", {}).get("block_20_month", {})
+        if dg:
+            dn, act = dg["by_daynight"], dg["by_activity"]
+            L += [f"Block-design diagnostics: day WAPE {f(dn['day'].get('wape_pct'), 1, '%')}, night WAPE {f(dn['night'].get('wape_pct'), 1, '%')}; "
+                  f"low-count months WAPE {f(act['low_count_months'].get('wape_pct'), 1, '%')}, high-count {f(act['high_count_months'].get('wape_pct'), 1, '%')} "
+                  f"(split at {f(act['split_at'], 0)} detections).", "",
+                  "| State | n | WAPE | Bias |", "|---|---|---|---|"]
+            for r in dg["by_state"][:8]:
+                L.append(f"| {r['state']} | {r.get('n', 0)} | {f(r.get('wape_pct'), 1, '%')} | {f(r.get('bias_pct'), 1, '%')} |")
+            L.append("")
+    st_ = harmonize.extrapolation_stress_test()
+    if st_:
+        L += [f"**Extrapolation stress test** (train {st_['train_years'][0]}–{st_['train_years'][-1]} only, predict {st_['test_period'][0]}–{st_['test_period'][1]}, "
+              f"{st_['n_test_months']} months): " + "; ".join(f"{k} WAPE {f(m.get('wape_pct'), 1, '%')} bias {f(m.get('bias_pct'), 1, '%')} R² {f(m.get('r2'), 2)}"
+                                                            for k, m in st_["scores"].items()) + ".", "", st_["interpretation"], ""]
+    L += [f"## 4. 2012 seam test ({s.get('validation_kind')})", ""]
     if s.get("real_seam_note"):
         L += [f"> {s['real_seam_note']}", ""]
     L += [f"* Seam month {s['seam_month']}, window ±{s['window_months']} months.",
@@ -85,7 +131,20 @@ def build() -> str:
           f"* Target step (true withheld VIIRS / unchanged reference sensor): {f(s.get('step_true') or s.get('step_reference_sensor'), 3)} ({s['reference_sensor']} reference {f(s['step_reference_sensor'], 3)}).",
           f"* Artificial discontinuity |ln(step/target)|: before **{f(s['artificial_jump_before'], 3)}**, after **{f(s['artificial_jump_after'], 3)}** "
           f"(reduction {f(s.get('reduction_pct'), 1, '%')}); status {s.get('status')}.",
-          f"* Genuine change still detectable: **{s['genuine_change']['detectable']}** ({s['genuine_change']['direction']}).", ""]
+          f"* Genuine change still detectable: **{s['genuine_change']['detectable']}** ({s['genuine_change']['direction']}). {s['genuine_change'].get('why') or ''}",
+          f"* **Verdict: {str(s.get('verdict', '-')).upper()}** — rule: {s.get('verdict_rule', '')}", ""]
+    rb = harmonize.seam_robustness()
+    L += ["### 4a. Seam robustness (real seam)", "", "| Scope | Window | Raw step | Harmonized step (band) | Reference step | Jump before → after | Verdict |",
+          "|---|---|---|---|---|---|---|"]
+    for w in rb["windows"]:
+        L.append(f"| India | ±{w.get('window_months')} | {f(w.get('step_raw'), 2)} | {f(w.get('step_harmonized'), 3)} "
+                 f"({f((w.get('step_harmonized_band') or [None])[0], 2)}–{f((w.get('step_harmonized_band') or [None, None])[1], 2)}) | "
+                 f"{f(w.get('step_reference_sensor'), 3)} | {f(w.get('artificial_jump_before'), 2)} → {f(w.get('artificial_jump_after'), 3)} | {w.get('verdict')} |")
+    for w in rb["states"]:
+        L.append(f"| {w['state']} | ±24 | {f(w.get('step_raw'), 2)} | {f(w.get('step_harmonized'), 3)} "
+                 f"({f((w.get('step_harmonized_band') or [None])[0], 2)}–{f((w.get('step_harmonized_band') or [None, None])[1], 2)}) | "
+                 f"{f(w.get('step_reference_sensor'), 3)} | {f(w.get('artificial_jump_before'), 2)} → {f(w.get('artificial_jump_after'), 3)} | {w.get('verdict', w.get('error'))} |")
+    L += ["", f"State verdicts: {rb.get('state_summary')}.", ""]
     if fm:
         t = fm["test"]
         c60, c80 = t["confusion"].get("60", {}), t["confusion"].get("80", {})
@@ -112,6 +171,9 @@ def build() -> str:
           "* VIIRS 750 m (VNP14/VJ114) is not distributed by FIRMS; a separate 750 m calibration pathway exists but has no data.",
           f"* MODIS orbit drift years excluded from calibration: {', '.join(n for n in sh['notes'] if 'drift' in n) or 'none'}",
           "* Administrative intelligence (states, districts, land use) covers India only.",
+          "* MODIS row `version` strings 6.03 (2000-2022) and 61.03 (2023 onward) are not defined in readable FIRMS documentation; they are kept verbatim and the collection (C6.1) is taken from the archive name.",
+          "* NOAA-21 archive records begin 2023-03 (pre-operational period, official FIRMS start 2024-01-17); kept as labelled actual observations, not a calibration target.",
+          "* NRT records are provisional and never used for calibration or validation.",
           f"* Month coverage: S-NPP months with full coverage {int((cov['Suomi NPP'] >= 0.999).sum())}; Aqua {int((cov['Aqua'] >= 0.999).sum())}; Terra {int((cov['Terra'] >= 0.999).sum())}."]
     return "\n".join(L) + "\n"
 
@@ -119,7 +181,7 @@ def build() -> str:
 def main():
     out = ROOT / "docs" / "SCIENTIFIC_VALIDATION.md"
     out.parent.mkdir(exist_ok=True)
-    out.write_text(build())
+    out.write_text(build(), encoding="utf-8")
     print(out)
 
 

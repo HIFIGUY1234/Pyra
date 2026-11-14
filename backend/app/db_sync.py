@@ -201,6 +201,6 @@ def sync_all(log=print):
     recent, _ = ingest.query_hotspots(end - pd.Timedelta(days=29), end, limit=10 ** 9)
     recent = recent.copy()
     recent["anomaly_type"] = recent["anomaly_type"].astype("float")
-    recent["timestamp_utc"] = pd.to_datetime(recent["timestamp_utc"]).dt.to_pydatetime()
+    recent["timestamp_utc"] = [t.to_pydatetime() for t in pd.to_datetime(recent["timestamp_utc"])]
     _replace(M.HotspotObservation, recent)
     log(f"[db] recent hotspot window: {len(recent):,} rows")

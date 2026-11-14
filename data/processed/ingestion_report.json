@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T15:19:52+00:00",
+ "generated_at": "2026-11-14T16:56:49+00:00",
  "aoi_bbox": [
   68.0,
   6.0,
@@ -10,6 +10,7 @@
   {
    "file": "DL_FIRE_J1V-C2_846938.zip",
    "status": "valid",
+   "integrity": "zip_crc_ok",
    "bytes": 94262123,
    "members": [
     {
@@ -27,11 +28,23 @@
      "bytes": 89,
      "kind": "other"
     }
-   ]
+   ],
+   "csv_members": [
+    "fire_archive_J1V-C2_846938.csv",
+    "fire_nrt_J1V-C2_846938.csv"
+   ],
+   "archive_tag": "J1V-C2",
+   "instrument": "VIIRS",
+   "collection": "Collection 2",
+   "product": "VJ114IMGT",
+   "row_versions": [],
+   "collection_source": "archive file name (FIRMS Readme convention)",
+   "sha256": "bf560d9071829726676853900286f7064ea637470b82223fe164d7b6dde4cf8f"
   },
   {
    "file": "DL_FIRE_J2V-C2_846939.zip",
    "status": "valid",
+   "integrity": "zip_crc_ok",
    "bytes": 39960895,
    "members": [
     {
@@ -49,11 +62,23 @@
      "bytes": 89,
      "kind": "other"
     }
-   ]
+   ],
+   "csv_members": [
+    "fire_archive_J2V-C2_846939.csv",
+    "fire_nrt_J2V-C2_846939.csv"
+   ],
+   "archive_tag": "J2V-C2",
+   "instrument": "VIIRS",
+   "collection": "Collection 2",
+   "product": "VJ214IMGT",
+   "row_versions": [],
+   "collection_source": "archive file name (FIRMS Readme convention)",
+   "sha256": "a5916fbb704f9a0f8f612ed2111c28ebc8628c0859cc1fba9f6c9ca3c25ba71e"
   },
   {
    "file": "DL_FIRE_M-C61_846937.zip",
    "status": "valid",
+   "integrity": "zip_crc_ok",
    "bytes": 21761475,
    "members": [
     {
@@ -71,11 +96,23 @@
      "bytes": 89,
      "kind": "other"
     }
-   ]
+   ],
+   "csv_members": [
+    "fire_archive_M-C61_846937.csv",
+    "fire_nrt_M-C61_846937.csv"
+   ],
+   "archive_tag": "M-C61",
+   "instrument": "MODIS",
+   "collection": "Collection 6.1",
+   "product": "MCD14ML",
+   "row_versions": [],
+   "collection_source": "archive file name (FIRMS Readme convention)",
+   "sha256": "abe840b5277297af1b2412dc7ceefdde348a9dfd3f5b0f5d7eec894cd49b26e4"
   },
   {
    "file": "DL_FIRE_M-C61_848456.zip",
    "status": "valid",
+   "integrity": "zip_crc_ok",
    "bytes": 11909796,
    "members": [
     {
@@ -88,11 +125,22 @@
      "bytes": 89,
      "kind": "other"
     }
-   ]
+   ],
+   "csv_members": [
+    "fire_archive_M-C61_848456.csv"
+   ],
+   "archive_tag": "M-C61",
+   "instrument": "MODIS",
+   "collection": "Collection 6.1",
+   "product": "MCD14ML",
+   "row_versions": [],
+   "collection_source": "archive file name (FIRMS Readme convention)",
+   "sha256": "3491e9398b7a862928c0940155fb5f49f9e80c6115dbbc402ea0b218abae36a6"
   },
   {
    "file": "DL_FIRE_SV-C2_846940.zip",
    "status": "valid",
+   "integrity": "zip_crc_ok",
    "bytes": 159863811,
    "members": [
     {
@@ -110,70 +158,81 @@
      "bytes": 89,
      "kind": "other"
     }
-   ]
+   ],
+   "csv_members": [
+    "fire_archive_SV-C2_846940.csv",
+    "fire_nrt_SV-C2_846940.csv"
+   ],
+   "archive_tag": "SV-C2",
+   "instrument": "VIIRS",
+   "collection": "Collection 2",
+   "product": "VNP14IMGT",
+   "row_versions": [],
+   "collection_source": "archive file name (FIRMS Readme convention)",
+   "sha256": "258cbbf1c474835839435c2859c954f403c0f564656bcd570c55f8aacefe6b27"
   }
  ],
  "sources": [
   {
    "key": "fire_archive_J1V-C2_846938",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J1V-C2_846938.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J1V-C2_846938.zip",
    "member": "fire_archive_J1V-C2_846938.csv",
    "bytes": 410079818
   },
   {
    "key": "fire_nrt_J1V-C2_846938",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J1V-C2_846938.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J1V-C2_846938.zip",
    "member": "fire_nrt_J1V-C2_846938.csv",
    "bytes": 2845149
   },
   {
    "key": "fire_archive_J2V-C2_846939",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J2V-C2_846939.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J2V-C2_846939.zip",
    "member": "fire_archive_J2V-C2_846939.csv",
    "bytes": 171428296
   },
   {
    "key": "fire_nrt_J2V-C2_846939",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J2V-C2_846939.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_J2V-C2_846939.zip",
    "member": "fire_nrt_J2V-C2_846939.csv",
    "bytes": 2538945
   },
   {
    "key": "fire_archive_M-C61_846937",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_M-C61_846937.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_M-C61_846937.zip",
    "member": "fire_archive_M-C61_846937.csv",
    "bytes": 96179318
   },
   {
    "key": "fire_nrt_M-C61_846937",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_M-C61_846937.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_M-C61_846937.zip",
    "member": "fire_nrt_M-C61_846937.csv",
    "bytes": 332917
   },
   {
    "key": "fire_archive_M-C61_848456",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_M-C61_848456.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_M-C61_848456.zip",
    "member": "fire_archive_M-C61_848456.csv",
    "bytes": 53158010
   },
   {
    "key": "fire_archive_SV-C2_846940",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_SV-C2_846940.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_SV-C2_846940.zip",
    "member": "fire_archive_SV-C2_846940.csv",
    "bytes": 700313861
   },
   {
    "key": "fire_nrt_SV-C2_846940",
    "origin": "repository",
-   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_SV-C2_846940.zip",
+   "container": "D:\\Projects\\NASA\\Pyra\\DL_FIRE_SV-C2_846940.zip",
    "member": "fire_nrt_SV-C2_846940.csv",
    "bytes": 2503251
   }
@@ -207,7 +266,39 @@
      "1km"
     ]
    },
-   "status": "complete_from_firms_start"
+   "status": "complete_from_firms_start",
+   "gaps": {
+    "missing_days": 63,
+    "missing_periods": [
+     [
+      "2001-06-15",
+      "2001-07-03"
+     ],
+     [
+      "2002-03-20",
+      "2002-03-28"
+     ],
+     [
+      "2003-12-17",
+      "2003-12-24"
+     ],
+     [
+      "2006-07-10",
+      "2006-07-14"
+     ],
+     [
+      "2016-02-19",
+      "2016-02-27"
+     ],
+     [
+      "2022-10-11",
+      "2022-10-23"
+     ]
+    ],
+    "rule_min_run_days": 5,
+    "days_in_span": 9496,
+    "days_with_detections": 9102
+   }
   },
   "Aqua": {
    "expected": {
@@ -237,7 +328,23 @@
      "1km"
     ]
    },
-   "status": "complete_from_firms_start"
+   "status": "complete_from_firms_start",
+   "gaps": {
+    "missing_days": 27,
+    "missing_periods": [
+     [
+      "2002-07-28",
+      "2002-08-07"
+     ],
+     [
+      "2022-04-01",
+      "2022-04-16"
+     ]
+    ],
+    "rule_min_run_days": 5,
+    "days_in_span": 8886,
+    "days_with_detections": 8463
+   }
   },
   "Suomi NPP": {
    "expected": {
@@ -265,7 +372,47 @@
      "375m"
     ]
    },
-   "status": "complete_from_firms_start"
+   "status": "complete_from_firms_start",
+   "gaps": {
+    "missing_days": 46,
+    "missing_periods": [
+     [
+      "2022-07-27",
+      "2022-08-10"
+     ],
+     [
+      "2024-05-30",
+      "2024-06-03"
+     ],
+     [
+      "2024-07-10",
+      "2024-07-15"
+     ],
+     [
+      "2024-07-24",
+      "2024-07-28"
+     ],
+     [
+      "2024-11-03",
+      "2024-11-05"
+     ],
+     [
+      "2026-03-10",
+      "2026-03-12"
+     ],
+     [
+      "2026-04-28",
+      "2026-04-30"
+     ],
+     [
+      "2026-07-11",
+      "2026-07-16"
+     ]
+    ],
+    "rule_min_run_days": 3,
+    "days_in_span": 5399,
+    "days_with_detections": 5346
+   }
   },
   "NOAA-20": {
    "expected": {
@@ -293,7 +440,19 @@
      "375m"
     ]
    },
-   "status": "complete_from_firms_start"
+   "status": "complete_from_firms_start",
+   "gaps": {
+    "missing_days": 4,
+    "missing_periods": [
+     [
+      "2023-07-19",
+      "2023-07-22"
+     ]
+    ],
+    "rule_min_run_days": 3,
+    "days_in_span": 3136,
+    "days_with_detections": 3130
+   }
   },
   "NOAA-21": {
    "expected": {
@@ -322,7 +481,19 @@
      "375m"
     ]
    },
-   "status": "complete_from_firms_start"
+   "status": "complete_from_firms_start",
+   "pre_operational_records": {
+    "first": "2023-03-01",
+    "official_start": "2024-01-17",
+    "note": "records exist before the official FIRMS start date (pre-operational / early-mission period); kept as actual observations, labelled, and not used as a calibration target"
+   },
+   "gaps": {
+    "missing_days": 0,
+    "missing_periods": [],
+    "rule_min_run_days": 3,
+    "days_in_span": 1341,
+    "days_with_detections": 1339
+   }
   }
  },
  "missing": [],
@@ -364,6 +535,42 @@
     "375m"
    ],
    "processed_at": "2026-11-14T08:29:55+00:00",
+   "container": "DL_FIRE_J2V-C2_846939.zip",
+   "kind": "archive",
+   "quality": {
+    "rows_read": 2135511,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 0,
+    "duplicates_removed": 0,
+    "rows_kept": 2135511
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "J2V-C2",
+    "instrument": "VIIRS",
+    "collection": "Collection 2",
+    "product": "VJ214IMGT",
+    "row_versions": [
+     {
+      "version": "2",
+      "rows": 2135511,
+      "status": "pattern",
+      "meaning": "VIIRS Collection 2, standard processing; follows the documented collection-only convention"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_nrt_J2V-C2_846939": {
@@ -383,6 +590,42 @@
     "375m"
    ],
    "processed_at": "2026-11-14T08:29:56+00:00",
+   "container": "DL_FIRE_J2V-C2_846939.zip",
+   "kind": "nrt",
+   "quality": {
+    "rows_read": 30498,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 30498,
+    "duplicates_removed": 0,
+    "rows_kept": 30498
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "J2V-C2",
+    "instrument": "VIIRS",
+    "collection": "Collection 2",
+    "product": "VJ214IMGT",
+    "row_versions": [
+     {
+      "version": "2.0NRT",
+      "rows": 30498,
+      "status": "pattern",
+      "meaning": "VIIRS Collection 2, near-real-time processing (provisional); follows the documented NRT-suffix convention"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_archive_M-C61_846937": {
@@ -408,6 +651,48 @@
     "1km"
    ],
    "processed_at": "2026-11-14T08:30:11+00:00",
+   "container": "DL_FIRE_M-C61_846937.zip",
+   "kind": "archive",
+   "quality": {
+    "rows_read": 1233985,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 0,
+    "duplicates_removed": 0,
+    "rows_kept": 1233985
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "M-C61",
+    "instrument": "MODIS",
+    "collection": "Collection 6.1",
+    "product": "MCD14ML",
+    "row_versions": [
+     {
+      "version": "6.03",
+      "rows": 917482,
+      "status": "undocumented",
+      "meaning": "found in FIRMS MODIS C6.1 standard-processing archives for 2000-2022; not defined in the FIRMS Readme or attribute page. Kept verbatim; the collection is taken from the archive name (C6.1), not from this string."
+     },
+     {
+      "version": "61.03",
+      "rows": 316503,
+      "status": "undocumented",
+      "meaning": "found in FIRMS MODIS C6.1 standard-processing archives from 2023-01 onward; not defined in readable FIRMS documentation. Kept verbatim; it is NOT relabelled."
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_nrt_M-C61_846937": {
@@ -432,6 +717,42 @@
     "1km"
    ],
    "processed_at": "2026-11-14T08:30:11+00:00",
+   "container": "DL_FIRE_M-C61_846937.zip",
+   "kind": "nrt",
+   "quality": {
+    "rows_read": 3903,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 3903,
+    "duplicates_removed": 0,
+    "rows_kept": 3903
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "M-C61",
+    "instrument": "MODIS",
+    "collection": "Collection 6.1",
+    "product": "MCD14ML",
+    "row_versions": [
+     {
+      "version": "6.1NRT",
+      "rows": 3903,
+      "status": "documented",
+      "meaning": "MODIS Collection 6.1, near-real-time processing (provisional)"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_archive_SV-C2_846940": {
@@ -451,6 +772,42 @@
     "375m"
    ],
    "processed_at": "2026-11-14T08:31:52+00:00",
+   "container": "DL_FIRE_SV-C2_846940.zip",
+   "kind": "archive",
+   "quality": {
+    "rows_read": 8726813,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 8726813,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 0,
+    "duplicates_removed": 0,
+    "rows_kept": 8726813
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "SV-C2",
+    "instrument": "VIIRS",
+    "collection": "Collection 2",
+    "product": "VNP14IMGT",
+    "row_versions": [
+     {
+      "version": "2",
+      "rows": 8726813,
+      "status": "pattern",
+      "meaning": "VIIRS Collection 2, standard processing; follows the documented collection-only convention"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_nrt_SV-C2_846940": {
@@ -470,6 +827,42 @@
     "375m"
    ],
    "processed_at": "2026-11-14T08:31:52+00:00",
+   "container": "DL_FIRE_SV-C2_846940.zip",
+   "kind": "nrt",
+   "quality": {
+    "rows_read": 30073,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 30073,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 30073,
+    "duplicates_removed": 0,
+    "rows_kept": 30073
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "SV-C2",
+    "instrument": "VIIRS",
+    "collection": "Collection 2",
+    "product": "VNP14IMGT",
+    "row_versions": [
+     {
+      "version": "2.0NRT",
+      "rows": 30073,
+      "status": "pattern",
+      "meaning": "VIIRS Collection 2, near-real-time processing (provisional); follows the documented NRT-suffix convention"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_archive_J1V-C2_846938": {
@@ -489,6 +882,42 @@
     "375m"
    ],
    "processed_at": "2026-11-14T14:48:00+00:00",
+   "container": "DL_FIRE_J1V-C2_846938.zip",
+   "kind": "archive",
+   "quality": {
+    "rows_read": 5109832,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 0,
+    "duplicates_removed": 0,
+    "rows_kept": 5109832
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "J1V-C2",
+    "instrument": "VIIRS",
+    "collection": "Collection 2",
+    "product": "VJ114IMGT",
+    "row_versions": [
+     {
+      "version": "2",
+      "rows": 5109832,
+      "status": "pattern",
+      "meaning": "VIIRS Collection 2, standard processing; follows the documented collection-only convention"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_nrt_J1V-C2_846938": {
@@ -508,6 +937,42 @@
     "375m"
    ],
    "processed_at": "2026-11-14T14:48:00+00:00",
+   "container": "DL_FIRE_J1V-C2_846938.zip",
+   "kind": "nrt",
+   "quality": {
+    "rows_read": 34176,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 0,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 34176,
+    "duplicates_removed": 0,
+    "rows_kept": 34176
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "J1V-C2",
+    "instrument": "VIIRS",
+    "collection": "Collection 2",
+    "product": "VJ114IMGT",
+    "row_versions": [
+     {
+      "version": "2.0NRT",
+      "rows": 34176,
+      "status": "pattern",
+      "meaning": "VIIRS Collection 2, near-real-time processing (provisional); follows the documented NRT-suffix convention"
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   },
   "fire_archive_M-C61_848456": {
@@ -532,6 +997,42 @@
     "1km"
    ],
    "processed_at": "2026-11-14T15:16:16+00:00",
+   "container": "DL_FIRE_M-C61_848456.zip",
+   "kind": "archive",
+   "quality": {
+    "rows_read": 683359,
+    "dropped_invalid_coordinates": 0,
+    "dropped_invalid_timestamp": 0,
+    "dropped_unknown_sensor": 0,
+    "instrument_relabelled": 0,
+    "confidence_missing": 0,
+    "frp_missing": 0,
+    "frp_invalid_negative": 0,
+    "frp_extreme_gt_10000MW": 2,
+    "scan_track_invalid": 0,
+    "brightness_outside_200_700K": 0,
+    "daynight_missing": 0,
+    "anomaly_type_missing": 0,
+    "duplicates_removed": 0,
+    "rows_kept": 683359
+   },
+   "quality_status": "good",
+   "processing_status": "processed",
+   "collection": {
+    "archive_tag": "M-C61",
+    "instrument": "MODIS",
+    "collection": "Collection 6.1",
+    "product": "MCD14ML",
+    "row_versions": [
+     {
+      "version": "6.03",
+      "rows": 683359,
+      "status": "undocumented",
+      "meaning": "found in FIRMS MODIS C6.1 standard-processing archives for 2000-2022; not defined in the FIRMS Readme or attribute page. Kept verbatim; the collection is taken from the archive name (C6.1), not from this string."
+     }
+    ],
+    "collection_source": "archive file name (FIRMS Readme convention)"
+   },
    "error": null
   }
  }

@@ -44,3 +44,7 @@ graphify-out/cache/
 data/backups/
 data/raw/*.parts/
 data/raw/*.csv
+
+# pipeline runtime state / partial downloads
+data/processed/pipeline_state.json
+*.zip.part

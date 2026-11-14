@@ -1,6 +1,6 @@
 # PyroScope - Scientific Validation Report
 
-Generated 2026-11-14T15:19:52+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
+Generated 2026-11-14T16:55:16+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
 
 ## 1. Sensor coverage actually loaded
 
@@ -56,7 +56,7 @@ Night-time Terra→Aqua ratios below 1 show that the afternoon/early-morning pas
 | · stage morning_gap_sensor | 20 | 7,547 | 10,963 | 17.3% | 10.2% | 0.948 |
 | · stage sensor_calibrated | 39 | 4,540 | 8,219 | 10.7% | -5.8% | 0.966 |
 
-Uncertainty band (5–95 % of replicates, nominal 90 %): empirical coverage on held-out months **89.8%** (close to nominal: well calibrated).
+Uncertainty band (5–95 % of replicates, nominal 90 %): empirical coverage on held-out months **93.2%** (close to nominal: well calibrated).
 
 ### 3a. Monthly performance (held-out)
 
@@ -77,14 +77,77 @@ Uncertainty band (5–95 % of replicates, nominal 90 %): empirical coverage on h
 
 ### 3b. Morning-gap step (SIMULATED experiment, not the real 2000–2002 correction)
 
-Real Aqua months 200207–201309 hidden; Terra used to estimate them.
+20-month blocks of real Aqua (the length of the real Terra-only era) are hidden in turn; the Terra→Aqua calibration is refitted on every other overlap year (whole years removed) and the hidden Aqua months are the answer key. Blocks: 200209–200405, 200510–200706, 200811–201006, 201111–201306, 201411–201607, 201712–201907, 202012–202208.
 
 | Method | n | MAE | RMSE | WAPE | Bias | R² |
 |---|---|---|---|---|---|---|
-| Calibrated Terra→Aqua | 135 | 1,728 | 3,970 | 42.1% | 33.4% | 0.424 |
-| Constant Aqua/Terra ratio | 135 | 1,754 | 2,842 | 42.7% | -8.9% | 0.705 |
+| Calibrated Terra→Aqua (cell_silent) | 140 | 913 | 1,655 | 18.4% | 3.7% | 0.920 |
+| Constant Aqua/Terra ratio | 140 | 2,248 | 3,512 | 45.3% | 5.0% | 0.641 |
+| National month/day-night ratio | 140 | 858 | 1,501 | 17.3% | 2.5% | 0.934 |
 
-Band coverage: 86.7%.
+Band coverage (nominal 90 %): **91.4%**; median relative band width 87%.
+
+> **Limitation.** Trained only on later years (the situation of the real Terra-only correction), the selected model's national bias is +12.2% - estimates for months before the overlap period may be systematically high by roughly this amount.
+
+Chain experiment (Aqua hidden 201202–201309, calibration trained only on years ≥ split): WAPE 12.9%, bias 6.3%, R² 0.971 vs constant ratio WAPE 54.1%.
+
+### 3c. Calibration model selection (held-out, year-blocked)
+
+Earlier versions of this report scored the morning-gap step with a design that, once pre-2012 MODIS was loaded, hid Aqua for 135 months (2002-07 → 2013-09) and trained only on 2017–2022. Its +33 % bias was a property of that decade-long backward extrapolation, not of the operational fit (which trains on all overlap years). That design is kept below as a labelled stress test.
+
+**Terra MODIS -> Aqua MODIS** — selected: `cell_silent` (no candidate beat the default model on both leave-one-year-out and 20-month block hold-out (state-month level)). Rule: replace the default only if a candidate wins on both leave-one-year-out and 20-month block hold-out (state-month WAPE lower by >= 1.0 pt, |bias| no worse by > 1 pt, R^2 no lower)
+
+| Design | folds | cell_silent | cell_silent_scaled | ratio_state | ratio_national | constant |
+|---|---|---|---|---|---|---|
+| leave_one_year_out | 21 | 32.2 / 0.0 / 0.81 (nat 19.3) | 32.2 / 0.3 / 0.79 (nat 18.5) | 33.0 / 1.1 / 0.78 (nat 19.0) | 57.7 / 0.2 / 0.72 (nat 17.9) | 78.2 / 0.1 / 0.31 (nat 48.3) |
+| block_20_month | 7 | 32.0 / 3.7 / 0.78 (nat 18.4) | 31.8 / 4.4 / 0.74 (nat 17.2) | 32.6 / 5.5 / 0.73 (nat 17.6) | 55.8 / 2.5 / 0.74 (nat 17.3) | 75.6 / 5.0 / 0.36 (nat 45.3) |
+| rolling_origin_forward | 16 | 31.6 / -7.1 / 0.84 (nat 18.0) | 32.7 / -3.0 / 0.83 (nat 16.7) | 33.6 / -1.2 / 0.81 (nat 17.3) | 60.4 / 2.9 / 0.68 (nat 18.3) | 82.8 / 8.4 / 0.22 (nat 50.9) |
+| rolling_origin_backward | 16 | 37.7 / 12.2 / 0.64 (nat 23.6) | 37.2 / 10.0 / 0.58 (nat 23.6) | 38.1 / 11.1 / 0.56 (nat 24.0) | 54.6 / -0.9 / 0.76 (nat 19.9) | 72.5 / -7.4 / 0.45 (nat 44.6) |
+
+Cells: state-month WAPE % / bias % / R² (national-month WAPE %).
+Band coverage of the selected model: block design 91.4%, backward rolling-origin 84.5% (nominal 90 %).
+
+Block-design diagnostics: day WAPE 18.6%, night WAPE 22.8%; low-count months WAPE 17.6%, high-count 18.5% (split at 2,796 detections).
+
+| State | n | WAPE | Bias |
+|---|---|---|---|
+| Punjab | 140 | 41.5% | 18.3% |
+| Mizoram | 140 | 47.5% | 6.1% |
+| Assam | 140 | 24.5% | -5.0% |
+| Madhya Pradesh | 140 | 22.2% | 0.8% |
+| Manipur | 140 | 25.0% | -6.5% |
+| Odisha | 140 | 25.4% | -2.5% |
+| Chhattīsgarh | 140 | 22.8% | -2.3% |
+| Mahārāshtra | 140 | 20.2% | -0.7% |
+
+**Aqua MODIS -> Suomi NPP VIIRS 375 m** — selected: `cell_silent` (no candidate beat the default model on both leave-one-year-out and 20-month block hold-out (state-month level)). Rule: replace the default only if a candidate wins on both leave-one-year-out and 20-month block hold-out (state-month WAPE lower by >= 1.0 pt, |bias| no worse by > 1 pt, R^2 no lower)
+
+| Design | folds | cell_silent | cell_silent_scaled | ratio_state | ratio_national | constant |
+|---|---|---|---|---|---|---|
+| leave_one_year_out | 11 | 17.1 / 0.5 / 0.97 (nat 9.6) | 18.8 / -0.3 / 0.96 (nat 9.8) | 19.0 / -0.0 / 0.95 (nat 11.0) | 37.9 / 0.0 / 0.85 (nat 10.5) | 55.2 / -0.0 / 0.52 (nat 30.1) |
+| block_20_month | 4 | 17.0 / 0.6 / 0.97 (nat 9.3) | 19.7 / 1.9 / 0.96 (nat 10.6) | 19.9 / 2.3 / 0.95 (nat 12.0) | 40.2 / 1.4 / 0.82 (nat 11.4) | 54.9 / -4.9 / 0.54 (nat 27.3) |
+| rolling_origin_forward | 6 | 17.0 / 3.0 / 0.97 (nat 8.9) | 19.6 / 5.8 / 0.96 (nat 8.9) | 19.8 / 6.9 / 0.94 (nat 11.2) | 37.8 / 3.0 / 0.85 (nat 10.5) | 53.9 / 0.8 / 0.52 (nat 28.8) |
+| rolling_origin_backward | 6 | 17.9 / -0.7 / 0.97 (nat 10.1) | 19.7 / -4.8 / 0.95 (nat 11.1) | 19.4 / -5.9 / 0.95 (nat 12.2) | 37.8 / -2.9 / 0.85 (nat 12.2) | 55.2 / -0.2 / 0.54 (nat 30.7) |
+
+Cells: state-month WAPE % / bias % / R² (national-month WAPE %).
+Band coverage of the selected model: block design 88.8%, backward rolling-origin 77.5% (nominal 90 %).
+
+Block-design diagnostics: day WAPE 8.5%, night WAPE 28.0%; low-count months WAPE 13.4%, high-count 8.9% (split at 26,151 detections).
+
+| State | n | WAPE | Bias |
+|---|---|---|---|
+| Punjab | 80 | 13.1% | 5.5% |
+| Madhya Pradesh | 80 | 14.1% | -1.5% |
+| Chhattīsgarh | 80 | 19.1% | -6.1% |
+| Mahārāshtra | 80 | 10.7% | -2.8% |
+| Odisha | 80 | 22.8% | -3.6% |
+| Andhra Pradesh | 80 | 12.9% | -0.5% |
+| Telangāna | 80 | 17.3% | -5.3% |
+| Uttar Pradesh | 80 | 16.6% | -1.2% |
+
+**Extrapolation stress test** (train 2017–2022 only, predict 200209–201612, 169 months): cell_silent WAPE 37.3% bias 29.7% R² 0.48; cell_silent_scaled WAPE 37.7% bias 26.6% R² 0.43; ratio_state WAPE 39.3% bias 29.5% R² 0.38; ratio_national WAPE 24.8% bias 1.0% R² 0.82; constant WAPE 44.8% bias -11.3% R² 0.65.
+
+Training only on the most recent overlap years and predicting a decade backwards. All model forms degrade together here, so this measures temporal non-stationarity of the Terra/Aqua relationship; it is not the operational correction, which trains on every overlap year.
 
 ## 4. 2012 seam test (actual_seam)
 
@@ -92,7 +155,26 @@ Band coverage: 86.7%.
 * Step before harmonization (raw MODIS → VIIRS): **6.980**; after: **1.027** (band 0.938–1.093).
 * Target step (true withheld VIIRS / unchanged reference sensor): 1.103 (Aqua MODIS reference 1.103).
 * Artificial discontinuity |ln(step/target)|: before **1.845**, after **0.072** (reduction 96.1%); status good.
-* Genuine change still detectable: **False** (no clear change).
+* Genuine change still detectable: **False** (no clear change). The reference sensor shows +10% but the harmonized step is +3% (band -6%..+9%): the harmonization damps part of this genuine change. Reported as a limitation rather than adjusted away.
+* **Verdict: PARTIAL** — rule: pass: residual artificial jump <= 0.10 ln-units and the reference-sensor step lies inside the harmonized step band; partial: residual jump <= 0.25 or >= 50% reduction; otherwise fail.
+
+### 4a. Seam robustness (real seam)
+
+| Scope | Window | Raw step | Harmonized step (band) | Reference step | Jump before → after | Verdict |
+|---|---|---|---|---|---|---|
+| India | ±12 | 7.95 | 1.176 (1.02–1.27) | 1.314 | 1.80 → 0.111 | partial |
+| India | ±24 | 6.98 | 1.027 (0.94–1.09) | 1.103 | 1.84 → 0.072 | partial |
+| India | ±36 | 6.47 | 0.971 (0.89–1.02) | 1.000 | 1.87 → 0.029 | pass |
+| Punjab | ±24 | 5.05 | 1.110 (0.94–1.22) | 1.096 | 1.53 → 0.013 | pass |
+| Madhya Pradesh | ±24 | 6.29 | 0.803 (0.71–0.89) | 0.883 | 1.96 → 0.095 | pass |
+| Mizoram | ±24 | 3.01 | 0.834 (0.67–1.01) | 0.943 | 1.16 → 0.123 | partial |
+| Assam | ±24 | 4.54 | 1.143 (1.02–1.36) | 1.208 | 1.32 → 0.055 | pass |
+| Chhattīsgarh | ±24 | 11.77 | 0.941 (0.81–1.09) | 1.055 | 2.41 → 0.114 | partial |
+| Odisha | ±24 | 14.04 | 1.139 (0.96–1.32) | 1.201 | 2.46 → 0.053 | pass |
+| Manipur | ±24 | 4.09 | 1.041 (0.88–1.24) | 1.069 | 1.34 → 0.026 | pass |
+| Mahārāshtra | ±24 | 11.04 | 1.091 (0.97–1.21) | 1.286 | 2.15 → 0.164 | partial |
+
+State verdicts: {'pass': 5, 'partial': 3}.
 
 ## 5. Seven-day hotspot-probability forecast
 
@@ -123,4 +205,7 @@ Regional aggregation: `P(any detection in region) = 1 - prod(1 - p_cell) ** alph
 * VIIRS 750 m (VNP14/VJ114) is not distributed by FIRMS; a separate 750 m calibration pathway exists but has no data.
 * MODIS orbit drift years excluded from calibration: MODIS orbit drift detected in the loaded records (mean day-time local overpass time moved more than 0.25 h from its early baseline): Terra [2023, 2024, 2025, 2026], Aqua [2023, 2024, 2025, 2026]. Those years are excluded from calibration because their diurnal sampling differs from the historical MODIS era.
 * Administrative intelligence (states, districts, land use) covers India only.
+* MODIS row `version` strings 6.03 (2000-2022) and 61.03 (2023 onward) are not defined in readable FIRMS documentation; they are kept verbatim and the collection (C6.1) is taken from the archive name.
+* NOAA-21 archive records begin 2023-03 (pre-operational period, official FIRMS start 2024-01-17); kept as labelled actual observations, not a calibration target.
+* NRT records are provisional and never used for calibration or validation.
 * Month coverage: S-NPP months with full coverage 168; Aqua 289; Terra 305.
