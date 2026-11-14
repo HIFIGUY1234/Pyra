@@ -12,7 +12,11 @@ probability with a human-in-the-loop authority alert workflow (India focus).
 | [docs/METHODOLOGY.md](docs/METHODOLOGY.md) | Scientific method: morning-gap fixer, sensor harmonizer, uncertainty, validation, seam test, forecast |
 | [docs/SCIENTIFIC_VALIDATION.md](docs/SCIENTIFIC_VALIDATION.md) | Metrics computed from the loaded data (regenerate with `python -m app.science_report`) |
 | [docs/DATA_ACQUISITION.md](docs/DATA_ACQUISITION.md) | Git LFS recovery, FIRMS API / archive download, VIIRS 750 m, uploads |
-| [docs/COMPLETION_REPORT.md](docs/COMPLETION_REPORT.md) | Requirement status, blockers, demo script |
+| [docs/COMPLETION_REPORT.md](docs/COMPLETION_REPORT.md) | Requirement status table, test results, blockers |
+| [docs/FINAL_PROJECT_REPORT.md](docs/FINAL_PROJECT_REPORT.md) | Problem, method, data, results, limitations, reproducibility |
+| [docs/NASA_DEMO_SCRIPT.md](docs/NASA_DEMO_SCRIPT.md) | 6-minute demo with the screens and real numbers |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Setup, Docker, production configuration, backup / recovery, performance |
+| [docs/SECURITY.md](docs/SECURITY.md) | Authentication, input handling, notifications, dependency audit, known gaps |
 | `data/processed/ingestion_report.md` | Generated inventory: what is loaded, what is missing |
 
 ## Datasets in this repository (Git LFS)
@@ -54,15 +58,22 @@ npm run dev                                # http://localhost:5173 (proxies /api
 Processed Parquet summaries and a trained model are committed, so the API works immediately after
 `pip install` even before the pipeline is re-run.
 
-Pipeline flags: `--only-new` (incremental: only unseen sources), `--skip-weather`, `--skip-train`,
-`--retrain`, `--rebuild-geo`. The forecast is retrained only when new data were ingested.
+Pipeline flags: `--only-new` (incremental: only unseen sources), `--skip-ingest`, `--skip-weather`,
+`--skip-train` / `--retrain`, `--rebuild-geo`, `--recover-lfs`, `--skip-report`, `--dry-run` (show the plan,
+change nothing) and `--validate-only` (integrity + hold-out + seam as JSON). Unknown flags are rejected.
+The forecast is retrained only when new data were ingested. Step outcomes go to `data/processed/pipeline_state.json`.
+
+Containers: `cp .env.example .env && docker compose up --build` serves UI + API on :8080 (see `docs/DEPLOYMENT.md`).
 
 ## Tests & checks
 
 ```bash
-cd backend && python -m pytest tests -v     # 89 tests (API, science, auth, alerts, GIS, migrations)
-cd frontend && npm run build && npm run lint
+cd backend && python -m pytest tests -q     # 109 tests (API, science, LFS recovery, auth, alerts, GIS, migrations)
+cd frontend && npm run typecheck && npm run lint && npm test && npm run build   # 16 Vitest workflow tests
 ```
+
+CI (`.github/workflows/ci.yml`) runs these on every push and PR, with the archives left as LFS pointers,
+plus `pip-audit` and `npm audit`. `data-integration.yml` (manual) pulls the real archives and validates them.
 
 ## Authentication
 

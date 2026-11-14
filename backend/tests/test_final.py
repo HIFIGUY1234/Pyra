@@ -229,3 +229,18 @@ def test_model_selection_endpoint_validates_stage():
 def test_health_reports_database_and_storage():
     h = c.get("/api/health").json()
     assert h["database"]["ok"] is True and "free_gb" in h["storage"]
+
+
+@needs_data
+def test_terra_only_sensitivity_is_labelled_estimate():
+    r = c.get("/api/morning-gap/sensitivity").json()
+    assert r["n_months"] >= 1 and r["period"][0] < 200207
+    assert set(r["aqua_equivalent_total_by_model"]) == set(harmonize.CANDIDATES)
+    assert "no Aqua ground truth" in r["note"]
+
+
+@needs_data
+def test_stress_test_interpretation_matches_numbers():
+    st = harmonize.extrapolation_stress_test()
+    best = min(st["scores"], key=lambda k: st["scores"][k]["wape_pct"])
+    assert st["most_robust"] == best and best in st["interpretation"]

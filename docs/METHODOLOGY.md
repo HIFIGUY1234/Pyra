@@ -68,9 +68,24 @@ on held-out months is reported (nominal 90 %).
   early period; calibration trains only on months ≥ split. Metrics against the real withheld VIIRS
   record: MAE, RMSE, WAPE, MAPE (≥10 detections), bias, R², by stage, month, year and day/night, plus
   band coverage. Baselines: raw MODIS and a single constant ratio.
-* **Simulated morning-gap experiment.** Inside the hold-out, real Aqua is hidden for the first 20 months
-  (the FIRMS Terra-only length) and estimated from Terra; the hidden Aqua is the answer key. Labelled
-  *simulated*: it tests the method, it is not the 2000–2002 correction.
+* **Simulated morning-gap experiment (20-month blocks).** Blocks of 20 overlap months (the FIRMS
+  Terra-only length) are hidden in turn, every 36 overlap months. Terra→Aqua is refitted on all *other*
+  overlap years (whole years removed) and the hidden Aqua is the answer key. Labelled *simulated*: it
+  tests the method, not the 2000–2002 correction, which has no ground truth.
+* **Chain experiment.** Inside the actual hold-out, Aqua is also hidden for the first 20 VIIRS months, so
+  VIIRS must be reached from Terra through both steps. (Before this branch, the mask hid Aqua for *every*
+  earlier month: 135 months once 2000–2011 MODIS was loaded. That is now fixed.)
+* **Model selection.** Candidate forms are the default `F·x + a·N_silent`, an activity-scaled silent
+  term, a state ratio, a national ratio and a constant. They are compared with leave-one-year-out,
+  20-month blocks and forward/backward rolling origin, all year-blocked. The default is replaced only if
+  a candidate wins on both leave-one-year-out and blocks at state-month level: WAPE lower by ≥ 1 point,
+  |bias| no worse, R² no lower. Diagnostics are reported by month, day/night, state, low/high activity
+  and year. Band coverage is reported for the block and backward designs. `GET /api/validation/model-selection`.
+* **Extrapolation stress test.** The old design (train on recent years only, predict a decade back) is
+  kept and labelled. It measures temporal non-stationarity: the national seasonal ratio stays unbiased
+  while state-level detail drifts.
+* **Terra-only structural sensitivity.** The 2000–02 Aqua-equivalent total under each model form
+  (`GET /api/morning-gap/sensitivity`).
 * **Status rule (PyroScope convention).** good: WAPE ≤ 20 % and |bias| ≤ 10 %; moderate: WAPE ≤ 40 %.
 
 ## 6. Seam test
@@ -80,8 +95,13 @@ months). The target is **not** 1.0: it is the step seen by a sensor that did not
 or in simulated mode the withheld real VIIRS. Artificial jump = |ln(step / target)|, before vs after
 harmonization; the bootstrap gives a band on the harmonized step. *Genuine change detectable* = the band
 excludes 1.0 and agrees in direction with the reference step.
-**Real seam** (first S-NPP month, Jan 2012) needs ≥ 12 months of earlier MODIS; with the repository data
-(MODIS from 2012-01) it falls back to the clearly labelled **simulated seam**.
+**Real seam** (first full S-NPP month, Feb 2012) uses the loaded 2000–2011 MODIS record. A simulated seam
+is used only when fewer than 12 earlier MODIS months exist.
+**Declared verdict:** *pass* when the residual jump is ≤ 0.10 ln-units and the reference step lies inside
+the harmonized band; *partial* when the residual jump is ≤ 0.25 or reduced by ≥ 50 %; otherwise *fail*.
+When a genuine change is not detectable, the report says whether that is a resolution limit (reference
+change within the band) or damping (reference outside the band). Robustness: ±12/24/36-month windows
+nationally and the most active states (`GET /api/validation/seam-robustness`).
 
 ## 7. Seven-day forecast
 

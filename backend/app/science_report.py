@@ -122,6 +122,12 @@ def build() -> str:
         L += [f"**Extrapolation stress test** (train {st_['train_years'][0]}–{st_['train_years'][-1]} only, predict {st_['test_period'][0]}–{st_['test_period'][1]}, "
               f"{st_['n_test_months']} months): " + "; ".join(f"{k} WAPE {f(m.get('wape_pct'), 1, '%')} bias {f(m.get('bias_pct'), 1, '%')} R² {f(m.get('r2'), 2)}"
                                                             for k, m in st_["scores"].items()) + ".", "", st_["interpretation"], ""]
+    ts = harmonize.terra_only_sensitivity()
+    if ts:
+        L += [f"**Real Terra-only era ({ts['period'][0]}–{ts['period'][1]}, {ts['n_months']} months) — model-structure sensitivity.** "
+              f"Actual Terra detections {f(ts['terra_actual_total'], 0)}; Aqua-equivalent estimate totals by model form (all fitted on every overlap year): "
+              + ", ".join(f"{k} {f(v, 0)}" for k, v in ts["aqua_equivalent_total_by_model"].items())
+              + f". Spread {f(ts['spread_pct_of_selected'], 1, '%')} of the selected model's total. {ts['note']}", ""]
     L += [f"## 4. 2012 seam test ({s.get('validation_kind')})", ""]
     if s.get("real_seam_note"):
         L += [f"> {s['real_seam_note']}", ""]

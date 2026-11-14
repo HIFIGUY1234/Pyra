@@ -930,9 +930,43 @@ def extrapolation_stress_test(ref: str = VIIRS_REFERENCE) -> dict | None:
     if tr.sum() == 0 or len(tt) == 0:
         return None
     ex = _experiment(p, args, [(tr, tt)])
+    scores = {nm: _score(v["rows"])["national"] for nm, v in ex.items()}
+    best = min(scores, key=lambda n: scores[n].get("wape_pct") or 1e9)
+    sel = selected_model("mg", ref)
+    b, s_ = scores[best], scores.get(sel, {})
+    if best == sel:
+        txt = (f"The selected model ({sel}) is also the most robust form under long backward extrapolation "
+               f"(national WAPE {b['wape_pct']:.1f}%, bias {b['bias_pct']:+.1f}%).")
+    else:
+        txt = (f"Under long backward extrapolation the selected state-level model ({sel}) degrades to national WAPE "
+               f"{s_.get('wape_pct', float('nan')):.1f}% / bias {s_.get('bias_pct', float('nan')):+.1f}%, while '{best}' stays at "
+               f"{b['wape_pct']:.1f}% / {b['bias_pct']:+.1f}%: regional structure learned from recent years transfers poorly to a decade "
+               "earlier, whereas the national seasonal ratio is stable. The operational fit trains on every overlap year, so this "
+               "stress test bounds, but does not measure, the operational error; national totals far outside the overlap period "
+               "should be read with this bias in mind.")
     return {"train_years": sorted(set(int(y) for y in p.ax.year.to_numpy()[tr])),
             "test_period": [int(p.ym[tt[0]]), int(p.ym[tt[-1]])], "n_test_months": int(len(tt)),
-            "scores": {nm: _score(v["rows"])["national"] for nm, v in ex.items()},
-            "interpretation": "Training only on the most recent overlap years and predicting a decade backwards. All model forms "
-                              "degrade together here, so this measures temporal non-stationarity of the Terra/Aqua relationship; "
-                              "it is not the operational correction, which trains on every overlap year."}
+            "scores": scores, "most_robust": best, "interpretation": txt}
+
+
+def terra_only_sensitivity(ref: str = VIIRS_REFERENCE) -> dict | None:
+    """Real Terra-only era (no Aqua yet): Aqua-equivalent totals from each model form fitted on ALL overlap years.
+    There is no ground truth here; the spread between forms is a model-structure sensitivity, reported next to
+    the bootstrap band rather than hidden."""
+    p, args, train = _stage_data("mg", ref)
+    cov = store.coverage()
+    era = np.where((cov["Aqua"].to_numpy() == 0) & (cov["Terra"].to_numpy() >= 0.5))[0]
+    if len(era) == 0 or train.sum() == 0:
+        return None
+    ex = _cand_predict  # alias for brevity
+    out = {}
+    for nm in CANDIDATES:
+        yh = ex(nm, train.astype(float)[None], p, args)[0]
+        out[nm] = float(yh[era].sum())
+    sel = selected_model("mg", ref)
+    vals = np.array(list(out.values()))
+    return {"period": [int(p.ym[era[0]]), int(p.ym[era[-1]])], "n_months": int(len(era)),
+            "terra_actual_total": float(args[0][era].sum()), "aqua_equivalent_total_by_model": out, "selected_model": sel,
+            "spread_pct_of_selected": float(100 * (vals.max() - vals.min()) / out[sel]) if out[sel] > 0 else None,
+            "note": "Estimates only - there is no Aqua ground truth before July 2002. Partial-coverage scaling used in the "
+                    "operational series is not applied here, so totals can differ slightly from the Morning-Gap page."}

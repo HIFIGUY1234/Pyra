@@ -1,5 +1,5 @@
 # PyroScope ingestion report
-Generated 2026-11-14T16:56:49+00:00 - AOI bbox (68.0, 6.0, 98.0, 36.0)
+Generated 2026-11-14T17:11:04+00:00 - AOI bbox (68.0, 6.0, 98.0, 36.0)
 
 ## Archives
 

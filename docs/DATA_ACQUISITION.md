@@ -5,8 +5,16 @@ All commands run from `backend/`. Inventory at any time: `python -m app.acquire`
 
 ## 1. Repository archives (Git LFS)
 
-The three `DL_FIRE_*.zip` files are Git LFS objects. Without `git lfs pull` they are 133-byte pointers;
-discovery reports them as `lfs_pointer` and they are never parsed as ZIPs.
+The five `DL_FIRE_*.zip` files are Git LFS objects. Without `git lfs pull` they are ~133-byte pointers.
+Discovery reports them as `lfs_pointer` and never parses them as ZIPs.
+
+Recovery (`acquire.recover_lfs`) reads the expected size and SHA-256 from each pointer and downloads to
+`<name>.zip.part`. An interrupted transfer resumes with an HTTP Range request. Network errors, timeouts
+and 5xx responses are retried with exponential back-off; a 404 is reported as `remote_missing` and not
+retried. The archive is replaced only when **both size and SHA-256 match**, so a valid archive is never
+overwritten. A JSON report goes to `data/processed/lfs_recovery_report.json`. Statuses:
+`recovered`, `already_present`, `invalid_pointer`, `remote_missing`, `download_failed` (partial kept,
+resumable), `checksum_mismatch` (partial deleted).
 
 ```bash
 git lfs install && git lfs pull
@@ -14,7 +22,17 @@ git lfs install && git lfs pull
 python -m app.acquire lfs          # also: python -m app.pipeline --recover-lfs, or POST /api/data/recover-lfs (admin)
 ```
 
-Verified SHA-256 (from the pointers): M-C61 `abe840b5…26e4`, J2V-C2 `a5916fbb…a71e`, SV-C2 `258cbbf1…b27`.
+Full SHA-256 for every archive: `data/processed/archive_checksums.json` (also listed in the inventory).
+
+### Collection and version labels
+
+| Archive tag | Collection (from the name, per the FIRMS download Readme) | Row `version` values found | Meaning |
+|---|---|---|---|
+| `M-C61` | MODIS Collection 6.1 (MCD14ML) | `6.03` (2000-11 → 2022-12), `61.03` (2023-01 →), `6.1NRT` | `6.1NRT` is documented (C6.1 NRT). `6.03` and `61.03` are **not defined** in readable FIRMS documentation. They are kept verbatim and flagged *undocumented*, and are never relabelled. |
+| `SV-C2`, `J1V-C2`, `J2V-C2` | VIIRS Collection 2, 375 m (VNP14IMGT / VJ114IMGT / VJ214IMGT) | `2`, `2.0NRT` | These follow the documented convention (collection = standard processing; `NRT` suffix = provisional). |
+
+NOAA-21 archive rows start 2023-03-01, before the official FIRMS start of 2024-01-17. The inventory
+flags them as *pre-operational records*.
 
 ## 2. Missing historical MODIS (needed for the real morning-gap correction and real 2012 seam)
 

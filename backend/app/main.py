@@ -691,6 +691,12 @@ def model_selection(stage: str = Query("mg", pattern="^(mg|sh)$"), product: Opti
     return ok(harmonize.model_selection(stage, _ref(product)))
 
 
+@app.get("/api/morning-gap/sensitivity", dependencies=[Depends(need_data)])
+def mg_sensitivity(product: Optional[str] = None):
+    """Real Terra-only era: Aqua-equivalent totals by model form (structural sensitivity; no ground truth exists)."""
+    return ok(harmonize.terra_only_sensitivity(_ref(product)) or {"status": "unavailable"})
+
+
 @app.get("/api/validation/seam-robustness", dependencies=[Depends(need_data)])
 def seam_robust(product: Optional[str] = None):
     return ok(harmonize.seam_robustness(_ref(product)))

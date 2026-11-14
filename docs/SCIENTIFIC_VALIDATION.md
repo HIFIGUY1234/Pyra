@@ -1,6 +1,6 @@
 # PyroScope - Scientific Validation Report
 
-Generated 2026-11-14T16:55:16+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
+Generated 2026-11-14T17:11:04+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
 
 ## 1. Sensor coverage actually loaded
 
@@ -147,7 +147,9 @@ Block-design diagnostics: day WAPE 8.5%, night WAPE 28.0%; low-count months WAPE
 
 **Extrapolation stress test** (train 2017–2022 only, predict 200209–201612, 169 months): cell_silent WAPE 37.3% bias 29.7% R² 0.48; cell_silent_scaled WAPE 37.7% bias 26.6% R² 0.43; ratio_state WAPE 39.3% bias 29.5% R² 0.38; ratio_national WAPE 24.8% bias 1.0% R² 0.82; constant WAPE 44.8% bias -11.3% R² 0.65.
 
-Training only on the most recent overlap years and predicting a decade backwards. All model forms degrade together here, so this measures temporal non-stationarity of the Terra/Aqua relationship; it is not the operational correction, which trains on every overlap year.
+Under long backward extrapolation the selected state-level model (cell_silent) degrades to national WAPE 37.3% / bias +29.7%, while 'ratio_national' stays at 24.8% / +1.0%: regional structure learned from recent years transfers poorly to a decade earlier, whereas the national seasonal ratio is stable. The operational fit trains on every overlap year, so this stress test bounds, but does not measure, the operational error; national totals far outside the overlap period should be read with this bias in mind.
+
+**Real Terra-only era (200011–200206, 19 months) — model-structure sensitivity.** Actual Terra detections 30,872; Aqua-equivalent estimate totals by model form (all fitted on every overlap year): cell_silent 82,384, cell_silent_scaled 79,435, ratio_state 79,857, ratio_national 75,004, constant 80,407. Spread 9.0% of the selected model's total. Estimates only - there is no Aqua ground truth before July 2002. Partial-coverage scaling used in the operational series is not applied here, so totals can differ slightly from the Morning-Gap page.
 
 ## 4. 2012 seam test (actual_seam)
 
