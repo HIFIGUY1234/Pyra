@@ -24,11 +24,32 @@ from . import models as M
 from .config import (ANOMALY_TYPES, PROCESSED, REPORTS, SAT_INSTRUMENT, SAT_LABEL, SATELLITES, UPLOADS, VIIRS_CONF_SCORE,
                      VIIRS_REFERENCE)
 
-app = FastAPI(title="PyroScope API", version="1.0.0",
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(_app):
+    _production_config_guard()
+    yield
+
+
+app = FastAPI(title="PyroScope API", version="1.0.0", lifespan=_lifespan,
               description="MODIS-VIIRS hot-spot harmonization, calibrated 7-day hotspot probability and authority alert routing.")
 _origins = [o.strip() for o in os.getenv("PYROSCOPE_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-User"])
 db_sync.init_db()
+
+
+def _production_config_guard():
+    """Refuse to serve in production while the configuration has blocking errors (wildcard CORS, no admin, ...)."""
+    from . import system_config
+    v = system_config.validate()
+    log = logging.getLogger("pyroscope")
+    for i in v["issues"]:
+        (log.error if i["level"] == "error" else log.warning)("config %s: %s", i["key"], i["message"])
+    if v["mode"] == "production" and not v["ok"]:
+        raise RuntimeError(f"production configuration has {v['errors']} blocking error(s); see the log or GET /api/system/config in dev mode")
+
 
 rec = analytics._rec
 
@@ -319,8 +340,24 @@ def health():
     du = shutil.disk_usage(str(PROCESSED))
     free_gb = du.free / 1e9
     status = "ok" if db_ok else "degraded"
+    from . import system_config
     return {"status": status, "has_data": store.has_data(), "forecast": forecast.available(),
-            "database": {"ok": db_ok, "error": db_err}, "storage": {"free_gb": round(free_gb, 2), "low": free_gb < 2.0}}
+            "database": {"ok": db_ok, "error": db_err}, "storage": {"free_gb": round(free_gb, 2), "low": free_gb < 2.0},
+            "admin_bootstrap": system_config.admin_bootstrap_state(), "auth_mode": security.auth_mode()}
+
+
+@app.get("/api/system/config")
+def system_config_view(a: Actor = Depends(require())):
+    """Configuration validation for the running mode. Variable NAMES and problems only, never values."""
+    from . import system_config
+    return ok(system_config.validate())
+
+
+@app.get("/api/system/credentials")
+def system_credentials(a: Actor = Depends(require())):
+    from . import system_config
+    return ok({"items": system_config.credentials(),
+               "note": "Status only. Secrets are read from the environment and are never returned, logged or stored by PyroScope."})
 
 
 @app.get("/api/meta")
@@ -773,6 +810,70 @@ def critical(top: int = Query(60, ge=1, le=300)):
     return ok({**out, "items": items})
 
 
+@app.get("/api/critical-regions/sensitivity", dependencies=[Depends(need_data)])
+def critical_sensitivity(top: int = Query(20, ge=5, le=100)):
+    return ok(analytics.critical_sensitivity(top))
+
+
+@app.get("/api/critical-regions/weights")
+def critical_weights():
+    from . import critical_scoring as CS
+    return ok({"active": CS.active_weights(), "profiles": CS.PROFILES, "components": CS.COMPONENTS, "labels": CS.LABELS})
+
+
+class WeightsBody(BaseModel):
+    weights: dict[str, float]
+    note: str = Field("", max_length=300)
+
+
+@app.put("/api/critical-regions/weights")
+def critical_weights_set(body: WeightsBody, a: Actor = Depends(require())):
+    from . import critical_scoring as CS
+    rec = CS.set_weights(body.weights, a.username, body.note)
+    with M.Session() as s:
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="CRITICAL_WEIGHTS_SET", entity="critical_weights", entity_id=rec["version"], detail=rec))
+        s.commit()
+    analytics.clear()
+    return ok(rec)
+
+
+@app.delete("/api/critical-regions/weights")
+def critical_weights_reset(a: Actor = Depends(require())):
+    from . import critical_scoring as CS
+    CS.reset_weights()
+    analytics.clear()
+    return ok(CS.active_weights())
+
+
+@app.get("/api/infrastructure/linear/status")
+def linear_status():
+    from . import linear_gis
+    return ok(linear_gis.status())
+
+
+@app.get("/api/infrastructure/nearest")
+def linear_nearest(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180),
+                   category: str = Query("road_major"), max_km: float = Query(50, gt=0, le=200)):
+    from . import linear_gis
+    return ok(linear_gis.nearest(lat, lon, category, max_km))
+
+
+@app.get("/api/infrastructure/within")
+def linear_within(lat: float = Query(..., ge=-90, le=90), lon: float = Query(..., ge=-180, le=180),
+                  radius_km: float = Query(10, gt=0, le=100), category: str = Query("road_major")):
+    from . import linear_gis
+    if category not in linear_gis.CATEGORIES:
+        raise ValueError(f"category must be one of {list(linear_gis.CATEGORIES)}")
+    return ok(linear_gis.within(lat, lon, radius_km, category))
+
+
+@app.get("/api/viirs750/credentials")
+def viirs750_credentials():
+    """Configured / method / last access only. Never returns the token or netrc contents."""
+    from . import viirs750
+    return ok(viirs750.credentials_status())
+
+
 @app.get("/api/observations/quality", dependencies=[Depends(need_data)])
 def obs_quality(region: str = "country", days: int = Query(30, ge=7, le=120)):
     return ok(analytics.observation_quality(region, days))
@@ -1176,6 +1277,12 @@ def region_custom(body: CustomRegionBody):
 @app.get("/api/notifications/status")
 def notifications_status():
     return ok(notify.status())
+
+
+@app.get("/api/notifications/checklist")
+def notifications_checklist(a: Actor = Depends(require())):
+    from . import system_config
+    return ok({"steps": system_config.notification_checklist(), "issues": system_config.notification_issues(), "provider": notify.status()})
 
 
 @app.get("/api/notifications/check")

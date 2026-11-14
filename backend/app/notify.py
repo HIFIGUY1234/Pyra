@@ -159,11 +159,24 @@ def check_connection() -> dict:
             sm.quit()
             return {"provider": p, "ok": code == 250, "noop": code}
         except Exception as exc:
-            return {"provider": p, "ok": False, "error": f"{type(exc).__name__}: {exc}"}
+            err = redact(f"{type(exc).__name__}: {exc}")
+            from .system_config import explain_failure
+            return {"provider": p, "ok": False, "error": err, "explanation": explain_failure(err)}
     if p == "webhook":
         hosts = [h for h in os.getenv("PYROSCOPE_WEBHOOK_ALLOWED_HOSTS", "").split(",") if h.strip()]
         return {"provider": p, "ok": bool(hosts), "allowed_hosts": hosts, "note": "Webhooks are validated per delivery (https, allow-list, public address)."}
     return {"provider": p, "ok": True, "note": "Simulated provider: nothing leaves the system."}
+
+
+def redact(msg: str | None) -> str | None:
+    """Strip any configured secret from an error message before it is logged, stored or returned."""
+    if not msg:
+        return msg
+    for k in ("SMTP_PASSWORD", "PYROSCOPE_WEBHOOK_TOKEN", "SMTP_USER"):
+        v = os.getenv(k)
+        if v and len(v) >= 3:
+            msg = msg.replace(v, "***")
+    return msg
 
 
 def _send_with_retry(send, addr, body, sleep=time.sleep) -> tuple:
@@ -173,11 +186,11 @@ def _send_with_retry(send, addr, body, sleep=time.sleep) -> tuple:
             send(addr, body)
             return "SENT", None, attempt
         except TransientError as exc:
-            err = f"TransientError: {exc}"
+            err = redact(f"TransientError: {exc}")
             if attempt < MAX_ATTEMPTS:
                 sleep(RETRY_BASE_S * 2 ** (attempt - 1))
         except Exception as exc:  # permanent: configuration, validation, authentication -> no retry
-            return "FAILED", f"{type(exc).__name__}: {exc}"[:500], attempt
+            return "FAILED", redact(f"{type(exc).__name__}: {exc}")[:500], attempt
     return "FAILED", (err or "")[:500], MAX_ATTEMPTS
 
 
@@ -239,4 +252,10 @@ def log(alert_id: str | None = None, limit: int = 200) -> list[dict]:
             q = q.where(M.Alert.alert_id == alert_id)
         rows = s.execute(q.order_by(M.NotificationDelivery.id.desc()).limit(limit)).all()
         return [{"id": d.id, "alert_id": aid, "provider": d.provider, "channel": d.channel, "simulated": d.simulated, "status": d.status,
-                 "attempts": d.attempts, "error": d.error, "approved_by": d.approved_by, "at": d.created_at.isoformat() + "Z"} for d, aid in rows]
+                 "attempts": d.attempts, "error": d.error, "explanation": _explain(d.error), "approved_by": d.approved_by,
+                 "at": d.created_at.isoformat() + "Z"} for d, aid in rows]
+
+
+def _explain(err):
+    from .system_config import explain_failure
+    return explain_failure(err)

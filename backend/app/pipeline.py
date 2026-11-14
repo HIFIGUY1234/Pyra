@@ -3,7 +3,7 @@
     python -m app.pipeline [--recover-lfs] [--only-new] [--skip-ingest] [--skip-weather]
                            [--skip-train | --retrain] [--rebuild-geo] [--skip-report]
                            [--refresh-exposure] [--refresh-tle] [--compare-forecast]
-                           [--viirs750 START END] [--dry-run] [--validate-only]
+                           [--viirs750 START END] [--linear-gis] [--sensor-models] [--dry-run] [--validate-only]
 
 Archive discovery -> LFS recovery -> ZIP validation -> CSV extraction / cleaning / satellite + product
 identification / standardisation / de-duplication -> Parquet -> spatial assignment -> quality analysis
@@ -42,6 +42,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     ap.add_argument("--refresh-tle", action="store_true", help="fetch current TLEs from CelesTrak and re-validate overpass prediction")
     ap.add_argument("--compare-forecast", action="store_true", help="run the forecast candidate-model comparison (slow)")
     ap.add_argument("--viirs750", nargs=2, metavar=("START", "END"), help="search, download (Earthdata Login) and convert VIIRS 750 m granules")
+    ap.add_argument("--linear-gis", action="store_true", help="download the Geofabrik India PBF and build road / rail / power / settlement layers")
+    ap.add_argument("--sensor-models", action="store_true", help="(re)train the independent NOAA-20 and NOAA-21 forecast models and re-run the operational-reference evaluation")
     ap.add_argument("--dry-run", action="store_true", help="show what would run (archives, new sources, steps) and change nothing")
     ap.add_argument("--validate-only", action="store_true", help="validate archives and the loaded data (integrity, hold-out, seam); write nothing else")
     return ap.parse_args(argv)   # argparse exits with an error on unknown arguments
@@ -177,17 +179,29 @@ def main(argv=None):
             except Exception as exc:  # offline: the forecast trains without weather and says so
                 print(f"[pipeline]    NASA POWER unavailable ({exc}); continuing without weather features")
         ingested_ok = [k for k, v in new.items() if not v.get("error")]
-        if not args.skip_train and (ingested_ok or not forecast.available() or args.retrain):
+        if not args.skip_train and (ingested_ok or not forecast.available("Suomi NPP") or args.retrain):
             r.step("forecast_training", forecast.train)
         else:
             r.skip("forecast_training", "--skip-train" if args.skip_train else "nothing new ingested; pass --retrain to force")
+        if args.sensor_models or (not args.skip_train and (ingested_ok or args.retrain)):
+            for snr in ("NOAA-20", "NOAA-21"):
+                if snr in store.spans():
+                    r.step(f"forecast_training_{snr}", forecast.train, sensor=snr)
+                else:
+                    r.skip(f"forecast_training_{snr}", f"{snr} not loaded")
+        else:
+            r.skip("forecast_training_sensors", "pass --sensor-models (or ingest new data) to retrain NOAA-20 / NOAA-21 models")
+        from . import bridge, operational
+        bridge.clear(); operational.clear()
+        sel = r.step("operational_reference", operational.summary)
+        print(f"[pipeline]    operational reference: {sel['operational_reference']} ({sel['operational_status']})")
         r.step("database_sync", db_sync.sync_all)
         v = r.step("harmonization_validation", harmonize.validation, "country")
         print(f"[pipeline]    hold-out: {v.get('status')} | WAPE {v['overall'].get('wape_pct'):.1f}% | morning-gap WAPE "
               f"{v['morning_gap']['metrics'].get('wape_pct'):.1f}%")
         if args.refresh_exposure:
             from . import infrastructure, population
-            r.step("population", lambda: population.build(population.acquire()))
+            r.step("population", lambda: population.build(population.acquire(), method="area_weighted"))
             r.step("infrastructure", infrastructure.acquire)
         else:
             r.skip("exposure_layers", "pass --refresh-exposure to download WorldPop / OpenStreetMap")
@@ -205,6 +219,12 @@ def main(argv=None):
                 for sat in viirs750.PRODUCTS:
                     r.step(f"viirs750_{sat}", lambda s=sat: viirs750.download(viirs750.search(s, *args.viirs750)))
                 r.step("viirs750_convert", viirs750.convert)
+        if args.linear_gis:
+            from . import linear_gis
+            pbf = r.step("linear_gis_download", linear_gis.acquire)
+            r.step("linear_gis_build", linear_gis.build, pbf, node_index="sparse_file_array," + str(linear_gis.LIN_DIR / "nodes.idx"))
+        else:
+            r.skip("linear_gis", "pass --linear-gis to download and process the Geofabrik extract")
         if args.compare_forecast:
             from . import forecast_eval
             r.step("forecast_comparison", forecast_eval.compare)

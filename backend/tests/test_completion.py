@@ -340,13 +340,16 @@ def test_exposure_layers_unavailable_vs_loaded(monkeypatch, tmp_path):
     from app import analytics
     analytics.clear()
     cr = c.get("/api/critical-regions").json()
-    assert "infrastructure" not in cr["weights"] and any("infrastructure" in x for x in cr["not_available"])
+    # unavailable layer: reported, dropped per district with weights renormalised -- never scored as zero exposure
+    assert any("Infrastructure exposure" in x for x in cr["not_available"])
+    assert all("infrastructure" in it["missing_components"] and it["components"]["infrastructure"] is None for it in cr["items"])
     csv = "latitude,longitude,type\n30.9,75.85,substation\n21.1,79.0,hospital\n"
     r = c.post("/api/geo/exposure", data={"kind": "infrastructure", "source": "Test fixture (not real)"},
                files={"file": ("infra.csv", io.BytesIO(csv.encode()), "text/csv")}, headers=ADMIN)
     assert r.status_code == 200 and r.json()["rows"] == 2
     cr = c.get("/api/critical-regions").json()
-    assert "infrastructure" in cr["weights"] and abs(sum(cr["weights"].values()) - 1) < 1e-9
+    assert abs(sum(cr["weights"].values()) - 1) < 1e-9 and not any("Infrastructure exposure" in x for x in cr["not_available"])
+    assert any("infrastructure" not in it["missing_components"] for it in cr["items"])
     analytics.clear()
     gis_layers.clear()
 
