@@ -1,0 +1,635 @@
+{
+ "target": "At least one Suomi NPP VIIRS 375 m presumed-vegetation detection in the 0.25 deg cell within 7 days of the issue date",
+ "target_kind": "probability of a detectable satellite hotspot (NOT a verified ground ignition)",
+ "trained_on": "NASA FIRMS S-NPP VIIRS detections (repository archive) + NASA POWER meteorology",
+ "has_weather": true,
+ "features": [
+  "v7",
+  "v30",
+  "v90",
+  "act30",
+  "since",
+  "m30",
+  "frp30",
+  "nb7",
+  "clim",
+  "clim_n",
+  "lag52",
+  "doy_sin",
+  "doy_cos",
+  "lat",
+  "lon",
+  "lc_forest",
+  "lc_savanna",
+  "lc_cropland",
+  "lc_urban",
+  "static_share",
+  "t7",
+  "t30",
+  "p7",
+  "p30",
+  "p90",
+  "rh7",
+  "wind7",
+  "soil7",
+  "gap30"
+ ],
+ "feature_labels": {
+  "v7": "VIIRS detections, last 7 days",
+  "v30": "VIIRS detections, last 30 days",
+  "v90": "VIIRS detections, last 90 days",
+  "act30": "Days with VIIRS detections, last 30",
+  "since": "Days since last VIIRS detection",
+  "m30": "MODIS detections, last 30 days",
+  "frp30": "VIIRS FRP total, last 30 days",
+  "nb7": "Neighbouring-cell VIIRS detections, last 7 days",
+  "clim": "Seasonal recurrence (same weeks, earlier years)",
+  "clim_n": "Years of history behind recurrence",
+  "lag52": "Detected in same week last year",
+  "doy_sin": "Season (sin day-of-year)",
+  "doy_cos": "Season (cos day-of-year)",
+  "lat": "Latitude",
+  "lon": "Longitude",
+  "lc_forest": "Forest fraction",
+  "lc_savanna": "Savanna/woodland fraction",
+  "lc_cropland": "Cropland fraction",
+  "lc_urban": "Urban fraction",
+  "static_share": "Static thermal source share",
+  "t7": "Max temperature, 7-day mean",
+  "t30": "Max temperature, 30-day mean",
+  "p7": "Rainfall, last 7 days",
+  "p30": "Rainfall, last 30 days",
+  "p90": "Rainfall, last 90 days",
+  "rh7": "Relative humidity, 7-day mean",
+  "wind7": "Wind speed, 7-day mean",
+  "soil7": "Surface soil wetness, 7-day mean",
+  "gap30": "S-NPP data-gap days, last 30"
+ },
+ "split": {
+  "train_until": "2021-12-31",
+  "calibrate_until": "2023-12-31",
+  "test_from": "2024-01-01",
+  "test_until": "2026-11-07"
+ },
+ "rows": {
+  "train": 1161776,
+  "calibration": 468384,
+  "test": 629104
+ },
+ "calibration_method": "Isotonic regression fitted on 2022-2023 predictions of the XGBoost model (prefit), applied before any threshold comparison",
+ "test": {
+  "n": 629104,
+  "base_rate": 0.26806536316871643,
+  "brier": 0.09712056070566177,
+  "roc_auc": 0.9204649483364821,
+  "pr_auc": 0.8234692021448117,
+  "confusion": {
+   "60": {
+    "tp": 98035,
+    "fp": 19292,
+    "fn": 70606,
+    "tn": 441171,
+    "precision": 0.8355706700077561,
+    "recall": 0.5813236401586803,
+    "false_alarm_ratio": 0.1644293299922439,
+    "false_alarm_rate": 0.0418969602335041,
+    "missed_event_rate": 0.41867635984131973
+   },
+   "80": {
+    "tp": 61843,
+    "fp": 5010,
+    "fn": 106798,
+    "tn": 455453,
+    "precision": 0.9250594588126188,
+    "recall": 0.36671390705700274,
+    "false_alarm_ratio": 0.07494054118738126,
+    "false_alarm_rate": 0.010880353035965974,
+    "missed_event_rate": 0.6332860929429972
+   }
+  }
+ },
+ "test_uncalibrated": {
+  "n": 629104,
+  "base_rate": 0.26806536316871643,
+  "brier": 0.09712229669094086,
+  "roc_auc": 0.9204950872916382,
+  "pr_auc": 0.8256834717682838,
+  "confusion": {
+   "60": {
+    "tp": 101375,
+    "fp": 21474,
+    "fn": 67266,
+    "tn": 438989,
+    "precision": 0.8252000423283868,
+    "recall": 0.6011290255631786,
+    "false_alarm_ratio": 0.17479995767161313,
+    "false_alarm_rate": 0.04663566888110445,
+    "missed_event_rate": 0.3988709744368214
+   },
+   "80": {
+    "tp": 68495,
+    "fp": 6659,
+    "fn": 100146,
+    "tn": 453804,
+    "precision": 0.9113952683822552,
+    "recall": 0.40615864469494367,
+    "false_alarm_ratio": 0.0886047316177449,
+    "false_alarm_rate": 0.01446153111107733,
+    "missed_event_rate": 0.5938413553050563
+   }
+  }
+ },
+ "reliability": [
+  {
+   "bin_lo": 0.0,
+   "bin_hi": 0.1,
+   "n": 304956,
+   "mean_pred": 0.025487706065177917,
+   "observed": 0.025757813826203346
+  },
+  {
+   "bin_lo": 0.1,
+   "bin_hi": 0.2,
+   "n": 68792,
+   "mean_pred": 0.14155924320220947,
+   "observed": 0.14459529519081116
+  },
+  {
+   "bin_lo": 0.2,
+   "bin_hi": 0.30000000000000004,
+   "n": 49240,
+   "mean_pred": 0.2457224428653717,
+   "observed": 0.2534931004047394
+  },
+  {
+   "bin_lo": 0.30000000000000004,
+   "bin_hi": 0.4,
+   "n": 36381,
+   "mean_pred": 0.3558858036994934,
+   "observed": 0.3667024075984955
+  },
+  {
+   "bin_lo": 0.4,
+   "bin_hi": 0.5,
+   "n": 27961,
+   "mean_pred": 0.45344045758247375,
+   "observed": 0.4702979028224945
+  },
+  {
+   "bin_lo": 0.5,
+   "bin_hi": 0.6000000000000001,
+   "n": 24447,
+   "mean_pred": 0.5488356947898865,
+   "observed": 0.5657544732093811
+  },
+  {
+   "bin_lo": 0.6000000000000001,
+   "bin_hi": 0.7000000000000001,
+   "n": 24599,
+   "mean_pred": 0.6471652388572693,
+   "observed": 0.6651896238327026
+  },
+  {
+   "bin_lo": 0.7000000000000001,
+   "bin_hi": 0.8,
+   "n": 25875,
+   "mean_pred": 0.7419424057006836,
+   "observed": 0.7663381695747375
+  },
+  {
+   "bin_lo": 0.8,
+   "bin_hi": 0.9,
+   "n": 26842,
+   "mean_pred": 0.8498337864875793,
+   "observed": 0.8706504702568054
+  },
+  {
+   "bin_lo": 0.9,
+   "bin_hi": 1.0,
+   "n": 40011,
+   "mean_pred": 0.9500647187232971,
+   "observed": 0.9615605473518372
+  }
+ ],
+ "reliability_uncalibrated": [
+  {
+   "bin_lo": 0.0,
+   "bin_hi": 0.1,
+   "n": 320617,
+   "mean_pred": 0.024619676172733307,
+   "observed": 0.029957862570881844
+  },
+  {
+   "bin_lo": 0.1,
+   "bin_hi": 0.2,
+   "n": 63307,
+   "mean_pred": 0.14502421021461487,
+   "observed": 0.16374176740646362
+  },
+  {
+   "bin_lo": 0.2,
+   "bin_hi": 0.30000000000000004,
+   "n": 40729,
+   "mean_pred": 0.2473689466714859,
+   "observed": 0.2663213014602661
+  },
+  {
+   "bin_lo": 0.30000000000000004,
+   "bin_hi": 0.4,
+   "n": 31189,
+   "mean_pred": 0.34815967082977295,
+   "observed": 0.363301157951355
+  },
+  {
+   "bin_lo": 0.4,
+   "bin_hi": 0.5,
+   "n": 26372,
+   "mean_pred": 0.4488733410835266,
+   "observed": 0.45442134141921997
+  },
+  {
+   "bin_lo": 0.5,
+   "bin_hi": 0.6000000000000001,
+   "n": 24041,
+   "mean_pred": 0.5495935082435608,
+   "observed": 0.5462751388549805
+  },
+  {
+   "bin_lo": 0.6000000000000001,
+   "bin_hi": 0.7000000000000001,
+   "n": 23324,
+   "mean_pred": 0.6499833464622498,
+   "observed": 0.6393843293190002
+  },
+  {
+   "bin_lo": 0.7000000000000001,
+   "bin_hi": 0.8,
+   "n": 24371,
+   "mean_pred": 0.7502686977386475,
+   "observed": 0.7372286915779114
+  },
+  {
+   "bin_lo": 0.8,
+   "bin_hi": 0.9,
+   "n": 28140,
+   "mean_pred": 0.8519405126571655,
+   "observed": 0.842181921005249
+  },
+  {
+   "bin_lo": 0.9,
+   "bin_hi": 1.0,
+   "n": 47014,
+   "mean_pred": 0.9585210084915161,
+   "observed": 0.9528225660324097
+  }
+ ],
+ "baseline_climatology": {
+  "n": 629104,
+  "base_rate": 0.26806536316871643,
+  "brier": 0.10672613233327866,
+  "roc_auc": 0.9021013018522502,
+  "pr_auc": 0.775714240448125,
+  "confusion": {
+   "60": {
+    "tp": 87840,
+    "fp": 19874,
+    "fn": 80801,
+    "tn": 440589,
+    "precision": 0.815492879291457,
+    "recall": 0.5208697766260874,
+    "false_alarm_ratio": 0.184507120708543,
+    "false_alarm_rate": 0.043160905436484584,
+    "missed_event_rate": 0.47913022337391264
+   },
+   "80": {
+    "tp": 45424,
+    "fp": 4741,
+    "fn": 123217,
+    "tn": 455722,
+    "precision": 0.9054918768065384,
+    "recall": 0.26935324150117707,
+    "false_alarm_ratio": 0.09450812319346158,
+    "false_alarm_rate": 0.010296158431839257,
+    "missed_event_rate": 0.730646758498823
+   }
+  }
+ },
+ "brier_skill_vs_climatology": 0.09000205870499567,
+ "feature_importance": [
+  {
+   "feature": "since",
+   "label": "Days since last VIIRS detection",
+   "gain_share": 0.4020274459424394
+  },
+  {
+   "feature": "nb7",
+   "label": "Neighbouring-cell VIIRS detections, last 7 days",
+   "gain_share": 0.19837640533579276
+  },
+  {
+   "feature": "clim",
+   "label": "Seasonal recurrence (same weeks, earlier years)",
+   "gain_share": 0.11250255452725635
+  },
+  {
+   "feature": "act30",
+   "label": "Days with VIIRS detections, last 30",
+   "gain_share": 0.09018204724122836
+  },
+  {
+   "feature": "v7",
+   "label": "VIIRS detections, last 7 days",
+   "gain_share": 0.05035333962269598
+  },
+  {
+   "feature": "doy_cos",
+   "label": "Season (cos day-of-year)",
+   "gain_share": 0.030919313030763826
+  },
+  {
+   "feature": "doy_sin",
+   "label": "Season (sin day-of-year)",
+   "gain_share": 0.012555978550915598
+  },
+  {
+   "feature": "lat",
+   "label": "Latitude",
+   "gain_share": 0.01145519121568333
+  },
+  {
+   "feature": "lag52",
+   "label": "Detected in same week last year",
+   "gain_share": 0.009688057775738652
+  },
+  {
+   "feature": "p7",
+   "label": "Rainfall, last 7 days",
+   "gain_share": 0.009232458030543301
+  },
+  {
+   "feature": "p30",
+   "label": "Rainfall, last 30 days",
+   "gain_share": 0.009152580145227998
+  },
+  {
+   "feature": "lon",
+   "label": "Longitude",
+   "gain_share": 0.008398296609852035
+  },
+  {
+   "feature": "clim_n",
+   "label": "Years of history behind recurrence",
+   "gain_share": 0.008056832843115784
+  },
+  {
+   "feature": "frp30",
+   "label": "VIIRS FRP total, last 30 days",
+   "gain_share": 0.006413864889162438
+  },
+  {
+   "feature": "static_share",
+   "label": "Static thermal source share",
+   "gain_share": 0.0061798487320602735
+  },
+  {
+   "feature": "t30",
+   "label": "Max temperature, 30-day mean",
+   "gain_share": 0.00419544442271832
+  },
+  {
+   "feature": "v30",
+   "label": "VIIRS detections, last 30 days",
+   "gain_share": 0.004175693023888525
+  },
+  {
+   "feature": "rh7",
+   "label": "Relative humidity, 7-day mean",
+   "gain_share": 0.0032493003372106146
+  },
+  {
+   "feature": "p90",
+   "label": "Rainfall, last 90 days",
+   "gain_share": 0.003059555333975893
+  },
+  {
+   "feature": "lc_cropland",
+   "label": "Cropland fraction",
+   "gain_share": 0.0029236833751176065
+  },
+  {
+   "feature": "t7",
+   "label": "Max temperature, 7-day mean",
+   "gain_share": 0.0027387789113061996
+  },
+  {
+   "feature": "wind7",
+   "label": "Wind speed, 7-day mean",
+   "gain_share": 0.00260462625308622
+  },
+  {
+   "feature": "m30",
+   "label": "MODIS detections, last 30 days",
+   "gain_share": 0.002576260381403658
+  },
+  {
+   "feature": "v90",
+   "label": "VIIRS detections, last 90 days",
+   "gain_share": 0.0025260254320005754
+  },
+  {
+   "feature": "lc_forest",
+   "label": "Forest fraction",
+   "gain_share": 0.0020138951122747515
+  },
+  {
+   "feature": "soil7",
+   "label": "Surface soil wetness, 7-day mean",
+   "gain_share": 0.0018431909448247993
+  },
+  {
+   "feature": "lc_savanna",
+   "label": "Savanna/woodland fraction",
+   "gain_share": 0.0016695032044691163
+  },
+  {
+   "feature": "lc_urban",
+   "label": "Urban fraction",
+   "gain_share": 0.000929828775247657
+  }
+ ],
+ "test_by_land_use": {
+  "Forest": {
+   "n": 125766,
+   "base_rate": 0.23418888449668884,
+   "brier": 0.08695368468761444,
+   "roc_auc": 0.9300169648235012,
+   "pr_auc": 0.8142449599741407,
+   "confusion": {
+    "60": {
+     "tp": 16763,
+     "fp": 3440,
+     "fn": 12690,
+     "tn": 92873,
+     "precision": 0.8297282581794783,
+     "recall": 0.569144060027841,
+     "false_alarm_ratio": 0.1702717418205217,
+     "false_alarm_rate": 0.03571688141787713,
+     "missed_event_rate": 0.43085593997215904
+    },
+    "80": {
+     "tp": 10761,
+     "fp": 1001,
+     "fn": 18692,
+     "tn": 95312,
+     "precision": 0.914895425947968,
+     "recall": 0.36536176280854243,
+     "false_alarm_ratio": 0.08510457405203196,
+     "false_alarm_rate": 0.010393197180027618,
+     "missed_event_rate": 0.6346382371914576
+    }
+   }
+  },
+  "Other": {
+   "n": 67541,
+   "base_rate": 0.10649827867746353,
+   "brier": 0.059126563370227814,
+   "roc_auc": 0.9102872116919973,
+   "pr_auc": 0.637363636952079,
+   "confusion": {
+    "60": {
+     "tp": 2196,
+     "fp": 510,
+     "fn": 4997,
+     "tn": 59838,
+     "precision": 0.811529933481153,
+     "recall": 0.3052968163492284,
+     "false_alarm_ratio": 0.188470066518847,
+     "false_alarm_rate": 0.008450984291111553,
+     "missed_event_rate": 0.6947031836507715
+    },
+    "80": {
+     "tp": 1136,
+     "fp": 86,
+     "fn": 6057,
+     "tn": 60262,
+     "precision": 0.9296235679214403,
+     "recall": 0.15793132211872654,
+     "false_alarm_ratio": 0.07037643207855974,
+     "false_alarm_rate": 0.0014250679392854777,
+     "missed_event_rate": 0.8420686778812735
+    }
+   }
+  },
+  "Agricultural": {
+   "n": 432098,
+   "base_rate": 0.3015311360359192,
+   "brier": 0.10565904527902603,
+   "roc_auc": 0.9141633315267946,
+   "pr_auc": 0.8331920895715984,
+   "confusion": {
+    "60": {
+     "tp": 77977,
+     "fp": 15160,
+     "fn": 52314,
+     "tn": 286647,
+     "precision": 0.8372290282057614,
+     "recall": 0.5984833948622699,
+     "false_alarm_ratio": 0.1627709717942386,
+     "false_alarm_rate": 0.050230776622145944,
+     "missed_event_rate": 0.40151660513773013
+    },
+    "80": {
+     "tp": 49265,
+     "fp": 3878,
+     "fn": 81026,
+     "tn": 297929,
+     "precision": 0.9270270778841992,
+     "recall": 0.3781151422584829,
+     "false_alarm_ratio": 0.07297292211580077,
+     "false_alarm_rate": 0.01284927122300013,
+     "missed_event_rate": 0.621884857741517
+    }
+   }
+  },
+  "Municipal/Urban": {
+   "n": 3699,
+   "base_rate": 0.4606650471687317,
+   "brier": 0.13911670446395874,
+   "roc_auc": 0.8825954263593255,
+   "pr_auc": 0.8698456161439652,
+   "confusion": {
+    "60": {
+     "tp": 1099,
+     "fp": 182,
+     "fn": 605,
+     "tn": 1813,
+     "precision": 0.8579234972677595,
+     "recall": 0.6449530516431925,
+     "false_alarm_ratio": 0.14207650273224043,
+     "false_alarm_rate": 0.0912280701754386,
+     "missed_event_rate": 0.3550469483568075
+    },
+    "80": {
+     "tp": 681,
+     "fp": 45,
+     "fn": 1023,
+     "tn": 1950,
+     "precision": 0.9380165289256198,
+     "recall": 0.3996478873239437,
+     "false_alarm_ratio": 0.06198347107438017,
+     "false_alarm_rate": 0.022556390977443608,
+     "missed_event_rate": 0.6003521126760564
+    }
+   }
+  }
+ },
+ "aggregation": {
+  "alpha": 0.7300000000000001,
+  "fitted_on": "district-weeks in 2022-2023",
+  "formula": "P(any detection in region) = 1 - prod(1 - p_cell) ** alpha",
+  "test_brier": {
+   "district": {
+    "n": 96996,
+    "event_rate": 0.5099694728851318,
+    "brier": {
+     "alpha_adjusted (used)": 0.10927901417016983,
+     "independent_cells": 0.10963854193687439,
+     "max_cell": 0.13661599159240723,
+     "mean_of_cells (invalid, for contrast)": 0.20206691324710846
+    }
+   },
+   "state": {
+    "n": 4658,
+    "event_rate": 0.7797337770462036,
+    "brier": {
+     "alpha_adjusted (used)": 0.06679870188236237,
+     "independent_cells": 0.06722202152013779,
+     "max_cell": 0.12494418025016785,
+     "mean_of_cells (invalid, for contrast)": 0.4411188066005707
+    }
+   }
+  }
+ },
+ "issue_date": "2026-10-31",
+ "issues_kept": [
+  "2026-07-18",
+  "2026-07-25",
+  "2026-08-01",
+  "2026-08-08",
+  "2026-08-15",
+  "2026-08-22",
+  "2026-08-29",
+  "2026-09-05",
+  "2026-09-12",
+  "2026-09-19",
+  "2026-09-26",
+  "2026-10-03",
+  "2026-10-10",
+  "2026-10-17",
+  "2026-10-24",
+  "2026-10-31"
+ ],
+ "n_cells": 4592,
+ "uncertainty_method": "Range of 5 calibrated models trained on year-block bootstraps of the training years (model spread, not a formal interval)",
+ "explanation_method": "TreeSHAP contributions of the XGBoost model in log-odds, before calibration"
+}

@@ -1,0 +1,247 @@
+{
+ "fire_archive_J2V-C2_846939": {
+  "key": "fire_archive_J2V-C2_846939",
+  "origin": "repository",
+  "file": "fire_archive_J2V-C2_846939.csv",
+  "container": "DL_FIRE_J2V-C2_846939.zip",
+  "bytes": 171428296,
+  "quality": {
+   "rows_read": 2135511,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 0,
+   "duplicates_removed": 0,
+   "rows_kept": 2135511
+  },
+  "versions": {
+   "2": 2135511
+  },
+  "satellites": {
+   "NOAA-21": {
+    "rows": 2135511,
+    "first": "2023-03-01",
+    "last": "2026-07-31"
+   }
+  },
+  "product_types": [
+   "375m"
+  ],
+  "processed_at": "2026-11-14T08:29:55+00:00",
+  "has_anomaly_type": true
+ },
+ "fire_nrt_J2V-C2_846939": {
+  "key": "fire_nrt_J2V-C2_846939",
+  "origin": "repository",
+  "file": "fire_nrt_J2V-C2_846939.csv",
+  "container": "DL_FIRE_J2V-C2_846939.zip",
+  "bytes": 2538945,
+  "quality": {
+   "rows_read": 30498,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 30498,
+   "duplicates_removed": 0,
+   "rows_kept": 30498
+  },
+  "versions": {
+   "2.0NRT": 30498
+  },
+  "satellites": {
+   "NOAA-21": {
+    "rows": 30498,
+    "first": "2026-08-01",
+    "last": "2026-10-31"
+   }
+  },
+  "product_types": [
+   "375m"
+  ],
+  "processed_at": "2026-11-14T08:29:56+00:00",
+  "has_anomaly_type": false
+ },
+ "fire_archive_M-C61_846937": {
+  "key": "fire_archive_M-C61_846937",
+  "origin": "repository",
+  "file": "fire_archive_M-C61_846937.csv",
+  "container": "DL_FIRE_M-C61_846937.zip",
+  "bytes": 96179318,
+  "quality": {
+   "rows_read": 1233985,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 0,
+   "duplicates_removed": 0,
+   "rows_kept": 1233985
+  },
+  "versions": {
+   "6.03": 917482,
+   "61.03": 316503
+  },
+  "satellites": {
+   "Aqua": {
+    "rows": 852128,
+    "first": "2012-01-01",
+    "last": "2026-08-30"
+   },
+   "Terra": {
+    "rows": 381857,
+    "first": "2012-01-01",
+    "last": "2026-08-31"
+   }
+  },
+  "product_types": [
+   "1km"
+  ],
+  "processed_at": "2026-11-14T08:30:11+00:00",
+  "has_anomaly_type": true
+ },
+ "fire_nrt_M-C61_846937": {
+  "key": "fire_nrt_M-C61_846937",
+  "origin": "repository",
+  "file": "fire_nrt_M-C61_846937.csv",
+  "container": "DL_FIRE_M-C61_846937.zip",
+  "bytes": 332917,
+  "quality": {
+   "rows_read": 3903,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 3903,
+   "duplicates_removed": 0,
+   "rows_kept": 3903
+  },
+  "versions": {
+   "6.1NRT": 3903
+  },
+  "satellites": {
+   "Aqua": {
+    "rows": 2342,
+    "first": "2026-09-01",
+    "last": "2026-10-31"
+   },
+   "Terra": {
+    "rows": 1561,
+    "first": "2026-09-01",
+    "last": "2026-10-31"
+   }
+  },
+  "product_types": [
+   "1km"
+  ],
+  "processed_at": "2026-11-14T08:30:11+00:00",
+  "has_anomaly_type": false
+ },
+ "fire_archive_SV-C2_846940": {
+  "key": "fire_archive_SV-C2_846940",
+  "origin": "repository",
+  "file": "fire_archive_SV-C2_846940.csv",
+  "container": "DL_FIRE_SV-C2_846940.zip",
+  "bytes": 700313861,
+  "quality": {
+   "rows_read": 8726813,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 8726813,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 0,
+   "duplicates_removed": 0,
+   "rows_kept": 8726813
+  },
+  "versions": {
+   "2": 8726813
+  },
+  "satellites": {
+   "Suomi NPP": {
+    "rows": 8726813,
+    "first": "2012-01-20",
+    "last": "2026-07-31"
+   }
+  },
+  "product_types": [
+   "375m"
+  ],
+  "processed_at": "2026-11-14T08:31:52+00:00",
+  "has_anomaly_type": true
+ },
+ "fire_nrt_SV-C2_846940": {
+  "key": "fire_nrt_SV-C2_846940",
+  "origin": "repository",
+  "file": "fire_nrt_SV-C2_846940.csv",
+  "container": "DL_FIRE_SV-C2_846940.zip",
+  "bytes": 2503251,
+  "quality": {
+   "rows_read": 30073,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 30073,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 30073,
+   "duplicates_removed": 0,
+   "rows_kept": 30073
+  },
+  "versions": {
+   "2.0NRT": 30073
+  },
+  "satellites": {
+   "Suomi NPP": {
+    "rows": 30073,
+    "first": "2026-08-01",
+    "last": "2026-10-31"
+   }
+  },
+  "product_types": [
+   "375m"
+  ],
+  "processed_at": "2026-11-14T08:31:52+00:00",
+  "has_anomaly_type": false
+ }
+}
