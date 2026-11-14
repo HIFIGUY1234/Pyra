@@ -8,8 +8,15 @@ from . import alerts, forecast, grid, store
 from .analytics import _f, _rec
 
 MEANING = ("Based on the model and available information, there is an estimated {p:.0f}% probability of at least one detectable "
-           "S-NPP VIIRS active-fire hotspot in {where} during the seven days after {d}. The model is trained on NASA FIRMS satellite "
-           "detections, so this is the probability of observing a hotspot, not of a verified ground fire.")
+           "{sensor} VIIRS 375 m active-fire hotspot in {where} during the seven days after {d}. The model is trained on NASA FIRMS "
+           "{sensor} detections, so this is the probability of observing a hotspot from that satellite, not of a verified ground fire.")
+
+
+def reference_block(m: dict | None = None) -> dict:
+    """Reference platform metadata attached to every forecast output."""
+    m = m or forecast.meta()
+    return {"reference_sensor": m.get("reference_sensor"), "product": m.get("product"), "model_version": m.get("model_version"),
+            "trained_at": m.get("trained_at"), "target": m.get("target"), "serving_status": m.get("serving_status")}
 
 
 def _cells(region_id: str, issue_date: str | None = None) -> pd.DataFrame:
@@ -32,7 +39,8 @@ def region_forecast(region_id: str, issue_date: str | None = None) -> dict:
     n_region = len(store.region_cells(region_id))
     if df.empty:
         return {"status": "no_cells", "region": store.region_label(region_id), "n_region_cells": n_region,
-                "message": "None of this area's grid cells has a forecast (no S-NPP detection history inside the mapped country cells)."}
+                "message": f"None of this area's grid cells has a forecast (no {m.get('reference_sensor')} detection history inside the mapped country cells).",
+                "reference": reference_block(m)}
     alpha = m["aggregation"]["alpha"]
     agg = forecast.aggregate_region(df["p"].to_numpy(), alpha)
     lo = forecast.aggregate_region(df["p_lo"].to_numpy(), alpha)["p_any"]
@@ -70,9 +78,10 @@ def region_forecast(region_id: str, issue_date: str | None = None) -> dict:
         "headline_probability": agg["p_any"] if len(df) > 1 else float(top["p"]), "max_cell_probability": float(top["p"]),
         "risk_category": tier, "suggested_action": alerts.ACTIONS[tier],
         "tier_basis": "Risk category is set by the highest calibrated grid-cell probability in the area, compared with the thresholds applying to that cell's state / land use.",
-        "meaning": MEANING.format(p=(agg["p_any"] if len(df) > 1 else float(top["p"])) * 100, where=where, d=idate.date()),
-        "aggregation_note": "Regional probability = 1 - prod(1 - p_cell)^alpha with alpha = %.2f fitted on 2022-2023 district-weeks; bounds are the "
-                            "largest cell probability (fully dependent cells) and the independent-cells product. Cell probabilities are never averaged." % alpha,
+        "meaning": MEANING.format(p=(agg["p_any"] if len(df) > 1 else float(top["p"])) * 100, where=where, d=idate.date(), sensor=m.get("reference_sensor")),
+        "reference": reference_block(m),
+        "aggregation_note": "Regional probability = 1 - prod(1 - p_cell)^alpha with alpha = %.2f fitted on %s; bounds are the "
+                            "largest cell probability (fully dependent cells) and the independent-cells product. Cell probabilities are never averaged." % (alpha, m["aggregation"].get("fitted_on", "calibration-period district-weeks")),
         "tier_counts": df["tier"].value_counts().reindex(alerts.TIERS, fill_value=0).to_dict(),
         "land_use_mix": df["land_use"].value_counts().to_dict(),
         "supporting": {"temperature_max_7d_c": w("f_t7"), "rain_30d_mm": w("f_p30"), "humidity_7d_pct": w("f_rh7"), "wind_7d_ms": w("f_wind7"),
@@ -81,7 +90,7 @@ def region_forecast(region_id: str, issue_date: str | None = None) -> dict:
         "factors": factors, "timeline": timeline, "history": hist,
         "confidence": {"model_band_mean_width": _f((df["p_hi"] - df["p_lo"]).mean()), "observation_coverage_score": _f(max(0.0, 1 - gap / 30)),
                        "test_brier": m["test"]["brier"], "test_roc_auc": m["test"]["roc_auc"],
-                       "note": "Model confidence (spread between bootstrap models) and observation quality (S-NPP coverage in the last 30 days) are separate "
+                       "note": f"Model confidence (spread between bootstrap models) and observation quality ({m.get('reference_sensor')} coverage in the last 30 days) are separate "
                                "from the predicted probability. Low coverage is never read as low risk."},
         "thresholds": alerts.tiers_view(cfg), "thresholds_scope": {"scope_type": cfg.get("scope_type"), "scope_value": cfg.get("scope_value")},
         "trained_on": m["trained_on"], "target": m["target"],
@@ -97,7 +106,7 @@ def grid_cells(region_id: str, issue_date: str | None = None) -> dict:
     cols = ["cell_id", "lat", "lon", "west", "south", "east", "north", "p", "p_lo", "p_hi", "tier", "land_use", "state", "district", "clim", "observed", "f_gap30"]
     alpha = forecast.meta()["aggregation"]["alpha"]
     return {"issue_date": str(pd.Timestamp(df["issue_date"].iloc[0]).date()), "cells": _rec(df[cols].round(4)),
-            "regional": forecast.aggregate_region(df["p"].to_numpy(), alpha)}
+            "regional": forecast.aggregate_region(df["p"].to_numpy(), alpha), "reference": reference_block()}
 
 
 def cell_detail(cell_id: int) -> dict:
@@ -111,7 +120,7 @@ def cell_detail(cell_id: int) -> dict:
             "daily_cumulative": [float(r[f"p_d{k}"]) for k in range(1, 8)], "factors": forecast.explain(int(cell_id)),
             "jurisdiction": alerts.resolve_jurisdiction(cell_id=int(cell_id)),
             "history": [{"issue_date": str(pd.Timestamp(a).date()), "p": float(b), "observed": None if pd.isna(c) else bool(c)} for a, b, c in zip(h["issue_date"], h["p"], h["observed"])],
-            "inputs": {k[2:]: _f(r[k]) for k in r.index if k.startswith("f_")}, "seasonal_recurrence": _f(r["clim"])}
+            "inputs": {k[2:]: _f(r[k]) for k in r.index if k.startswith("f_")}, "seasonal_recurrence": _f(r["clim"]), "reference": reference_block()}
 
 
 def ranking(level: str = "district", top: int = 50) -> list:

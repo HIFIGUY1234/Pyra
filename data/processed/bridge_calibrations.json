@@ -1,0 +1,662 @@
+{
+ "pairs": [
+  {
+   "target": "NOAA-20",
+   "reference": "Suomi NPP",
+   "status": "not_calibrated",
+   "selected": null,
+   "selection_reason": "no candidate met the declared criteria: state_season_ratio: forward: WAPE 5.35 not >= 1 point better than identity 5.49; forward: not >= 1 point better than national ratio; forward: band coverage 33.3 % < 80 % | state_ratio: forward: WAPE 5.53 not >= 1 point better than identity 5.49; forward: not >= 1 point better than national ratio; forward: band coverage 16.7 % < 80 % | national_ratio: forward: WAPE 5.54 not >= 1 point better than identity 5.49; forward: band coverage 0.0 % < 80 %; backward: WAPE 5.75 not >= 1 point better than identity 5.49",
+   "matched_days": 2982,
+   "overlap_months": 100,
+   "overlap": [
+    "2018-04-01",
+    "2026-07-31"
+   ],
+   "operational_start": "2018-04-01",
+   "reference_per_target_ratio": {
+    "D": 0.9928,
+    "N": 0.9796
+   },
+   "experiments": [
+    {
+     "design": "forward: train early operational overlap, test next 12 months",
+     "train": [
+      "2018-04",
+      "2024-07"
+     ],
+     "test": [
+      "2024-08",
+      "2025-07"
+     ],
+     "test_months": 12,
+     "test_reference_detections": 561155,
+     "train_reference_detections": 3299007,
+     "state_month": {
+      "identity": {
+       "wape_pct": 5.49,
+       "bias_pct": 0.7,
+       "r2": 0.997,
+       "mae": 80.79,
+       "rmse": 218.5
+      },
+      "national_ratio": {
+       "wape_pct": 5.54,
+       "bias_pct": -0.18,
+       "r2": 0.997,
+       "mae": 81.53,
+       "rmse": 233.38
+      },
+      "state_ratio": {
+       "wape_pct": 5.53,
+       "bias_pct": 0.14,
+       "r2": 0.997,
+       "mae": 81.47,
+       "rmse": 225.1
+      },
+      "state_season_ratio": {
+       "wape_pct": 5.35,
+       "bias_pct": -0.0,
+       "r2": 0.997,
+       "mae": 78.73,
+       "rmse": 213.59
+      }
+     },
+     "national_month": {
+      "identity": {
+       "wape_pct": 1.99,
+       "bias_pct": 0.7,
+       "r2": 0.999,
+       "mae": 929.5,
+       "rmse": 1387.9
+      },
+      "national_ratio": {
+       "wape_pct": 2.37,
+       "bias_pct": -0.18,
+       "r2": 0.999,
+       "mae": 1109.84,
+       "rmse": 1671.09
+      },
+      "state_ratio": {
+       "wape_pct": 1.83,
+       "bias_pct": 0.14,
+       "r2": 0.999,
+       "mae": 855.28,
+       "rmse": 1418.75
+      },
+      "state_season_ratio": {
+       "wape_pct": 1.76,
+       "bias_pct": -0.0,
+       "r2": 1.0,
+       "mae": 825.36,
+       "rmse": 1172.25
+      }
+     },
+     "band_coverage_pct": {
+      "national_ratio": 0.0,
+      "state_ratio": 16.7,
+      "state_season_ratio": 33.3
+     },
+     "bias_by_daynight_pct": {
+      "D": {
+       "identity": 0.41,
+       "national_ratio": -0.21,
+       "state_ratio": 0.23,
+       "state_season_ratio": 0.04
+      },
+      "N": {
+       "identity": 1.73,
+       "national_ratio": -0.05,
+       "state_ratio": -0.21,
+       "state_season_ratio": -0.16
+      }
+     },
+     "coefficients": {
+      "national": {
+       "D": 0.9938,
+       "N": 0.9825
+      }
+     }
+    },
+    {
+     "design": "backward: train latest 12 months, test the 12 months before",
+     "train": [
+      "2025-08",
+      "2026-07"
+     ],
+     "test": [
+      "2024-08",
+      "2025-07"
+     ],
+     "test_months": 12,
+     "test_reference_detections": 561155,
+     "train_reference_detections": 550081,
+     "state_month": {
+      "identity": {
+       "wape_pct": 5.49,
+       "bias_pct": 0.7,
+       "r2": 0.997,
+       "mae": 80.79,
+       "rmse": 218.5
+      },
+      "national_ratio": {
+       "wape_pct": 5.75,
+       "bias_pct": -1.47,
+       "r2": 0.996,
+       "mae": 84.72,
+       "rmse": 265.61
+      },
+      "state_ratio": {
+       "wape_pct": 5.78,
+       "bias_pct": -1.13,
+       "r2": 0.997,
+       "mae": 85.2,
+       "rmse": 236.41
+      },
+      "state_season_ratio": {
+       "wape_pct": 6.03,
+       "bias_pct": -0.88,
+       "r2": 0.997,
+       "mae": 88.87,
+       "rmse": 229.8
+      }
+     },
+     "national_month": {
+      "identity": {
+       "wape_pct": 1.99,
+       "bias_pct": 0.7,
+       "r2": 0.999,
+       "mae": 929.5,
+       "rmse": 1387.9
+      },
+      "national_ratio": {
+       "wape_pct": 2.94,
+       "bias_pct": -1.47,
+       "r2": 0.998,
+       "mae": 1374.22,
+       "rmse": 2391.07
+      },
+      "state_ratio": {
+       "wape_pct": 2.36,
+       "bias_pct": -1.13,
+       "r2": 0.999,
+       "mae": 1102.95,
+       "rmse": 1913.58
+      },
+      "state_season_ratio": {
+       "wape_pct": 1.98,
+       "bias_pct": -0.88,
+       "r2": 0.999,
+       "mae": 926.88,
+       "rmse": 1400.33
+      }
+     },
+     "band_coverage_pct": {
+      "national_ratio": 25.0,
+      "state_ratio": 33.3,
+      "state_season_ratio": 50.0
+     },
+     "bias_by_daynight_pct": {
+      "D": {
+       "identity": 0.41,
+       "national_ratio": -1.17,
+       "state_ratio": -0.79,
+       "state_season_ratio": -0.53
+      },
+      "N": {
+       "identity": 1.73,
+       "national_ratio": -2.52,
+       "state_ratio": -2.33,
+       "state_season_ratio": -2.12
+      }
+     },
+     "coefficients": {
+      "national": {
+       "D": 0.9843,
+       "N": 0.9582
+      }
+     }
+    }
+   ],
+   "criteria": "The declared rule applied uniformly to EVERY candidate (incl. the national ratio): beat identity by >= 1 WAPE\npoint (and the national ratio, for state-level candidates) on BOTH splits, |bias| <= 5 %, band coverage >= 80 %.\nnoaa21._accept has a looser national-ratio fallback (first split only, no coverage check); bridges do not use it."
+  },
+  {
+   "target": "NOAA-21",
+   "reference": "Suomi NPP",
+   "status": "not_calibrated",
+   "selected": null,
+   "selection_reason": "no candidate met the declared criteria: state_season_ratio: forward: WAPE 7.52 not >= 1 point better than identity 7.93; forward: not >= 1 point better than national ratio; forward: band coverage 66.7 % < 80 % | state_ratio: forward: WAPE 7.57 not >= 1 point better than identity 7.93; forward: not >= 1 point better than national ratio; forward: band coverage 58.3 % < 80 % | national_ratio: forward: band coverage 41.7 % < 80 %; backward: WAPE 7.29 not >= 1 point better than identity 7.93; backward: band coverage 33.3 % < 80 %",
+   "matched_days": 1211,
+   "overlap_months": 31,
+   "overlap": [
+    "2024-01-17",
+    "2026-07-31"
+   ],
+   "operational_start": "2024-01-17",
+   "reference_per_target_ratio": {
+    "D": 1.0502,
+    "N": 1.0216
+   },
+   "experiments": [
+    {
+     "design": "forward: train early operational overlap, test next 12 months",
+     "train": [
+      "2024-01",
+      "2024-07"
+     ],
+     "test": [
+      "2024-08",
+      "2025-07"
+     ],
+     "test_months": 12,
+     "test_reference_detections": 561155,
+     "train_reference_detections": 378307,
+     "state_month": {
+      "identity": {
+       "wape_pct": 7.93,
+       "bias_pct": -5.28,
+       "r2": 0.99,
+       "mae": 118.92,
+       "rmse": 415.37
+      },
+      "national_ratio": {
+       "wape_pct": 6.11,
+       "bias_pct": 1.07,
+       "r2": 0.996,
+       "mae": 91.62,
+       "rmse": 265.02
+      },
+      "state_ratio": {
+       "wape_pct": 7.57,
+       "bias_pct": 1.52,
+       "r2": 0.993,
+       "mae": 113.51,
+       "rmse": 342.23
+      },
+      "state_season_ratio": {
+       "wape_pct": 7.52,
+       "bias_pct": 0.97,
+       "r2": 0.993,
+       "mae": 112.83,
+       "rmse": 351.93
+      }
+     },
+     "national_month": {
+      "identity": {
+       "wape_pct": 6.11,
+       "bias_pct": -5.28,
+       "r2": 0.99,
+       "mae": 2857.92,
+       "rmse": 5846.28
+      },
+      "national_ratio": {
+       "wape_pct": 4.01,
+       "bias_pct": 1.07,
+       "r2": 0.998,
+       "mae": 1875.41,
+       "rmse": 2537.62
+      },
+      "state_ratio": {
+       "wape_pct": 4.42,
+       "bias_pct": 1.52,
+       "r2": 0.997,
+       "mae": 2067.75,
+       "rmse": 2978.03
+      },
+      "state_season_ratio": {
+       "wape_pct": 3.95,
+       "bias_pct": 0.97,
+       "r2": 0.997,
+       "mae": 1846.02,
+       "rmse": 2949.93
+      }
+     },
+     "band_coverage_pct": {
+      "national_ratio": 41.7,
+      "state_ratio": 58.3,
+      "state_season_ratio": 66.7
+     },
+     "bias_by_daynight_pct": {
+      "D": {
+       "identity": -5.38,
+       "national_ratio": 1.97,
+       "state_ratio": 2.54,
+       "state_season_ratio": 1.76
+      },
+      "N": {
+       "identity": -4.91,
+       "national_ratio": -2.14,
+       "state_ratio": -2.12,
+       "state_season_ratio": -1.84
+      }
+     },
+     "coefficients": {
+      "national": {
+       "D": 1.0777,
+       "N": 1.0292
+      }
+     }
+    },
+    {
+     "design": "backward: train latest 12 months, test the 12 months before",
+     "train": [
+      "2025-08",
+      "2026-07"
+     ],
+     "test": [
+      "2024-08",
+      "2025-07"
+     ],
+     "test_months": 12,
+     "test_reference_detections": 561155,
+     "train_reference_detections": 550088,
+     "state_month": {
+      "identity": {
+       "wape_pct": 7.93,
+       "bias_pct": -5.28,
+       "r2": 0.99,
+       "mae": 118.92,
+       "rmse": 415.37
+      },
+      "national_ratio": {
+       "wape_pct": 7.29,
+       "bias_pct": -3.65,
+       "r2": 0.992,
+       "mae": 109.36,
+       "rmse": 379.31
+      },
+      "state_ratio": {
+       "wape_pct": 7.63,
+       "bias_pct": -3.46,
+       "r2": 0.992,
+       "mae": 114.45,
+       "rmse": 381.45
+      },
+      "state_season_ratio": {
+       "wape_pct": 7.36,
+       "bias_pct": -3.21,
+       "r2": 0.992,
+       "mae": 110.39,
+       "rmse": 370.78
+      }
+     },
+     "national_month": {
+      "identity": {
+       "wape_pct": 6.11,
+       "bias_pct": -5.28,
+       "r2": 0.99,
+       "mae": 2857.92,
+       "rmse": 5846.28
+      },
+      "national_ratio": {
+       "wape_pct": 5.42,
+       "bias_pct": -3.65,
+       "r2": 0.993,
+       "mae": 2536.41,
+       "rmse": 4941.14
+      },
+      "state_ratio": {
+       "wape_pct": 4.94,
+       "bias_pct": -3.46,
+       "r2": 0.994,
+       "mae": 2310.19,
+       "rmse": 4347.65
+      },
+      "state_season_ratio": {
+       "wape_pct": 3.8,
+       "bias_pct": -3.21,
+       "r2": 0.996,
+       "mae": 1775.94,
+       "rmse": 3484.81
+      }
+     },
+     "band_coverage_pct": {
+      "national_ratio": 33.3,
+      "state_ratio": 16.7,
+      "state_season_ratio": 25.0
+     },
+     "bias_by_daynight_pct": {
+      "D": {
+       "identity": -5.38,
+       "national_ratio": -2.9,
+       "state_ratio": -2.7,
+       "state_season_ratio": -2.29
+      },
+      "N": {
+       "identity": -4.91,
+       "national_ratio": -6.35,
+       "state_ratio": -6.2,
+       "state_season_ratio": -6.48
+      }
+     },
+     "coefficients": {
+      "national": {
+       "D": 1.0262,
+       "N": 0.9849
+      }
+     }
+    }
+   ],
+   "criteria": "The declared rule applied uniformly to EVERY candidate (incl. the national ratio): beat identity by >= 1 WAPE\npoint (and the national ratio, for state-level candidates) on BOTH splits, |bias| <= 5 %, band coverage >= 80 %.\nnoaa21._accept has a looser national-ratio fallback (first split only, no coverage check); bridges do not use it."
+  },
+  {
+   "target": "NOAA-21",
+   "reference": "NOAA-20",
+   "status": "not_calibrated",
+   "selected": null,
+   "selection_reason": "no candidate met the declared criteria: state_season_ratio: forward: not >= 1 point better than national ratio; forward: band coverage 41.7 % < 80 %; backward: not >= 1 point better than national ratio | state_ratio: forward: not >= 1 point better than national ratio; forward: band coverage 41.7 % < 80 %; backward: not >= 1 point better than national ratio | national_ratio: forward: band coverage 25.0 % < 80 %; backward: band coverage 58.3 % < 80 %",
+   "matched_days": 1240,
+   "overlap_months": 31,
+   "overlap": [
+    "2024-01-17",
+    "2026-07-31"
+   ],
+   "operational_start": "2024-01-17",
+   "reference_per_target_ratio": {
+    "D": 1.0607,
+    "N": 1.0564
+   },
+   "experiments": [
+    {
+     "design": "forward: train early operational overlap, test next 12 months",
+     "train": [
+      "2024-01",
+      "2024-07"
+     ],
+     "test": [
+      "2024-08",
+      "2025-07"
+     ],
+     "test_months": 12,
+     "test_reference_detections": 570014,
+     "train_reference_detections": 388855,
+     "state_month": {
+      "identity": {
+       "wape_pct": 7.73,
+       "bias_pct": -6.24,
+       "r2": 0.993,
+       "mae": 116.56,
+       "rmse": 349.58
+      },
+      "national_ratio": {
+       "wape_pct": 4.91,
+       "bias_pct": 0.85,
+       "r2": 0.998,
+       "mae": 73.98,
+       "rmse": 187.0
+      },
+      "state_ratio": {
+       "wape_pct": 6.31,
+       "bias_pct": 1.3,
+       "r2": 0.996,
+       "mae": 95.11,
+       "rmse": 262.8
+      },
+      "state_season_ratio": {
+       "wape_pct": 6.47,
+       "bias_pct": 1.09,
+       "r2": 0.995,
+       "mae": 97.56,
+       "rmse": 283.59
+      }
+     },
+     "national_month": {
+      "identity": {
+       "wape_pct": 6.45,
+       "bias_pct": -6.24,
+       "r2": 0.991,
+       "mae": 3065.08,
+       "rmse": 5562.5
+      },
+      "national_ratio": {
+       "wape_pct": 2.54,
+       "bias_pct": 0.85,
+       "r2": 0.999,
+       "mae": 1207.09,
+       "rmse": 1641.35
+      },
+      "state_ratio": {
+       "wape_pct": 3.1,
+       "bias_pct": 1.3,
+       "r2": 0.999,
+       "mae": 1470.27,
+       "rmse": 2047.8
+      },
+      "state_season_ratio": {
+       "wape_pct": 3.22,
+       "bias_pct": 1.09,
+       "r2": 0.999,
+       "mae": 1528.63,
+       "rmse": 2200.55
+      }
+     },
+     "band_coverage_pct": {
+      "national_ratio": 25.0,
+      "state_ratio": 41.7,
+      "state_season_ratio": 41.7
+     },
+     "bias_by_daynight_pct": {
+      "D": {
+       "identity": -6.13,
+       "national_ratio": 1.01,
+       "state_ratio": 1.27,
+       "state_season_ratio": 0.91
+      },
+      "N": {
+       "identity": -6.61,
+       "national_ratio": 0.29,
+       "state_ratio": 1.39,
+       "state_season_ratio": 1.76
+      }
+     },
+     "coefficients": {
+      "national": {
+       "D": 1.0761,
+       "N": 1.074
+      }
+     }
+    },
+    {
+     "design": "backward: train latest 12 months, test the 12 months before",
+     "train": [
+      "2025-08",
+      "2026-07"
+     ],
+     "test": [
+      "2024-08",
+      "2025-07"
+     ],
+     "test_months": 12,
+     "test_reference_detections": 570014,
+     "train_reference_detections": 596046,
+     "state_month": {
+      "identity": {
+       "wape_pct": 7.73,
+       "bias_pct": -6.24,
+       "r2": 0.993,
+       "mae": 116.56,
+       "rmse": 349.58
+      },
+      "national_ratio": {
+       "wape_pct": 5.47,
+       "bias_pct": -2.18,
+       "r2": 0.997,
+       "mae": 82.46,
+       "rmse": 226.43
+      },
+      "state_ratio": {
+       "wape_pct": 5.87,
+       "bias_pct": -2.15,
+       "r2": 0.996,
+       "mae": 88.45,
+       "rmse": 244.4
+      },
+      "state_season_ratio": {
+       "wape_pct": 6.31,
+       "bias_pct": -1.96,
+       "r2": 0.996,
+       "mae": 95.13,
+       "rmse": 271.61
+      }
+     },
+     "national_month": {
+      "identity": {
+       "wape_pct": 6.45,
+       "bias_pct": -6.24,
+       "r2": 0.991,
+       "mae": 3065.08,
+       "rmse": 5562.5
+      },
+      "national_ratio": {
+       "wape_pct": 2.91,
+       "bias_pct": -2.18,
+       "r2": 0.998,
+       "mae": 1380.77,
+       "rmse": 2882.34
+      },
+      "state_ratio": {
+       "wape_pct": 2.68,
+       "bias_pct": -2.15,
+       "r2": 0.998,
+       "mae": 1270.95,
+       "rmse": 2619.67
+      },
+      "state_season_ratio": {
+       "wape_pct": 2.85,
+       "bias_pct": -1.96,
+       "r2": 0.998,
+       "mae": 1353.06,
+       "rmse": 2667.18
+      }
+     },
+     "band_coverage_pct": {
+      "national_ratio": 58.3,
+      "state_ratio": 50.0,
+      "state_season_ratio": 50.0
+     },
+     "bias_by_daynight_pct": {
+      "D": {
+       "identity": -6.13,
+       "national_ratio": -1.72,
+       "state_ratio": -1.63,
+       "state_season_ratio": -1.3
+      },
+      "N": {
+       "identity": -6.61,
+       "national_ratio": -3.81,
+       "state_ratio": -3.99,
+       "state_season_ratio": -4.32
+      }
+     },
+     "coefficients": {
+      "national": {
+       "D": 1.047,
+       "N": 1.03
+      }
+     }
+    }
+   ],
+   "criteria": "The declared rule applied uniformly to EVERY candidate (incl. the national ratio): beat identity by >= 1 WAPE\npoint (and the national ratio, for state-level candidates) on BOTH splits, |bias| <= 5 %, band coverage >= 80 %.\nnoaa21._accept has a looser national-ratio fallback (first split only, no coverage check); bridges do not use it."
+  }
+ ],
+ "principle": "Bridges link operational successors to the historical reference scale for comparison only. The historical S-NPP-equivalent record is never altered; failed bridges leave the successor as an independent actual stream."
+}

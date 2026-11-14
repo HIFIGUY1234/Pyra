@@ -320,6 +320,32 @@ class AlertRecipient(Base):
     alert = relationship("Alert", back_populates="recipients")
 
 
+class OperationalSelection(Base):
+    """Administrator choice of the operational VIIRS reference (NULL platform = evidence default). History kept."""
+    __tablename__ = "operational_selections"
+    id = Column(Integer, primary_key=True)
+    platform = Column(String(40))
+    selected_by = Column(String(60), nullable=False)
+    reason = Column(String(500))
+    created_at = Column(DateTime, default=now, index=True)
+
+
+class DataJob(Base):
+    """Background data-acquisition / processing job (visible state, cooperative cancellation)."""
+    __tablename__ = "data_jobs"
+    id = Column(Integer, primary_key=True)
+    kind = Column(String(60), nullable=False, index=True)
+    params = Column(JSON)
+    status = Column(String(20), nullable=False, default="QUEUED", index=True)   # QUEUED RUNNING DONE FAILED CANCELLED
+    progress = Column(JSON)
+    error = Column(Text)
+    requested_by = Column(String(60))
+    cancel_requested = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=now, index=True)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+
 class NotificationDelivery(Base):
     """Delivery log for every notification attempt (simulated or through a configured provider)."""
     __tablename__ = "notification_deliveries"

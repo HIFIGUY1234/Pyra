@@ -16,10 +16,11 @@ DISCLAIMERS = [
     "VIIRS-equivalent values outside the VIIRS record are statistical estimates, not satellite detections.",
     "Uncertainty bands are 5-95% bootstrap resampling ranges, not formal confidence intervals or guarantees.",
     "Days or months without sensor coverage are missing data, not zero fire activity or low risk.",
-    "Forecast probabilities are the probability of a detectable S-NPP VIIRS hotspot, not of a verified ground fire.",
+    "Forecast probabilities are the probability of a detectable hotspot from the model's stated target satellite (VIIRS 375 m), not of a verified ground fire.",
+    "Suomi NPP science-data delivery ended on 2 Nov 2026: S-NPP remains the HISTORICAL harmonization reference; live forecasts use a separately validated operational platform.",
     "Alert thresholds (60% / 80%) are configurable prototype starting points, not statutory values.",
     "A satellite hotspot is an unverified thermal anomaly until confirmed by the responsible authority; land-use class identifies who is responsible, not the cause.",
-    "Notifications in this prototype are simulated in-app entries. No external message or public warning is sent.",
+    "Notifications are simulated in-app entries unless an administrator configured an external provider; no public warning is ever issued.",
 ]
 
 
@@ -185,7 +186,8 @@ def _pdf(data: dict, path, title: str, user: str):
                  f"highest cell: {f['max_cell_probability'] * 100:.0f}%. {f['meaning']}"),
                table([["Tier"] + list(f["tier_counts"].keys()), ["Grid cells"] + [str(x) for x in f["tier_counts"].values()]]),
                P(f"{f['aggregation_note']} Test-period Brier score {f['confidence']['test_brier']:.3f}, ROC-AUC {f['confidence']['test_roc_auc']:.3f} "
-                 f"({forecast.meta()['split']['test_from']} onward). Observation coverage score: {_fmt((f['confidence']['observation_coverage_score'] or 0) * 100)}%.", small)]
+                 f"({forecast.meta()['split']['test_from']} onward). Observation coverage score: {_fmt((f['confidence']['observation_coverage_score'] or 0) * 100)}%. "
+                 f"Target sensor: {f['reference']['reference_sensor']} (model {f['reference']['model_version']}, status {f['reference']['serving_status']['status']}).", small)]
     else:
         el.append(P(f.get("message", "Forecast unavailable.")))
     el.append(P("10. Authority alert routing and acknowledgement log", h2))

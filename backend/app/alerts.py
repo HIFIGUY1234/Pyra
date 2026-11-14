@@ -216,7 +216,9 @@ def evaluate(issue_date: str | None = None, actor: str = "system", actor_role: s
                 "grid_cells": [{"cell_id": int(r.cell_id), "lat": float(r.lat), "lon": float(r.lon), "probability": float(r.p), "p_lower": float(r.p_lo),
                                 "p_upper": float(r.p_hi), "tier": r.tier} for r in g.sort_values("p", ascending=False).itertuples()],
                 "probability_pct": round(float(top["p"]) * 100, 1), "risk_category": tier,
-                "probability_meaning": f"Estimated {top['p'] * 100:.0f}% probability of at least one detectable S-NPP VIIRS active-fire hotspot in the highest-risk "
+                "reference": {"reference_sensor": forecast.meta().get("reference_sensor"), "model_version": forecast.meta().get("model_version"),
+                              "serving_status": forecast.meta().get("serving_status")},
+                "probability_meaning": f"Estimated {top['p'] * 100:.0f}% probability of at least one detectable {forecast.meta().get('reference_sensor')} VIIRS 375 m active-fire hotspot in the highest-risk "
                                        f"0.25 deg cell during the 7 days after {idate.date()}. Not a probability of verified ground ignition.",
                 "regional_summary": agg, "prediction_period": {"from": str((idate + pd.Timedelta(days=1)).date()), "to": str((idate + pd.Timedelta(days=7)).date()), "label": "Next 7 days"},
                 "generated_at_utc": now_utc.isoformat(timespec="seconds"), "generated_at_local": now_utc.astimezone(IST).isoformat(timespec="seconds"),

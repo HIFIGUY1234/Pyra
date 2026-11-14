@@ -1,15 +1,18 @@
-"""Grid-cell 7-day probability of a detectable S-NPP VIIRS active-fire hotspot.
+"""Grid-cell 7-day probability of a detectable VIIRS active-fire hotspot, per target sensor.
 
-TARGET (what a probability means): P(at least one S-NPP VIIRS 375 m presumed-vegetation
+TARGET (what a probability means): P(at least one <sensor> VIIRS 375 m presumed-vegetation
 detection in the 0.25 deg cell during the 7 days after the issue date). This is the
-probability of *observing a satellite hotspot*, not of a ground-verified ignition.
+probability of *observing a satellite hotspot* from that one satellite, not of a
+ground-verified ignition.
 
-Chronological design (no random split):  train <= 2021 | calibrate 2022-2023 | test >= 2024.
-XGBoost scores are calibrated with isotonic regression fitted on the calibration years
-only; all reported metrics come from the untouched test years.
+One independent model per target sensor (Suomi NPP = legacy/historical, NOAA-20, NOAA-21).
+Their observations are never pooled, and calibrators are never transferred between sensors.
 
-Weeks whose target window overlaps an S-NPP data gap have an UNKNOWN label and are
-dropped -- a missing observation is never used as a "no fire" example.
+Chronological design per sensor (declared in SENSOR_CONFIG before results were seen):
+train | isotonic calibration | test, split on label-window END dates.
+Weeks whose target window overlaps a data gap of the target sensor, or extends into its
+near-real-time (NRT) period, have an UNKNOWN label and are dropped from training, calibration
+and test -- a missing observation is never used as a "no fire" example.
 """
 from __future__ import annotations
 
@@ -24,11 +27,33 @@ from . import grid, store, weather
 from .config import FORECAST_HORIZON_DAYS, MODELS, PROCESSED, RNG_SEED, VIIRS_REFERENCE
 
 H = FORECAST_HORIZON_DAYS
-TRAIN_END, CALIB_END = "2021-12-31", "2023-12-31"
+TRAIN_END, CALIB_END = "2021-12-31", "2023-12-31"        # legacy Suomi NPP model
 FC_PATH = PROCESSED / "forecast_cells.parquet"
 CONTRIB_PATH = PROCESSED / "forecast_contrib.parquet"
 META_PATH = MODELS / "forecast_meta.json"
 MODEL_PATH = MODELS / "forecast_models.pkl"
+SENSOR_MODELS = MODELS / "sensors"
+
+# Per-sensor chronological splits (label-window end dates). Declared before training; never tuned on test results.
+# label_start excludes pre-operational records from labels (NOAA-21 FIRMS operational start 2024-01-17).
+SENSOR_CONFIG = {
+    "Suomi NPP": {"train_end": TRAIN_END, "calib_end": CALIB_END, "label_start": None, "legacy": True},
+    "NOAA-20": {"train_end": "2022-12-31", "calib_end": "2024-06-30", "label_start": "2018-04-01", "legacy": False},
+    "NOAA-21": {"train_end": "2025-03-31", "calib_end": "2025-09-30", "label_start": "2024-01-17", "legacy": False},
+}
+
+
+def slug(sensor: str) -> str:
+    return sensor.lower().replace(" ", "-")
+
+
+def paths(sensor: str = VIIRS_REFERENCE) -> dict:
+    """Model artefact locations. The legacy S-NPP model keeps its original paths (backward compatible)."""
+    if SENSOR_CONFIG.get(sensor, {}).get("legacy"):
+        return {"meta": META_PATH, "model": MODEL_PATH, "fc": FC_PATH, "contrib": CONTRIB_PATH}
+    d = SENSOR_MODELS / slug(sensor)
+    return {"meta": d / "forecast_meta.json", "model": d / "forecast_models.pkl", "fc": d / "forecast_cells.parquet",
+            "contrib": d / "forecast_contrib.parquet"}
 N_ISSUES_KEPT = 16
 ENSEMBLE = 5
 
@@ -42,7 +67,7 @@ FEATURE_LABELS = {
     "lc_cropland": "Cropland fraction", "lc_urban": "Urban fraction", "static_share": "Static thermal source share",
     "t7": "Max temperature, 7-day mean", "t30": "Max temperature, 30-day mean", "p7": "Rainfall, last 7 days",
     "p30": "Rainfall, last 30 days", "p90": "Rainfall, last 90 days", "rh7": "Relative humidity, 7-day mean",
-    "wind7": "Wind speed, 7-day mean", "soil7": "Surface soil wetness, 7-day mean", "gap30": "S-NPP data-gap days, last 30",
+    "wind7": "Wind speed, 7-day mean", "soil7": "Surface soil wetness, 7-day mean", "gap30": "Target-sensor data-gap days, last 30",
 }
 FEATURES = list(FEATURE_LABELS)
 FACTOR_GROUPS = {
@@ -71,14 +96,16 @@ def _win(cs, idx, w):
     return cs[idx + 1] - cs[np.clip(idx + 1 - w, 0, None)]
 
 
-def build_dataset(log=print):
-    sp = store.spans()[VIIRS_REFERENCE]
+def build_dataset(log=print, sensor: str = VIIRS_REFERENCE):
+    if sensor not in store.spans():
+        raise ValueError(f"{sensor} is not loaded")
+    sp = store.spans()[sensor]
     days = pd.date_range(sp["first"], sp["last"], freq="D")
     D = len(days)
     gap = np.isin(days.strftime("%Y-%m-%d"), sp["gap_days"])
     d = store.daily()
     cells = store.cells()
-    v = d[d["satellite"] == VIIRS_REFERENCE].groupby(["acq_date", "cell_id"], observed=True).agg(n=("n_veg", "sum"), frp=("frp_sum", "sum")).reset_index()
+    v = d[d["satellite"] == sensor].groupby(["acq_date", "cell_id"], observed=True).agg(n=("n_veg", "sum"), frp=("frp_sum", "sum")).reset_index()
     ids = np.array(sorted(set(v["cell_id"].unique()) & set(cells.index[cells["in_country"]])))
     cpos = pd.Series(np.arange(len(ids), dtype=float), index=ids)
     C = len(ids)
@@ -97,11 +124,15 @@ def build_dataset(log=print):
     cs = np.vstack([np.zeros((1, C), "float32"), np.cumsum(V, 0, dtype="float32")])
     for w, nm in ((7, "v7"), (30, "v30"), (90, "v90")):
         X[:, :, f[nm]] = np.log1p(_win(cs, idx, w))
-    # labels for horizons 1..H (NaN when the window is not fully observed)
+    # labels for horizons 1..H (NaN when the window is not fully observed, extends into NRT, or precedes label_start)
     Y = np.full((H, I, C), np.nan, dtype="float32")
     gcs = np.concatenate([[0], np.cumsum(gap)])
+    sci_last = int(np.searchsorted(days, pd.Timestamp(sp.get("last_typed") or sp["last"]), side="right") - 1)
+    lab0 = SENSOR_CONFIG.get(sensor, {}).get("label_start")
+    lab0_i = int(np.searchsorted(days, pd.Timestamp(lab0))) if lab0 else 0
+    legacy = SENSOR_CONFIG.get(sensor, {}).get("legacy", False)
     for h in range(1, H + 1):
-        okw = (idx + h <= last)
+        okw = (idx + h <= last) if legacy else ((idx + h <= sci_last) & (idx + 1 >= lab0_i))
         end = np.clip(idx + h, 0, last)
         ev = (cs[end + 1] - cs[idx + 1]) > 0
         gaps_in = gcs[end + 1] - gcs[idx + 1]
@@ -142,7 +173,9 @@ def build_dataset(log=print):
     for i in range(I):
         prior = np.where((yr < yr[i]) & (np.minimum(np.abs(bucket - bucket[i]), 52 - np.abs(bucket - bucket[i])) <= 1))[0]
         if len(prior):
-            with np.errstate(invalid="ignore"):
+            import warnings
+            with np.errstate(invalid="ignore"), warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)   # all-unknown prior weeks -> NaN (no history), by design
                 X[i, :, f["clim"]] = np.nanmean(y7[prior], axis=0)
             X[i, :, f["clim_n"]] = len(np.unique(yr[prior]))
         lag = np.where(np.abs((dates[i] - dates).days - 364) <= 7)[0]
@@ -187,7 +220,8 @@ def build_dataset(log=print):
                                 ("wind7", "wind", 7, "mean"), ("soil7", "soil_wet", 7, "mean")):
             X[:, :, f[nm]] = wfeat(col, w, how)
         del wx
-    return {"X": X, "Y": Y, "dates": dates, "cells": ids, "has_weather": has_weather}
+    return {"X": X, "Y": Y, "dates": dates, "cells": ids, "has_weather": has_weather, "sensor": sensor,
+            "science_last": str(days[sci_last].date()), "data_last": str(days[last].date())}
 
 
 def _clf_metrics(y, p, thresholds=(0.6, 0.8)):
@@ -235,15 +269,23 @@ def aggregate_region(p: np.ndarray, alpha: float) -> dict:
             "top_decile_any": float(1 - np.exp(alpha * np.log1p(-top).sum())), "alpha": float(alpha)}
 
 
-def train(log=print) -> dict:
+def train(log=print, sensor: str = VIIRS_REFERENCE) -> dict:
+    import hashlib
+    from datetime import datetime, timezone
+
     import xgboost as xgb
     from sklearn.isotonic import IsotonicRegression
 
-    ds = build_dataset(log)
+    from . import forecast_eval as FE
+    cfg = SENSOR_CONFIG[sensor]
+    train_end, calib_end = cfg["train_end"], cfg["calib_end"]
+    P = paths(sensor)
+    P["meta"].parent.mkdir(parents=True, exist_ok=True)
+    ds = build_dataset(log, sensor)
     X, Y, dates, ids = ds["X"], ds["Y"], ds["dates"], ds["cells"]
     I, C, Fn = X.shape
     end = dates + pd.Timedelta(days=H)
-    seg = np.where(end <= pd.Timestamp(TRAIN_END), 0, np.where(end <= pd.Timestamp(CALIB_END), 1, 2))
+    seg = np.where(end <= pd.Timestamp(train_end), 0, np.where(end <= pd.Timestamp(calib_end), 1, 2))
     Xf = X.reshape(I * C, Fn)
     segf = np.repeat(seg, C)
     yrf = np.repeat(dates.year.to_numpy(), C)
@@ -265,15 +307,22 @@ def train(log=print) -> dict:
     iso = IsotonicRegression(y_min=0, y_max=1, out_of_bounds="clip").fit(raw(bst, ca), y7[ca])
     p_te_raw = raw(bst, te)
     p_te = iso.predict(p_te_raw)
+    if min(len(tr), len(ca), len(te)) < 1000 or y7[tr].mean() in (0, 1):
+        raise ValueError(f"{sensor}: insufficient labelled rows (train={len(tr)}, calib={len(ca)}, test={len(te)})")
+    test_until = str(end[np.unique(te // C)].max().date()) if len(te) else None
     meta = {
-        "target": f"At least one {VIIRS_REFERENCE} VIIRS 375 m presumed-vegetation detection in the 0.25 deg cell within {H} days of the issue date",
+        "reference_sensor": sensor, "product": "VIIRS 375 m active fire (FIRMS C2), presumed-vegetation detections",
+        "target": f"At least one {sensor} VIIRS 375 m presumed-vegetation detection in the 0.25 deg cell within {H} days of the issue date",
         "target_kind": "probability of a detectable satellite hotspot (NOT a verified ground ignition)",
-        "trained_on": "NASA FIRMS S-NPP VIIRS detections (repository archive) + NASA POWER meteorology" if ds["has_weather"] else "NASA FIRMS detections only (weather layer unavailable)",
+        "trained_on": f"NASA FIRMS {sensor} VIIRS detections (science-quality archive only; NRT excluded from labels) + MODIS context"
+                      + (" + NASA POWER meteorology" if ds["has_weather"] else " (weather layer unavailable)"),
         "has_weather": ds["has_weather"], "features": FEATURES, "feature_labels": FEATURE_LABELS,
-        "split": {"train_until": TRAIN_END, "calibrate_until": CALIB_END, "test_from": str((pd.Timestamp(CALIB_END) + pd.Timedelta(days=1)).date()),
-                  "test_until": str(end[seg == 2].max().date()) if (seg == 2).any() else None},
+        "science_quality_last": ds["science_last"], "data_last": ds["data_last"], "label_start": cfg.get("label_start"),
+        "nrt_in_labels": bool(cfg.get("legacy")),
+        "split": {"train_until": train_end, "calibrate_until": calib_end, "test_from": str((pd.Timestamp(calib_end) + pd.Timedelta(days=1)).date()),
+                  "test_until": test_until},
         "rows": {"train": int(len(tr)), "calibration": int(len(ca)), "test": int(len(te))},
-        "calibration_method": "Isotonic regression fitted on 2022-2023 predictions of the XGBoost model (prefit), applied before any threshold comparison",
+        "calibration_method": f"Isotonic regression fitted only on {sensor} calibration-period predictions of the {sensor} XGBoost model (never transferred between sensors)",
         "test": _clf_metrics(y7[te], p_te), "test_uncalibrated": _clf_metrics(y7[te], p_te_raw),
         "reliability": _reliability(y7[te], p_te), "reliability_uncalibrated": _reliability(y7[te], p_te_raw),
     }
@@ -329,6 +378,23 @@ def train(log=print) -> dict:
             rows.append(a[a.index != "none"])
         return pd.concat(rows)
 
+    # extended, sensor-specific evaluation: BSS, ECE, specificity and breakdowns (test period only)
+    clim_b = meta.get("baseline_climatology", {}).get("brier")
+    meta["evaluation"] = FE.metrics(y7[te], p_te, clim_b)
+    iss = te // C
+    cel = te % C
+    bd_frame = pd.DataFrame({"y": y7[te], "p": p_te, "month": dates.month.to_numpy()[iss],
+                             "state": cells_df["state"].to_numpy()[cel], "land_use": cells_df["land_use"].to_numpy()[cel],
+                             "gap": Xf[te, FEATURES.index("gap30")] > 0, "v30": Xf[te, FEATURES.index("v30")]})
+    bd_frame["season"] = bd_frame["month"].map(FE.SEASON)
+    bd_frame["coverage"] = np.where(bd_frame["gap"], "gap days in last 30", "fully observed last 30")
+    bd_frame["activity"] = pd.cut(np.expm1(bd_frame["v30"]), [-1, 0, 5, 50, np.inf], labels=["none", "1-5", "6-50", ">50"]).astype(str)
+
+    def _bd(col):
+        return {str(k): FE.metrics(g["y"].to_numpy(), g["p"].to_numpy(), clim_b) for k, g in bd_frame.groupby(col, observed=True)}
+    meta["breakdowns"] = {c: _bd(c) for c in ("month", "season", "state", "land_use", "coverage", "activity")}
+    meta["breakdown_note"] = "No day/night breakdown: the target is any detection in 7 days, not a day/night-specific event."
+
     rc = regional(dist, np.where(seg == 1)[0])
     grid_a = np.linspace(0.05, 1, 96)
     ll = [-(rc["y"] * np.log(np.clip(1 - np.exp(a * rc["s"]), 1e-9, 1)) + (1 - rc["y"]) * (a * rc["s"])).mean() for a in grid_a]
@@ -340,7 +406,7 @@ def train(log=print) -> dict:
                 "max_cell": rt["mx"], "mean_of_cells (invalid, for contrast)": rt["mean"]}
         agg_eval[nm] = {"n": int(len(rt)), "event_rate": float(rt["y"].mean()),
                         "brier": {k: float(((v - rt["y"]) ** 2).mean()) for k, v in cand.items()}}
-    meta["aggregation"] = {"alpha": alpha, "fitted_on": "district-weeks in 2022-2023",
+    meta["aggregation"] = {"alpha": alpha, "fitted_on": f"district-weeks in the {sensor} calibration period",
                            "formula": "P(any detection in region) = 1 - prod(1 - p_cell) ** alpha", "test_brier": agg_eval}
 
     # store recent issues (with verification where the window has passed) + explanations for the latest
@@ -358,53 +424,128 @@ def train(log=print) -> dict:
             r["f_" + nm] = X[i, :, FEATURES.index(nm)]
         rows.append(r)
     fc = pd.concat(rows, ignore_index=True)
-    fc.to_parquet(FC_PATH, index=False)
+    fc.to_parquet(P["fc"], index=False)
     contrib = bst.predict(xgb.DMatrix(X[-1], feature_names=FEATURES), pred_contribs=True)
     cdf = pd.DataFrame(contrib[:, :-1], columns=FEATURES)
     cdf.insert(0, "cell_id", ids)
     cdf["bias"] = contrib[:, -1]
-    cdf.to_parquet(CONTRIB_PATH, index=False)
-    with open(MODEL_PATH, "wb") as fh:
-        pickle.dump({"model": bst.save_raw("json"), "iso": iso}, fh)
+    cdf.to_parquet(P["contrib"], index=False)
+    raw_model = bst.save_raw("json")
+    with open(P["model"], "wb") as fh:
+        pickle.dump({"model": raw_model, "iso": iso, "sensor": sensor}, fh)
     meta.update(issue_date=str(dates[-1].date()), issues_kept=[str(x.date()) for x in dates[keep]], n_cells=int(C),
                 uncertainty_method=f"Range of {ENSEMBLE} calibrated models trained on year-block bootstraps of the training years (model spread, not a formal interval)",
                 explanation_method="TreeSHAP contributions of the XGBoost model in log-odds, before calibration")
-    META_PATH.write_text(json.dumps(meta, indent=1))
+    meta["trained_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    meta["model_version"] = f"{slug(sensor)}-xgb-{hashlib.sha256(bytes(raw_model)).hexdigest()[:10]}"
+    P["meta"].write_text(json.dumps(meta, indent=1, default=str))
     clear()
     log(f"[forecast] test Brier={meta['test']['brier']:.4f} AUC={meta['test']['roc_auc']:.3f} alpha={alpha:.2f}")
     return meta
 
 
 # --------------------------------------------------------------------------- serving
-@lru_cache(maxsize=1)
-def meta() -> dict:
-    return json.loads(META_PATH.read_text()) if META_PATH.exists() else {}
+from contextvars import ContextVar
+
+_override: ContextVar[str | None] = ContextVar("forecast_sensor", default=None)
 
 
-@lru_cache(maxsize=1)
-def cells_fc() -> pd.DataFrame:
-    return pd.read_parquet(FC_PATH) if FC_PATH.exists() else pd.DataFrame()
+def set_request_sensor(sensor: str | None):
+    """Per-request explicit target sensor (API ?sensor=). Returns the token for reset."""
+    if sensor is not None and sensor not in models_available():
+        raise ValueError(f"no forecast model for '{sensor}'; available: {models_available()}")
+    return _override.set(sensor)
 
 
-@lru_cache(maxsize=1)
-def contribs() -> pd.DataFrame:
-    return pd.read_parquet(CONTRIB_PATH).set_index("cell_id") if CONTRIB_PATH.exists() else pd.DataFrame()
+def active_sensor() -> str:
+    """Target sensor of the forecast served: an explicit request choice, else the approved operational
+    reference when one exists and has a model, else the legacy Suomi NPP model (flagged stale by `serving_status`)."""
+    ov = _override.get()
+    if ov:
+        return ov
+    try:
+        from . import operational
+        sel = operational.selected()
+        if sel and paths(sel)["meta"].exists():
+            return sel
+    except Exception:  # pragma: no cover - selection must never break serving
+        pass
+    return VIIRS_REFERENCE
 
 
-def available() -> bool:
-    return bool(meta()) and FC_PATH.exists()
+def models_available() -> list[str]:
+    return [s for s in SENSOR_CONFIG if paths(s)["meta"].exists() and paths(s)["fc"].exists()]
 
 
-def issue(issue_date: str | None = None) -> pd.DataFrame:
-    fc = cells_fc()
+@lru_cache(maxsize=8)
+def _meta(sensor: str) -> dict:
+    p = paths(sensor)["meta"]
+    if not p.exists():
+        return {}
+    m = json.loads(p.read_text())
+    # older (legacy) model files predate these fields: fill them from what is known, never invent metrics
+    m.setdefault("reference_sensor", sensor)
+    m.setdefault("product", "VIIRS 375 m active fire (FIRMS C2), presumed-vegetation detections")
+    m.setdefault("model_version", f"{slug(sensor)}-xgb-legacy")
+    m.setdefault("nrt_in_labels", bool(SENSOR_CONFIG.get(sensor, {}).get("legacy")))
+    m["serving_status"] = serving_status(sensor, m)
+    return m
+
+
+def serving_status(sensor: str, m: dict | None = None) -> dict:
+    from datetime import date
+    from .config import PLATFORMS
+    pl = PLATFORMS.get(sensor, {})
+    retired = pl.get("status") == "retired"
+    st = "STALE_RETIRED_SENSOR" if retired else "CURRENT"
+    msg = None
+    if retired:
+        msg = (f"{sensor} science-data delivery ended {pl.get('science_data_end')}. This model predicts {sensor} detections, which "
+               "can no longer be observed: use it for historical analysis only, not as a live forecast.")
+    issue = (m or {}).get("issue_date")
+    age = (date.today() - date.fromisoformat(issue)).days if issue else None
+    return {"status": st, "message": msg, "issue_date": issue, "issue_age_days": age, "platform_status": pl.get("status", "unknown")}
+
+
+def meta(sensor: str | None = None) -> dict:
+    return _meta(sensor or active_sensor())
+
+
+@lru_cache(maxsize=8)
+def _cells_fc(sensor: str) -> pd.DataFrame:
+    p = paths(sensor)["fc"]
+    return pd.read_parquet(p) if p.exists() else pd.DataFrame()
+
+
+def cells_fc(sensor: str | None = None) -> pd.DataFrame:
+    return _cells_fc(sensor or active_sensor())
+
+
+@lru_cache(maxsize=8)
+def _contribs(sensor: str) -> pd.DataFrame:
+    p = paths(sensor)["contrib"]
+    return pd.read_parquet(p).set_index("cell_id") if p.exists() else pd.DataFrame()
+
+
+def contribs(sensor: str | None = None) -> pd.DataFrame:
+    return _contribs(sensor or active_sensor())
+
+
+def available(sensor: str | None = None) -> bool:
+    s = sensor or active_sensor()
+    return bool(_meta(s)) and paths(s)["fc"].exists()
+
+
+def issue(issue_date: str | None = None, sensor: str | None = None) -> pd.DataFrame:
+    fc = cells_fc(sensor)
     if fc.empty:
         return fc
     d = pd.Timestamp(issue_date) if issue_date else fc["issue_date"].max()
     return fc[fc["issue_date"] == d]
 
 
-def explain(cell_id: int) -> list:
-    c = contribs()
+def explain(cell_id: int, sensor: str | None = None) -> list:
+    c = contribs(sensor)
     if c.empty or cell_id not in c.index:
         return []
     row = c.loc[cell_id]
@@ -415,9 +556,10 @@ def explain(cell_id: int) -> list:
 
 
 def clear():
-    for fn in (meta, cells_fc, contribs):
+    for fn in (_meta, _cells_fc, _contribs):
         fn.cache_clear()
 
 
 if __name__ == "__main__":
-    train()
+    import sys
+    train(sensor=sys.argv[1] if len(sys.argv) > 1 else VIIRS_REFERENCE)

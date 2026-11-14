@@ -152,6 +152,8 @@ def clear_caches():
         f.cache_clear()
     from .gis_layers import clear as _gclear
     _gclear()
+    from . import operational
+    operational.clear()
 
 
 # --------------------------------------------------------------------------- time axis & coverage

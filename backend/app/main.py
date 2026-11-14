@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 
-from . import acquire, alerts, analytics, db_sync, gis_layers, notify, security, forecast, geo, grid, harmonize, ingest, reports, risk, store
+from . import acquire, alerts, bridge, operational, analytics, db_sync, gis_layers, notify, security, forecast, geo, grid, harmonize, ingest, reports, risk, store
 from . import models as M
 from .config import (ANOMALY_TYPES, PROCESSED, REPORTS, SAT_INSTRUMENT, SAT_LABEL, SATELLITES, UPLOADS, VIIRS_CONF_SCORE,
                      VIIRS_REFERENCE)
@@ -76,6 +76,25 @@ async def _production_gate(request: Request, call_next):
             actor(request.headers.get("authorization"), None)
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    return await call_next(request)
+
+
+SENSOR_SCOPED = ("/api/forecast", "/api/alerts/evaluate", "/api/critical-regions", "/api/reports")
+
+
+@app.middleware("http")
+async def _forecast_sensor(request: Request, call_next):
+    """?sensor=<platform> on forecast-dependent routes selects that sensor's independent model for this request."""
+    snr = request.query_params.get("sensor")
+    if snr and request.url.path.startswith(SENSOR_SCOPED):
+        try:
+            tok = forecast.set_request_sensor(snr)
+        except ValueError as exc:
+            return JSONResponse(status_code=400, content={"detail": str(exc)})
+        try:
+            return await call_next(request)
+        finally:
+            forecast._override.reset(tok)
     return await call_next(request)
 
 
@@ -909,7 +928,55 @@ class ForecastBody(BaseModel):
 def forecast_model():
     if not forecast.available():
         return ok({"available": False, "message": "No trained model. Train it from Data Management; PyroScope never shows untrained or random forecasts."})
-    return ok({"available": True, **forecast.meta()})
+    return ok({"available": True, **forecast.meta(), "models_available": forecast.models_available()})
+
+
+@app.get("/api/forecast/models")
+def forecast_models():
+    """Model card summary for every independently trained target sensor."""
+    out = []
+    for snr in forecast.models_available():
+        m = forecast._meta(snr)
+        out.append({"reference_sensor": snr, "model_version": m.get("model_version"), "trained_at": m.get("trained_at"), "target": m.get("target"),
+                    "split": m.get("split"), "rows": m.get("rows"), "issue_date": m.get("issue_date"), "serving_status": m.get("serving_status"),
+                    "evaluation": m.get("evaluation") or {k: m.get("test", {}).get(k) for k in ("brier", "roc_auc", "pr_auc")},
+                    "baseline_climatology": m.get("baseline_climatology", {}).get("brier"), "breakdowns": m.get("breakdowns"),
+                    "reliability": m.get("reliability"), "nrt_in_labels": m.get("nrt_in_labels"), "legacy": forecast.SENSOR_CONFIG[snr].get("legacy", False)})
+    return ok({"items": out, "served_by_default": forecast.active_sensor(),
+               "rule": "Each model is trained, calibrated and tested only on its own sensor; calibrators are never transferred."})
+
+
+# --------------------------------------------------------------------------- operational reference (S-NPP cessation)
+@app.get("/api/reference/operational")
+def reference_operational():
+    return ok(operational.summary())
+
+
+class OpRefBody(BaseModel):
+    platform: Optional[str] = Field(None, description="NOAA-21 | NOAA-20 | null to revert to the evidence default")
+    reason: str = Field(min_length=5, max_length=500)
+
+
+@app.put("/api/reference/operational")
+def reference_operational_select(body: OpRefBody, a: Actor = Depends(require())):
+    return ok(operational.select(body.platform, a.username, a.role, body.reason))
+
+
+@app.get("/api/reference/transition")
+def reference_transition(window: int = Query(12, ge=3, le=24)):
+    return ok(operational.transition_report(window))
+
+
+@app.get("/api/reference/bridges")
+def reference_bridges():
+    return ok(bridge.studies())
+
+
+@app.get("/api/reference/platform/{sensor}")
+def reference_platform(sensor: str):
+    if sensor not in SATELLITES:
+        raise KeyError(sensor)
+    return ok(operational.evaluate(sensor))
 
 
 @app.get("/api/forecast/ranking", dependencies=[Depends(need_data)])
