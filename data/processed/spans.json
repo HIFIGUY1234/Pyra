@@ -238,6 +238,29 @@
   "last_typed": "2026-08-30",
   "detections": 854470
  },
+ "NOAA-20": {
+  "gap_days": [
+   "2023-07-19",
+   "2023-07-20",
+   "2023-07-21",
+   "2023-07-22"
+  ],
+  "gap_rule_min_run_days": 3,
+  "first": "2018-04-01",
+  "last": "2026-10-31",
+  "days_in_span": 3136,
+  "days_with_detections": 3130,
+  "zero_detection_days": [
+   "2023-07-19",
+   "2023-07-20",
+   "2023-07-21",
+   "2023-07-22",
+   "2023-09-30",
+   "2024-02-04"
+  ],
+  "last_typed": "2026-07-31",
+  "detections": 5144008
+ },
  "NOAA-21": {
   "gap_days": [],
   "gap_rule_min_run_days": 3,

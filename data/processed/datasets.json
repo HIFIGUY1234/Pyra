@@ -243,5 +243,83 @@
   ],
   "processed_at": "2026-11-14T08:31:52+00:00",
   "has_anomaly_type": false
+ },
+ "fire_archive_J1V-C2_846938": {
+  "key": "fire_archive_J1V-C2_846938",
+  "origin": "repository",
+  "file": "fire_archive_J1V-C2_846938.csv",
+  "container": "DL_FIRE_J1V-C2_846938.zip",
+  "bytes": 410079818,
+  "quality": {
+   "rows_read": 5109832,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 0,
+   "duplicates_removed": 0,
+   "rows_kept": 5109832
+  },
+  "versions": {
+   "2": 5109832
+  },
+  "satellites": {
+   "NOAA-20": {
+    "rows": 5109832,
+    "first": "2018-04-01",
+    "last": "2026-07-31"
+   }
+  },
+  "product_types": [
+   "375m"
+  ],
+  "processed_at": "2026-11-14T14:48:00+00:00",
+  "has_anomaly_type": true
+ },
+ "fire_nrt_J1V-C2_846938": {
+  "key": "fire_nrt_J1V-C2_846938",
+  "origin": "repository",
+  "file": "fire_nrt_J1V-C2_846938.csv",
+  "container": "DL_FIRE_J1V-C2_846938.zip",
+  "bytes": 2845149,
+  "quality": {
+   "rows_read": 34176,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 0,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 34176,
+   "duplicates_removed": 0,
+   "rows_kept": 34176
+  },
+  "versions": {
+   "2.0NRT": 34176
+  },
+  "satellites": {
+   "NOAA-20": {
+    "rows": 34176,
+    "first": "2026-08-01",
+    "last": "2026-10-31"
+   }
+  },
+  "product_types": [
+   "375m"
+  ],
+  "processed_at": "2026-11-14T14:48:00+00:00",
+  "has_anomaly_type": false
  }
 }

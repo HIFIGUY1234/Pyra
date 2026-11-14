@@ -1,6 +1,6 @@
 # PyroScope - Scientific Validation Report
 
-Generated 2026-11-14T14:08:34+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
+Generated 2026-11-14T14:50:59+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
 
 ## 1. Sensor coverage actually loaded
 
@@ -9,10 +9,10 @@ Generated 2026-11-14T14:08:34+00:00 by `python -m app.science_report` from the l
 | Terra | partial | 2012-01-01 → 2026-08-31 | 2026-09-01 → 2026-10-31 | 2000-11-01 |
 | Aqua | partial | 2012-01-01 → 2026-08-30 | 2026-09-01 → 2026-10-31 | 2002-07-04 |
 | Suomi NPP | complete_from_firms_start | 2012-01-20 → 2026-07-31 | 2026-08-01 → 2026-10-31 | 2012-01-20 |
-| NOAA-20 | missing | – | – | 2018-04-01 |
+| NOAA-20 | complete_from_firms_start | 2018-04-01 → 2026-07-31 | 2026-08-01 → 2026-10-31 | 2018-04-01 |
 | NOAA-21 | complete_from_firms_start | 2023-03-01 → 2026-07-31 | 2026-08-01 → 2026-10-31 | 2024-01-17 |
 
-Capabilities with this data: **terra_only_era_loaded**: False; **pre_viirs_modis_loaded**: False; **real_morning_gap_correction**: blocked: no Terra-only (Nov 2000 - Jun 2002) records loaded; **real_2012_seam_test**: blocked: fewer than 12 months of MODIS records precede the first VIIRS record; **viirs_750m**: unavailable; **noaa20**: missing
+Capabilities with this data: **terra_only_era_loaded**: False; **pre_viirs_modis_loaded**: False; **real_morning_gap_correction**: blocked: no Terra-only (Nov 2000 - Jun 2002) records loaded; **real_2012_seam_test**: blocked: fewer than 12 months of MODIS records precede the first VIIRS record; **viirs_750m**: unavailable; **noaa20**: loaded
 
 ## 2. Calibration design
 
@@ -120,7 +120,7 @@ Regional aggregation: `P(any detection in region) = 1 - prod(1 - p_cell) ** alph
 ## 6. Data limitations
 
 * No MODIS records before 2012-01-01 are loaded (FIRMS C6.1 starts 2000-11-01). The real Terra-only morning-gap correction (Nov 2000 – Jun 2002) and the real 2012 MODIS→VIIRS seam test therefore cannot be run on this data; the code runs them automatically once those records are ingested.
-* NOAA-20 VIIRS records are not in the repository; NOAA-21 is present but is not used as a calibration target.
+* NOAA-20 (2018-04 →) and NOAA-21 (2023-03 →) are loaded as separate actual observations; neither is the default calibration target.
 * VIIRS 750 m (VNP14/VJ114) is not distributed by FIRMS; a separate 750 m calibration pathway exists but has no data.
 * MODIS orbit drift years excluded from calibration: MODIS orbit drift detected in the loaded records (mean day-time local overpass time moved more than 0.25 h from its early baseline): Terra [2023, 2024, 2025, 2026], Aqua [2024, 2025, 2026]. Those years are excluded from calibration because their diurnal sampling differs from the historical MODIS era.
 * Administrative intelligence (states, districts, land use) covers India only.

@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T14:11:03+00:00",
+ "generated_at": "2026-11-14T14:50:59+00:00",
  "aoi_bbox": [
   68.0,
   6.0,
@@ -7,6 +7,28 @@
   36.0
  ],
  "archives": [
+  {
+   "file": "DL_FIRE_J1V-C2_846938.zip",
+   "status": "valid",
+   "bytes": 94262123,
+   "members": [
+    {
+     "name": "fire_archive_J1V-C2_846938.csv",
+     "bytes": 410079818,
+     "kind": "archive"
+    },
+    {
+     "name": "fire_nrt_J1V-C2_846938.csv",
+     "bytes": 2845149,
+     "kind": "nrt"
+    },
+    {
+     "name": "Readme.txt",
+     "bytes": 89,
+     "kind": "other"
+    }
+   ]
+  },
   {
    "file": "DL_FIRE_J2V-C2_846939.zip",
    "status": "valid",
@@ -75,6 +97,20 @@
   }
  ],
  "sources": [
+  {
+   "key": "fire_archive_J1V-C2_846938",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J1V-C2_846938.zip",
+   "member": "fire_archive_J1V-C2_846938.csv",
+   "bytes": 410079818
+  },
+  {
+   "key": "fire_nrt_J1V-C2_846938",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J1V-C2_846938.zip",
+   "member": "fire_nrt_J1V-C2_846938.csv",
+   "bytes": 2845149
+  },
   {
    "key": "fire_archive_J2V-C2_846939",
    "origin": "repository",
@@ -213,8 +249,27 @@
     "firms_start": "2018-04-01",
     "firms_source": "VIIRS_NOAA20_SP"
    },
-   "loaded": null,
-   "status": "missing"
+   "loaded": {
+    "archive": {
+     "first": "2018-04-01",
+     "last": "2026-07-31",
+     "rows": 5109832
+    },
+    "nrt": {
+     "first": "2026-08-01",
+     "last": "2026-10-31",
+     "rows": 34176
+    },
+    "rows": 5144008,
+    "versions": [
+     "2",
+     "2.0NRT"
+    ],
+    "products": [
+     "375m"
+    ]
+   },
+   "status": "complete_from_firms_start"
   },
   "NOAA-21": {
    "expected": {
@@ -256,11 +311,6 @@
    "satellite": "Aqua",
    "period": "2002-07-04 to 2011-12-31",
    "how": "FIRMS Archive Download (MODIS C6.1 / VIIRS C2, CSV, AOI (68.0, 6.0, 98.0, 36.0)) or `python -m app.acquire firms MODIS_SP 2002-07-04 2012-01-01`"
-  },
-  {
-   "satellite": "NOAA-20",
-   "period": "2018-04-01 onward",
-   "how": "FIRMS Archive Download or `python -m app.acquire firms VIIRS_NOAA20_SP <start> <end>` with FIRMS_MAP_KEY"
   }
  ],
  "capabilities": {
@@ -269,7 +319,7 @@
   "real_morning_gap_correction": "blocked: no Terra-only (Nov 2000 - Jun 2002) records loaded",
   "real_2012_seam_test": "blocked: fewer than 12 months of MODIS records precede the first VIIRS record",
   "viirs_750m": "unavailable",
-  "noaa20": "missing"
+  "noaa20": "loaded"
  },
  "viirs_750m": {
   "status": "not_in_firms",
@@ -407,6 +457,44 @@
     "375m"
    ],
    "processed_at": "2026-11-14T08:31:52+00:00",
+   "error": null
+  },
+  "fire_archive_J1V-C2_846938": {
+   "file": "fire_archive_J1V-C2_846938.csv",
+   "rows_kept": 5109832,
+   "versions": {
+    "2": 5109832
+   },
+   "satellites": {
+    "NOAA-20": {
+     "rows": 5109832,
+     "first": "2018-04-01",
+     "last": "2026-07-31"
+    }
+   },
+   "product_types": [
+    "375m"
+   ],
+   "processed_at": "2026-11-14T14:48:00+00:00",
+   "error": null
+  },
+  "fire_nrt_J1V-C2_846938": {
+   "file": "fire_nrt_J1V-C2_846938.csv",
+   "rows_kept": 34176,
+   "versions": {
+    "2.0NRT": 34176
+   },
+   "satellites": {
+    "NOAA-20": {
+     "rows": 34176,
+     "first": "2026-08-01",
+     "last": "2026-10-31"
+    }
+   },
+   "product_types": [
+    "375m"
+   ],
+   "processed_at": "2026-11-14T14:48:00+00:00",
    "error": null
   }
  }

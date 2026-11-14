@@ -66,7 +66,7 @@ def test_inventory_report_is_honest_about_missing_history():
     rep = c.get("/api/data/inventory?refresh=true").json()
     assert all(a["status"] in ("valid", "lfs_pointer", "corrupt") for a in rep["archives"])
     sats = rep["satellites"]
-    assert sats["NOAA-20"]["status"] == "missing"
+    assert (sats["NOAA-20"]["status"] == "missing") == (rep["capabilities"]["noaa20"] == "missing")
     if sats["Terra"]["loaded"] and sats["Terra"]["loaded"]["archive"]["first"] > "2000-11-01":
         assert sats["Terra"]["status"] == "partial"
         assert rep["capabilities"]["real_morning_gap_correction"].startswith("blocked")
