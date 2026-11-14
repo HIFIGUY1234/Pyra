@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 backend/.venv/
+backend/.venv311/
 .venv/
 env/
 venv/
@@ -48,3 +49,13 @@ data/raw/*.csv
 # pipeline runtime state / partial downloads
 data/processed/pipeline_state.json
 *.zip.part
+
+# e2e run artefacts
+data/e2e.db
+data/e2e_reports/
+frontend/test-results/
+frontend/playwright-report/
+# large downloaded rasters (manifest + derived grids are kept)
+data/auxiliary/population/*.tif
+data/auxiliary/population/*.part
+data/raw/viirs750/

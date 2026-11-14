@@ -7,6 +7,7 @@ services:
     env_file: [.env]
     environment:
       PYROSCOPE_REPORTS_DIR: /app/data/reports
+      PYROSCOPE_TRUST_PROXY: "1"     # only nginx reaches the backend; use its X-Forwarded-For for rate limits
     volumes:
       - ./data:/app/data            # archives, Parquet, SQLite database, reports (persistent)
       - ./docs:/app/docs            # generated scientific report
