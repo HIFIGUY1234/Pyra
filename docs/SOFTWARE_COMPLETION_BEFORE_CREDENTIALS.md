@@ -48,7 +48,7 @@ BLOCKED BY CREDENTIALS · BLOCKED BY MANUAL USER ACTION · NOT IMPLEMENTED.
 | `npm audit --audit-level=moderate` | 0 vulnerabilities |
 | `python -m app.pipeline --validate-only` | 0 archive problems; NOAA-21 *not_calibrated*; exposure layers loaded; orbit mean residuals 0.82–0.90 min |
 | `python -m app.pipeline --dry-run --only-new` | plan printed, nothing changed |
-| CI (GitHub Actions) | backend, backend audit, frontend, docker green on 27ce2dc; journey E failed on a cold 89 s bridge recomputation, fixed by serving the stored study (this commit) |
+| CI (GitHub Actions) | backend, backend audit, frontend, docker green on 27ce2dc; journey E failed on a cold 89 s bridge recomputation, fixed by serving the stored study. **f4c693c: all 6 jobs green** (run 43653638188), then fast-forwarded to `main` |
 
 ## B. What is blocked by credentials
 
