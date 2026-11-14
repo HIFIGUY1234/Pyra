@@ -130,18 +130,31 @@ export function InventoryCard() {
         {d && <div className="space-y-4 text-xs">
           {msg && <Note>{msg}</Note>}
           <table className="w-full text-left">
-            <thead className="text-slate-400"><tr><th className="py-1">Archive</th><th>Status</th><th>Contents</th></tr></thead>
+            <thead className="text-slate-400"><tr><th className="py-1">Archive</th><th>Status</th><th>Collection</th><th>Size</th><th>SHA-256</th><th>Contents</th></tr></thead>
             <tbody>{d.archives.map((a: any) => (
-              <tr key={a.file} className="border-t border-line"><td className="py-1 font-mono">{a.file}</td><td className={ST[a.status]}>{titleCase(a.status)}</td>
+              <tr key={a.file} className="border-t border-line"><td className="py-1 font-mono">{a.file}</td><td className={ST[a.status]}>{titleCase(a.status)}{a.integrity ? ` (${a.integrity.replace(/_/g, ' ')})` : ''}</td>
+                <td>{a.instrument ? `${a.instrument} ${a.collection}` : '–'}</td><td>{a.bytes ? `${(a.bytes / 1e6).toFixed(1)} MB` : '–'}</td>
+                <td className="font-mono" title={a.sha256 || a.expected_sha256}>{(a.sha256 || a.expected_sha256 || '–').slice(0, 12)}</td>
                 <td>{(a.members || []).filter((m: any) => m.kind !== 'other').map((m: any) => `${m.kind} ${(m.bytes / 1e6).toFixed(0)} MB`).join(' · ') || a.message}</td></tr>))}</tbody>
           </table>
           <table className="w-full text-left">
-            <thead className="text-slate-400"><tr><th className="py-1">Satellite</th><th>Status</th><th>Archive (science quality)</th><th>NRT</th><th>Rows</th><th>FIRMS from</th></tr></thead>
+            <thead className="text-slate-400"><tr><th className="py-1">Satellite</th><th>Status</th><th>Archive (science quality)</th><th>NRT (provisional)</th><th>Rows</th><th>Missing days</th><th>FIRMS from</th></tr></thead>
             <tbody>{Object.entries<any>(d.satellites).map(([s, e]) => (
-              <tr key={s} className="border-t border-line"><td className="py-1">{s}</td><td className={ST[e.status]}>{titleCase(e.status)}</td>
+              <tr key={s} className="border-t border-line align-top"><td className="py-1">{s}</td><td className={ST[e.status]}>{titleCase(e.status)}
+                {e.pre_operational_records && <div className="text-amber-300" title={e.pre_operational_records.note}>pre-operational records from {e.pre_operational_records.first}</div>}</td>
                 <td>{e.loaded?.archive ? `${e.loaded.archive.first} → ${e.loaded.archive.last}` : '–'}</td><td>{e.loaded?.nrt ? `${e.loaded.nrt.first} → ${e.loaded.nrt.last}` : '–'}</td>
-                <td>{num(e.loaded?.rows)}</td><td>{e.expected.firms_start}</td></tr>))}</tbody>
+                <td>{num(e.loaded?.rows)}</td>
+                <td title={(e.gaps?.missing_periods || []).map((g: string[]) => `${g[0]} to ${g[1]}`).join(', ')}>{e.gaps ? `${num(e.gaps.missing_days)} (${e.gaps.missing_periods.length} periods)` : '–'}</td>
+                <td>{e.expected.firms_start}</td></tr>))}</tbody>
           </table>
+          {d.registry && <table className="w-full text-left">
+            <thead className="text-slate-400"><tr><th className="py-1">Source</th><th>Kind</th><th>Rows kept</th><th>Row versions</th><th>Quality</th><th>Dropped (coord / time)</th><th>Duplicates</th></tr></thead>
+            <tbody>{Object.entries<any>(d.registry).map(([k, r]) => (
+              <tr key={k} className="border-t border-line"><td className="py-1 font-mono">{k}</td><td>{r.kind === 'nrt' ? 'NRT (provisional)' : 'archive'}</td><td>{num(r.rows_kept)}</td>
+                <td>{(r.collection?.row_versions || []).map((v: any) => <span key={v.version} title={v.meaning} className={v.status === 'undocumented' || v.status === 'unknown' ? 'text-amber-300' : ''}>{v.version} ({v.status}) </span>)}</td>
+                <td className={r.quality_status === 'good' ? 'text-emerald-300' : 'text-amber-300'}>{r.quality_status || '–'}</td>
+                <td>{num(r.quality?.dropped_invalid_coordinates)} / {num(r.quality?.dropped_invalid_timestamp)}</td><td>{num(r.quality?.duplicates_removed)}</td></tr>))}</tbody>
+          </table>}
           <div className="grid gap-2 sm:grid-cols-2">
             {Object.entries<any>(d.capabilities).map(([k, v]) => (
               <div key={k} className="rounded border border-line px-2 py-1"><span className="text-slate-400">{titleCase(k)}:</span>{' '}

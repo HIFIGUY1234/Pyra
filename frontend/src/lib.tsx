@@ -18,9 +18,10 @@ export const LAND_COLOR: Record<string, string> = {
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /* ------------------------------------------------------------------ formatting */
-export const num = (v: any, d = 0) => (v === null || v === undefined || Number.isNaN(v) ? '–' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }))
-export const pct = (v: any, d = 0) => (v === null || v === undefined ? '–' : `${(Number(v) * 100).toFixed(d)}%`)
-export const compact = (v: any) => (v === null || v === undefined ? '–' : Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 1e4 ? `${(v / 1e3).toFixed(0)}k` : Math.abs(v) >= 1e3 ? `${(v / 1e3).toFixed(1)}k` : `${Math.round(v)}`)
+type Numeric = number | string | null | undefined
+export const num = (v: Numeric, d = 0) => (v === null || v === undefined || Number.isNaN(Number(v)) ? '–' : Number(v).toLocaleString('en-IN', { maximumFractionDigits: d, minimumFractionDigits: d }))
+export const pct = (v: Numeric, d = 0) => (v === null || v === undefined ? '–' : `${(Number(v) * 100).toFixed(d)}%`)
+export const compact = (x: Numeric) => { if (x === null || x === undefined || Number.isNaN(Number(x))) return '–'; const v = Number(x); return Math.abs(v) >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : Math.abs(v) >= 1e4 ? `${(v / 1e3).toFixed(0)}k` : Math.abs(v) >= 1e3 ? `${(v / 1e3).toFixed(1)}k` : `${Math.round(v)}` }
 export const ymLabel = (ym: number) => `${MONTHS[(ym % 100) - 1]} ${Math.floor(ym / 100)}`
 export const titleCase = (s?: string | null) => (s || '').toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
 
@@ -31,7 +32,7 @@ export type Meta = {
   land_use_classes: string[]; satellites: string[]; auth_mode?: 'dev' | 'production'
 }
 type Ctx = { user: string; setUser: (u: string) => void; role: string; region: string; setRegion: (r: string) => void; meta: Meta | null; reloadMeta: () => void }
-export const AppCtx = createContext<Ctx>(null as any)
+export const AppCtx = createContext<Ctx>(null as unknown as Ctx)
 export const useApp = () => useContext(AppCtx)
 
 let currentUser = localStorage.getItem('pyro_user') || 'analyst'
@@ -43,14 +44,15 @@ export const getAuthToken = () => authToken
 export const setAuthToken = (t: string | null) => { authToken = t; if (t) sessionStorage.setItem('pyro_token', t); else sessionStorage.removeItem('pyro_token') }
 const authHeaders = (): Record<string, string> => (authToken ? { Authorization: `Bearer ${authToken}` } : { 'X-User': currentUser })
 
-export async function api<T = any>(path: string, opts: { method?: string; body?: any; form?: FormData } = {}): Promise<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see useApi
+export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
   const headers: Record<string, string> = authHeaders()
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
   const r = await fetch(path, { method: opts.method || (opts.body !== undefined || opts.form ? 'POST' : 'GET'), headers, body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined) })
   if (r.status === 401 && authToken && path !== '/api/auth/login') setAuthToken(null)   // expired / revoked session
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`
-    try { const j = await r.json(); msg = typeof j.detail === 'string' ? j.detail : Array.isArray(j.detail) ? j.detail.map((d: any) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ') : JSON.stringify(j) } catch { /* keep status text */ }
+    try { const j = await r.json(); msg = typeof j.detail === 'string' ? j.detail : Array.isArray(j.detail) ? j.detail.map((d: { loc?: (string | number)[]; msg: string }) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ') : JSON.stringify(j) } catch { /* keep status text */ }
     throw new Error(msg)
   }
   return r.json()
@@ -65,7 +67,8 @@ export async function download(path: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-export function useApi<T = any>(path: string | null, deps: any[] = []) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callers that do not pass a response type get the untyped JSON
+export function useApi<T = any>(path: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)

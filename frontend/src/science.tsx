@@ -8,6 +8,7 @@ import { Banner, Button, Card, CardBody, CardHeader, EmptyStateCard, Table, Unce
 import { Series, StatusBars, LogScatter, withBand } from './charts'
 import { seq } from './map'
 import { KindBadge, ValidationMethod } from './completion'
+import { ModelSelectionPanel, SeamRobustnessPanel, SeamVerdict, type Seam } from './validation_extra'
 
 /* ------------------------------------------------------------------ shared helpers */
 export const enc = (r: string) => encodeURIComponent(r)
@@ -60,7 +61,7 @@ export function StatusBanner({ status, rule, what }: { status?: string; rule?: s
 }
 
 const pf = (v: number) => `${Math.round(v * 100)}%`
-const r2 = (v: number) => num(v, 2)
+const r2 = (v?: number | null) => num(v, 2)
 const isEst = (p?: string) => p === 'sensor_calibrated' || p === 'morning_gap_sensor'
 
 /** Notes such as orbit drift returned by the calibration fit. */
@@ -411,7 +412,7 @@ export function ValidationPage() {
   const [win, setWin] = useState(24)
   const sp = split ? `&split=${split}` : ''
   const v = useApi<any>(`/api/validation?region=${enc(region)}${sp}`)
-  const s = useApi<any>(`/api/validation/seam-test?region=${enc(region)}${sp}&window=${win}`)
+  const s = useApi<Seam & { mode?: string; seam_month?: string; status?: string; status_rule?: string; explanation?: string; real_seam_possible?: boolean; real_seam_note?: string; reference_sensor?: string; step_true?: number | null; series?: Record<string, unknown>[] }>(`/api/validation/seam-test?region=${enc(region)}${sp}&window=${win}`)
   const d = v.data, sm = s.data
   const vrows = useMemo(() => (d?.series || []).map((r: any) => ({ ...r, band: r.veq_lo == null ? null : [r.veq_lo, r.veq_hi], test: r.withheld_viirs ? r.viirs : null, train: r.withheld_viirs ? null : r.viirs })), [d])
   return (
@@ -439,7 +440,7 @@ export function ValidationPage() {
           <div className="grid gap-4 xl:grid-cols-2">
             <Panel title="Hold-out metrics vs baselines" pad={false}>
               <MetricsTable rows={[{ name: <strong>PyroScope harmonization</strong>, m: d.overall }, { name: 'One constant ratio', m: d.baseline_constant_ratio }, { name: 'Raw MODIS (no conversion)', m: d.baseline_raw_modis },
-                { name: '· from Aqua (sensor step)', m: d.by_stage?.sensor_calibrated }, { name: '· from Terra only (both steps)', m: d.by_stage?.morning_gap_sensor }, { name: 'Morning-gap step (Aqua withheld)', m: d.morning_gap?.metrics }]} />
+                { name: '· from Aqua (sensor step)', m: d.by_stage?.sensor_calibrated }, { name: '· from Terra only (both steps)', m: d.by_stage?.morning_gap_sensor }, { name: 'Morning-gap step (20-month Aqua blocks withheld)', m: d.morning_gap?.metrics }, { name: '· constant Aqua/Terra ratio', m: d.morning_gap?.baseline_constant_ratio }]} />
             </Panel>
             <Panel title="Monthly calibration performance (WAPE)" sub="Colour reinforces the good / moderate / poor rule; values are labelled.">
               <StatusBars data={(d.by_month || []).map((r: any) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="wape_pct" name="WAPE %" yFmt={(x) => `${Math.round(x)}%`}
@@ -460,18 +461,21 @@ export function ValidationPage() {
           <div className="space-y-4">
             {!sm.real_seam_possible && <Banner tone="info" title="Why the seam is simulated">{sm.real_seam_note}</Banner>}
             <StatusBanner status={sm.status} rule={sm.status_rule} what="Seam result" />
+            <SeamVerdict seam={sm} />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <ArgonStatCard title="Step before harmonization" value={`×${r2(sm.step_raw)}`} subValue={`artificial jump ${r2(sm.artificial_jump_before)} ln-units`} provenance="Actual Observation" />
               <ArgonStatCard title="Step after harmonization" value={`×${r2(sm.step_harmonized)}`} subValue={`band ×${r2(sm.step_harmonized_band?.[0])}–×${r2(sm.step_harmonized_band?.[1])}; residual ${r2(sm.artificial_jump_after)} ln`} provenance="Harmonized Estimate" />
               <ArgonStatCard title="Genuine change (reference)" value={`×${r2(sm.step_true ?? sm.step_reference_sensor)}`} subValue={`${sm.reference_sensor} across the same seam - real changes must be kept`} provenance="Actual Observation" />
               <ArgonStatCard title="Artificial jump removed" value={`${num(sm.reduction_pct, 0)}%`} provenance="Harmonized Estimate" />
             </div>
-            <Series data={sm.series} height={280} refs={[{ x: sm.seam_month, label: 'seam' }]}
+            <Series data={sm.series || []} height={280} refs={[{ x: sm.seam_month, label: 'seam' }]}
               lines={[{ key: 'modis_total', name: 'Original MODIS', color: C.terra }, { key: 'viirs', name: 'Actual VIIRS', color: C.viirs }, { key: 'harmonized', name: 'Harmonized record', color: C.est, dash: '5 3', width: 2.5 }]} />
             <p className="text-xs text-slate-400">The goal is to remove the sensor-related jump, not to make the line smooth: the harmonized step should match the genuine change seen by a single unchanged sensor.</p>
           </div>
         </Panel>}
       </Load>
+      {!split && region === 'country' && <SeamRobustnessPanel />}
+      <ModelSelectionPanel />
     </div>
   )
 }
