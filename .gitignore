@@ -35,3 +35,6 @@ Thumbs.db
 # Uploads
 data/uploads/*
 !data/uploads/.gitkeep
+
+# graphify cache
+graphify-out/cache/

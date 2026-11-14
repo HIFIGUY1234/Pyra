@@ -34,6 +34,8 @@ import {
   TrendingUp,
   UserCheck,
   ArrowUpDown,
+  Landmark,
+  Building2,
 } from 'lucide-react'
 import {
   AppCtx,
@@ -56,7 +58,6 @@ import {
   Button,
   Card,
   CardBody,
-  CardFooter,
   CardHeader,
   EmptyStateCard,
   FormGroup,
@@ -69,140 +70,32 @@ import {
   type NavSectionItem,
   type ProvenanceType,
 } from './argon'
+import { AnomaliesPage, CalendarPage, HarmonizerPage, MorningGapPage, TrendsPage, UncertaintyPage, ValidationPage } from './science'
+import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
 
 /* ==========================================================================
  * 1. All 17 PyroScope Sections for Argon Sidebar & Router
  * ========================================================================== */
 export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
-  {
-    idx: '01',
-    path: '/',
-    label: 'Overview Dashboard',
-    group: 'Core & Maps',
-    icon: <Gauge className="h-4 w-4" />,
-  },
-  {
-    idx: '02',
-    path: '/map',
-    label: 'Live Fire Map',
-    group: 'Core & Maps',
-    icon: <MapPin className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '03',
-    path: '/morning-gap',
-    label: 'Morning-Gap Fixer',
-    group: 'Harmonization & QA',
-    icon: <Clock className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '04',
-    path: '/harmonization',
-    label: 'Sensor Harmonizer',
-    group: 'Harmonization & QA',
-    icon: <GitCompare className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '05',
-    path: '/uncertainty',
-    label: 'Uncertainty Estimation',
-    group: 'Harmonization & QA',
-    icon: <Activity className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '06',
-    path: '/validation',
-    label: 'Validation & Seam Tests',
-    group: 'Harmonization & QA',
-    icon: <ShieldCheck className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '07',
-    path: '/calendar',
-    label: 'Burning Activity Calendar',
-    group: 'Analytics & Forecast',
-    icon: <Calendar className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '08',
-    path: '/historical-trends',
-    label: 'Historical Trends',
-    group: 'Analytics & Forecast',
-    icon: <TrendingUp className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '09',
-    path: '/anomalies',
-    label: 'Anomaly Detection',
-    group: 'Analytics & Forecast',
-    icon: <AlertOctagon className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '10',
-    path: '/forecast',
-    label: 'Regional Fire Forecast',
-    group: 'Analytics & Forecast',
-    icon: <Sparkles className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '11',
-    path: '/critical-regions',
-    label: 'Critical Regions',
-    group: 'Analytics & Forecast',
-    icon: <Flame className="h-4 w-4" />,
-  },
-  {
-    idx: '12',
-    path: '/observations',
-    label: 'Observation Intelligence',
-    group: 'Analytics & Forecast',
-    icon: <Compass className="h-4 w-4" />,
-    badge: 'Stub',
-  },
-  {
-    idx: '13',
-    path: '/alerts',
-    label: 'Alerts & Escalation',
-    group: 'Governance & Data',
-    icon: <Bell className="h-4 w-4" />,
-  },
-  {
-    idx: '14',
-    path: '/thresholds',
-    label: 'Threshold Configuration',
-    group: 'Governance & Data',
-    icon: <Sliders className="h-4 w-4" />,
-  },
-  {
-    idx: '15',
-    path: '/data',
-    label: 'Data Management',
-    group: 'Governance & Data',
-    icon: <Database className="h-4 w-4" />,
-  },
-  {
-    idx: '16',
-    path: '/data/quality',
-    label: 'Data Quality Report',
-    group: 'Governance & Data',
-    icon: <BarChart3 className="h-4 w-4" />,
-  },
-  {
-    idx: '17',
-    path: '/reports',
-    label: 'Reports & Exports',
-    group: 'Governance & Data',
-    icon: <FileText className="h-4 w-4" />,
-  },
+  { idx: '01', path: '/', label: 'Overview Dashboard', group: 'Core & Maps', icon: <Gauge className="h-4 w-4" /> },
+  { idx: '02', path: '/map', label: 'Live Fire Map', group: 'Core & Maps', icon: <MapPin className="h-4 w-4" /> },
+  { idx: '03', path: '/morning-gap', label: 'Morning-Gap Fixer', group: 'Harmonization & QA', icon: <Clock className="h-4 w-4" /> },
+  { idx: '04', path: '/harmonization', label: 'MODIS–VIIRS Harmonizer', group: 'Harmonization & QA', icon: <GitCompare className="h-4 w-4" /> },
+  { idx: '05', path: '/uncertainty', label: 'Uncertainty Estimation', group: 'Harmonization & QA', icon: <Activity className="h-4 w-4" /> },
+  { idx: '06', path: '/validation', label: 'Validation & Seam Test', group: 'Harmonization & QA', icon: <ShieldCheck className="h-4 w-4" /> },
+  { idx: '07', path: '/calendar', label: 'Burning Activity Calendar', group: 'Analytics & Forecast', icon: <Calendar className="h-4 w-4" /> },
+  { idx: '08', path: '/historical-trends', label: 'Historical Trends', group: 'Analytics & Forecast', icon: <TrendingUp className="h-4 w-4" /> },
+  { idx: '09', path: '/anomalies', label: 'Anomaly Detection', group: 'Analytics & Forecast', icon: <AlertOctagon className="h-4 w-4" /> },
+  { idx: '10', path: '/forecast', label: 'Regional Fire Forecast', group: 'Analytics & Forecast', icon: <Sparkles className="h-4 w-4" /> },
+  { idx: '11', path: '/critical-regions', label: 'Critical Regions', group: 'Analytics & Forecast', icon: <Flame className="h-4 w-4" /> },
+  { idx: '12', path: '/observations', label: 'Observation Intelligence', group: 'Analytics & Forecast', icon: <Compass className="h-4 w-4" /> },
+  { idx: '13', path: '/alerts', label: 'Alerts & Escalation', group: 'Decision Support', icon: <Bell className="h-4 w-4" /> },
+  { idx: '14', path: '/government', label: 'Government Dashboard', group: 'Decision Support', icon: <Landmark className="h-4 w-4" /> },
+  { idx: '15', path: '/organisation', label: 'Organisation Dashboard', group: 'Decision Support', icon: <Building2 className="h-4 w-4" /> },
+  { idx: '16', path: '/thresholds', label: 'Threshold Configuration', group: 'Governance & Data', icon: <Sliders className="h-4 w-4" /> },
+  { idx: '17', path: '/data', label: 'Data Management', group: 'Governance & Data', icon: <Database className="h-4 w-4" /> },
+  { idx: '18', path: '/data/quality', label: 'Data Quality Report', group: 'Governance & Data', icon: <BarChart3 className="h-4 w-4" /> },
+  { idx: '19', path: '/reports', label: 'Reports & Exports', group: 'Governance & Data', icon: <FileText className="h-4 w-4" /> },
 ]
 
 /* ==========================================================================
@@ -2555,89 +2448,6 @@ function ReportsPage() {
 }
 
 /* ==========================================================================
- * 9. Stub Pages for Leaflet Map & Recharts Modules (Next Prompt Phase)
- * ========================================================================== */
-function ScientificModuleStubPage({
-  sectionNumber,
-  title,
-  routePath,
-  description,
-  endpoints,
-  provenance,
-  engineType,
-}: {
-  sectionNumber: string
-  title: string
-  routePath: string
-  description: string
-  endpoints: string[]
-  provenance: ProvenanceType
-  engineType: 'Leaflet Spatial Map' | 'Recharts Scientific Series'
-}) {
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-orange-500/15 px-2 py-0.5 font-mono text-xs font-bold text-orange-300 border border-orange-500/30">
-              Section {sectionNumber}
-            </span>
-            <h1 className="text-xl font-bold tracking-tight text-white">
-              {title}
-            </h1>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">{description}</p>
-        </div>
-        <ProvenanceBadge type={provenance} />
-      </div>
-
-      <UncertaintyNote provenance={provenance}>
-        This module outputs {provenance.toLowerCase()} series and requires empirical confidence bands when rendering {engineType} views.
-      </UncertaintyNote>
-
-      <Card>
-        <CardHeader
-          title={`${title} — ${engineType} Stub`}
-          subtitle={`Route: ${routePath} • Preserving untouched src/map.tsx, src/charts.tsx, and src/lib.tsx primitives for the visualization phase.`}
-          badge={<ProvenanceBadge type={provenance} />}
-        />
-        <CardBody className="py-10 text-center space-y-4">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#26324a] bg-[#0B0F19] text-orange-400">
-            {engineType === 'Leaflet Spatial Map' ? (
-              <MapPin className="h-7 w-7" />
-            ) : (
-              <BarChart3 className="h-7 w-7" />
-            )}
-          </div>
-          <div className="max-w-xl mx-auto space-y-1.5">
-            <h3 className="text-base font-bold text-white">
-              {engineType} Module Placeholder
-            </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              This Argon shell route is registered and wired to the global region context. Interactive Leaflet map layers and Recharts scientific plots are staged for the next prompt phase.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-            {endpoints.map((ep) => (
-              <code
-                key={ep}
-                className="rounded border border-[#26324a] bg-[#0B0F19] px-2.5 py-1 text-[11px] text-sky-300"
-              >
-                {ep}
-              </code>
-            ))}
-          </div>
-        </CardBody>
-        <CardFooter className="flex items-center justify-between">
-          <span>Argon UI Shell Route Ready</span>
-          <SimulatedBadge />
-        </CardFooter>
-      </Card>
-    </div>
-  )
-}
-
-/* ==========================================================================
  * Top Navbar & Main Argon Shell Layout
  * ========================================================================== */
 function ArgonShell() {
@@ -2700,7 +2510,7 @@ function ArgonShell() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[11px] font-bold text-orange-400">
-                    [{activeSection.idx}/17]
+                    [{activeSection.idx}/{PYROSCOPE_SECTIONS.length}]
                   </span>
                   <span className="text-sm font-bold text-white">
                     {activeSection.label}
@@ -2750,159 +2560,19 @@ function ArgonShell() {
                 <Route path="/data/quality" element={<DataQualityReportPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
 
-                {/* Separate Stubs for Leaflet Map & Recharts Pages */}
-                <Route
-                  path="/map"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="02"
-                      title="Live Fire Map"
-                      routePath="/map"
-                      description="Interactive Leaflet hotspot & gridded cell layer visualization across India."
-                      endpoints={['GET /api/hotspots', 'GET /api/hotspots/cell-layer', 'GET /api/geo/states']}
-                      provenance="Actual Observation"
-                      engineType="Leaflet Spatial Map"
-                    />
-                  }
-                />
-                <Route
-                  path="/morning-gap"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="03"
-                      title="Morning-Gap Fixer"
-                      routePath="/morning-gap"
-                      description="Diurnal overpass gap analysis and morning-gap correction between Terra/Aqua MODIS and VIIRS."
-                      endpoints={['GET /api/morning-gap/analysis', 'POST /api/morning-gap/correct']}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/harmonization"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="04"
-                      title="Sensor Harmonizer"
-                      routePath="/harmonization"
-                      description="MODIS-to-VIIRS sensor calibration curves, scaling factors, and harmonized time-series comparison."
-                      endpoints={[
-                        'GET /api/harmonization/summary',
-                        'GET /api/harmonization/compare',
-                        'GET /api/sensor-harmonizer/calibration',
-                      ]}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/uncertainty"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="05"
-                      title="Uncertainty Estimation"
-                      routePath="/uncertainty"
-                      description="Predictive interval width, heteroscedastic variance, and error propagation across harmonized series."
-                      endpoints={['GET /api/uncertainty']}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/validation"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="06"
-                      title="Validation & Seam Tests"
-                      routePath="/validation"
-                      description="Out-of-sample overlap hold-out validation and 2012 VIIRS introduction seam-step discontinuity tests."
-                      endpoints={['GET /api/validation', 'GET /api/validation/seam-test']}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/calendar"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="07"
-                      title="Burning Activity Calendar"
-                      routePath="/calendar"
-                      description="Seasonal and daily burning intensity heatmaps across agricultural and forest fire regimes."
-                      endpoints={['GET /api/calendar']}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/historical-trends"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="08"
-                      title="Historical Trends"
-                      routePath="/historical-trends"
-                      description="Multi-year harmonized fire activity trajectories and regional slope comparisons."
-                      endpoints={['GET /api/historical-trends', 'GET /api/historical-trends/regions']}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/anomalies"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="09"
-                      title="Anomaly Detection"
-                      routePath="/anomalies"
-                      description="Z-score, seasonal baseline residuals, and extreme radiative power (FRP) anomaly detection."
-                      endpoints={['GET /api/anomalies']}
-                      provenance="Harmonized Estimate"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
-                <Route
-                  path="/forecast"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="10"
-                      title="Regional Fire Risk Forecast"
-                      routePath="/forecast"
-                      description="7-day calibrated grid-cell and district fire occurrence probability maps and reliability curves."
-                      endpoints={[
-                        'GET /api/forecast/model',
-                        'GET /api/forecast/ranking',
-                        'GET /api/forecast/{region_id}',
-                      ]}
-                      provenance="Calibrated Forecast"
-                      engineType="Leaflet Spatial Map"
-                    />
-                  }
-                />
-                <Route
-                  path="/observations"
-                  element={
-                    <ScientificModuleStubPage
-                      sectionNumber="12"
-                      title="Smart Observation Intelligence"
-                      routePath="/observations"
-                      description="Satellite overpass windows, scan-angle quality diagnostics, and backup sensor recommendations."
-                      endpoints={[
-                        'GET /api/observations/quality',
-                        'GET /api/observations/alternatives',
-                        'GET /api/observations/overpasses',
-                      ]}
-                      provenance="Actual Observation"
-                      engineType="Recharts Scientific Series"
-                    />
-                  }
-                />
+                <Route path="/map" element={<LiveMapPage />} />
+                <Route path="/morning-gap" element={<MorningGapPage />} />
+                <Route path="/harmonization" element={<HarmonizerPage />} />
+                <Route path="/sensor-harmonizer" element={<HarmonizerPage />} />
+                <Route path="/uncertainty" element={<UncertaintyPage />} />
+                <Route path="/validation" element={<ValidationPage />} />
+                <Route path="/calendar" element={<CalendarPage />} />
+                <Route path="/historical-trends" element={<TrendsPage />} />
+                <Route path="/anomalies" element={<AnomaliesPage />} />
+                <Route path="/forecast" element={<ForecastPage />} />
+                <Route path="/observations" element={<ObservationsPage />} />
+                <Route path="/government" element={<GovernmentPage />} />
+                <Route path="/organisation" element={<OrganisationPage />} />
                 <Route path="*" element={<OverviewDashboardPage />} />
               </Routes>
             </div>

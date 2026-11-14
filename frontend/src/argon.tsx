@@ -541,7 +541,7 @@ export interface NavSectionItem {
   idx: string
   path: string
   label: string
-  group: 'Core & Maps' | 'Harmonization & QA' | 'Analytics & Forecast' | 'Governance & Data'
+  group: 'Core & Maps' | 'Harmonization & QA' | 'Analytics & Forecast' | 'Decision Support' | 'Governance & Data'
   icon: ReactNode
   badge?: string
 }
@@ -561,6 +561,7 @@ export function ArgonSidebar({
     'Core & Maps',
     'Harmonization & QA',
     'Analytics & Forecast',
+    'Decision Support',
     'Governance & Data',
   ]
 
