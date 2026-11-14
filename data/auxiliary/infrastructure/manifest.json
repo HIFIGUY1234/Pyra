@@ -1,0 +1,124 @@
+{
+ "categories": {
+  "hospital": {
+   "status": "loaded",
+   "raw_features": 55746,
+   "downloaded_at": "2026-11-14T18:51:36+00:00",
+   "query": [
+    "nwr[\"amenity\"=\"hospital\"]"
+   ],
+   "features": 55454
+  },
+  "clinic": {
+   "status": "loaded",
+   "raw_features": 22635,
+   "downloaded_at": "2026-11-14T18:59:37+00:00",
+   "query": [
+    "nwr[\"amenity\"=\"clinic\"]"
+   ],
+   "features": 22581
+  },
+  "fire_station": {
+   "status": "loaded",
+   "raw_features": 737,
+   "downloaded_at": "2026-11-14T19:00:45+00:00",
+   "query": [
+    "nwr[\"amenity\"=\"fire_station\"]"
+   ],
+   "features": 727
+  },
+  "police": {
+   "status": "loaded",
+   "raw_features": 4534,
+   "downloaded_at": "2026-11-14T19:02:02+00:00",
+   "query": [
+    "nwr[\"amenity\"=\"police\"]"
+   ],
+   "features": 4466
+  },
+  "school": {
+   "status": "loaded",
+   "raw_features": 38063,
+   "downloaded_at": "2026-11-14T19:03:45+00:00",
+   "query": [
+    "nwr[\"amenity\"=\"school\"]"
+   ],
+   "features": 37707
+  },
+  "power_substation": {
+   "status": "loaded",
+   "raw_features": 17145,
+   "downloaded_at": "2026-11-14T19:11:48+00:00",
+   "query": [
+    "nwr[\"power\"=\"substation\"]"
+   ],
+   "features": 17140
+  },
+  "power_plant": {
+   "status": "loaded",
+   "raw_features": 4431,
+   "downloaded_at": "2026-11-14T19:12:41+00:00",
+   "query": [
+    "nwr[\"power\"=\"plant\"]"
+   ],
+   "features": 4431
+  },
+  "railway_station": {
+   "status": "loaded",
+   "raw_features": 9033,
+   "downloaded_at": "2026-11-14T19:13:31+00:00",
+   "query": [
+    "node[\"railway\"=\"station\"]"
+   ],
+   "features": 9013
+  },
+  "water_works": {
+   "status": "loaded",
+   "raw_features": 2021,
+   "downloaded_at": "2026-11-14T19:14:13+00:00",
+   "query": [
+    "nwr[\"man_made\"=\"water_works\"]",
+    "nwr[\"man_made\"=\"wastewater_plant\"]"
+   ],
+   "features": 2018
+  },
+  "communications": {
+   "status": "loaded",
+   "raw_features": 2706,
+   "downloaded_at": "2026-11-14T19:20:30+00:00",
+   "query": [
+    "nwr[\"man_made\"=\"mast\"][\"tower:type\"=\"communication\"]",
+    "nwr[\"man_made\"=\"tower\"][\"tower:type\"=\"communication\"]"
+   ],
+   "features": 2705
+  },
+  "industrial_site": {
+   "status": "loaded",
+   "raw_features": 5717,
+   "downloaded_at": "2026-11-14T19:22:23+00:00",
+   "query": [
+    "nwr[\"landuse\"=\"industrial\"][\"name\"]"
+   ],
+   "features": 5710
+  }
+ },
+ "source": "OpenStreetMap via Overpass API",
+ "licence": "Open Database License (ODbL) 1.0 - (c) OpenStreetMap contributors",
+ "coverage": "India (ISO3166-1 IN), clipped to AOI bbox",
+ "crs": "EPSG:4326",
+ "cleaning": {
+  "input": 162768,
+  "invalid_or_outside_aoi": 0,
+  "duplicate_osm_id": 0,
+  "colocated_duplicates": 816,
+  "kept": 161952
+ },
+ "not_loaded": {
+  "roads": "linear network; needs a Geofabrik extract",
+  "railways": "linear network; needs a Geofabrik extract",
+  "transmission_lines": "linear network; needs a Geofabrik extract",
+  "residential_settlements": "use the WorldPop population layer instead of OSM polygons"
+ },
+ "updated": "2026-11-14T19:22:26+00:00",
+ "completeness_note": "OSM is volunteer-mapped; completeness varies by region and category. Not an official register."
+}

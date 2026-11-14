@@ -112,6 +112,32 @@ Weeks overlapping S-NPP gaps have unknown labels and are dropped. Features: rece
 detections, FRP, recurrence, season, land cover, NASA POWER weather, observation gaps.
 Regional probability: `1 − ∏(1 − p_cell)^α` with α fitted on held-out regional outcomes (never an average).
 
+**Model comparison** (`forecast_eval.py`, [MODEL_COMPARISON.md](MODEL_COMPARISON.md)): climatology, logistic regression,
+random forest, HistGradientBoosting and XGBoost are trained on the same 600,000-row training subsample, calibrated with
+isotonic regression on the same years and scored on the same test rows, plus three rolling origins (test 2021, 2022, 2023).
+A candidate replaces XGBoost only if Brier improves ≥ 2 % relative and ROC-AUC ≥ 0.005 and it is not worse on any origin.
+Result: XGBoost retained (Brier 0.0973 vs climatology 0.1067; best alternative HistGradientBoosting 0.0976).
+
+**Reference-stream risk:** S-NPP VIIRS science-data delivery ceased on 2026-11-02 (CMR metadata). The forecast target
+is S-NPP-based, so it stops being refreshable with new labels; retargeting to NOAA-20 is future work.
+
+## 7a. NOAA-21 cross-calibration study
+
+`noaa21.py`. NOAA-21 → S-NPP on matched days in the operational period only (≥ 2024-01-17); pre-operational records
+are scored separately, never used to fit. Candidates: identity, national day/night ratio, state ratio, state × season ratio.
+Forward (train 2024-01→2025-07, test 2025-08→2026-07) and backward splits, 200-replicate month-block bootstrap.
+Declared rule: adopt only if better than identity and national ratio by ≥ 1 WAPE point on both splits, |bias| ≤ 5 %,
+band coverage ≥ 80 %, ≥ 12 test months and ≥ 10,000 reference detections. **No candidate met it** (forward state-month
+WAPE identity 7.01 %, best 6.69 %; band coverage 17–33 %), so NOAA-21 stays a separate actual stream.
+
+## 7b. Overpass prediction
+
+`orbits.py`. SGP4 propagation of current CelesTrak TLEs, TEME→ECEF by GMST rotation, topocentric elevation for the
+location. A pass is the interval where elevation exceeds the swath-edge elevation implied by the scan half-angle
+(MODIS 55°, VIIRS 56.28°). Validated against 400 recent actual detections per satellite: mean |acq_time − predicted
+closest approach| 0.82–0.90 min, 95th percentile 1.8–2.2 min, 100 % within 10 min ([ORBIT_PREDICTION.md](ORBIT_PREDICTION.md)).
+Predictions say when a sensor can observe, never that a fire will be detected.
+
 ## 8. Alerts
 
 Five configurable tiers (0.20 / 0.40 / 0.60 / 0.80), three-condition trigger (calibrated probability,
@@ -127,3 +153,9 @@ Municipal-Urban / Other follow a prototype rule on those fractions. Residential/
 come only from administrator-supplied jurisdiction layers (`POST /api/jurisdictions/layers`, provenance
 required). Population and infrastructure exposure enter the critical-region score only when a layer is
 loaded (`POST /api/geo/exposure`); otherwise they are reported unavailable (weight 0, not zero exposure).
+
+**Exposure.** Population: WorldPop 2020 1 km UN-adjusted, pixel-centre assignment to 0.25° and 0.05° cells
+([POPULATION_EXPOSURE.md](POPULATION_EXPOSURE.md)). Infrastructure: 11 OpenStreetMap categories
+([INFRASTRUCTURE_EXPOSURE.md](INFRASTRUCTURE_EXPOSURE.md)). Hotspot exposure de-duplicates detections to ~375 m locations,
+then counts people (fine-grid cells whose centre is within the radius) and facilities (haversine via a KD-tree) within
+5/10/25 km. These are proximity counts — not predictions of harm — and are uncertain by roughly one fine cell (~5 km) at the radius edge.

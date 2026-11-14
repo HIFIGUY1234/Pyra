@@ -1,0 +1,23 @@
+{
+ "kind": "infrastructure",
+ "rows": 161952,
+ "rejected_rows": 0,
+ "source": "OpenStreetMap (Overpass API)",
+ "licence": "Open Database License (ODbL) 1.0 - (c) OpenStreetMap contributors",
+ "source_date": "2026-11-14",
+ "uploaded_by": "pipeline (infrastructure.acquire)",
+ "uploaded_at": "2026-11-14T19:22:26+00:00",
+ "categories": {
+  "hospital": 55454,
+  "school": 37707,
+  "clinic": 22581,
+  "power_substation": 17140,
+  "railway_station": 9013,
+  "industrial_site": 5710,
+  "police": 4466,
+  "power_plant": 4431,
+  "communications": 2705,
+  "water_works": 2018,
+  "fire_station": 727
+ }
+}

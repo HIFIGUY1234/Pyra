@@ -69,23 +69,33 @@ After ingestion the app switches automatically: Terra-only months get the real M
 FIRMS 375 m NOAA-20 coverage starts 1 Apr 2018. `python -m app.acquire firms VIIRS_NOAA20_SP 2018-04-01 <end>`
 (or the archive tool, product "VIIRS NOAA-20 375m"). Ingested as a separate satellite; never pooled with S-NPP.
 
-## 4. VIIRS 750 m (continuity product)
+## 4. VIIRS 750 m (continuity product) — `backend/app/viirs750.py`
 
-* Product: **VNP14** (S-NPP) / **VJ114** (NOAA-20), *Thermal Anomalies/Fire 6-Min L2 Swath 750 m*,
-  the MODIS C6 algorithm on VIIRS M-bands — NASA's continuity product for the MODIS 1 km record.
-* Not distributed by FIRMS as CSV. Download Level-2 granules (NetCDF) from LAADS DAAC
-  (https://ladsweb.modaps.eosdis.nasa.gov/, Earthdata Login) for the AOI and period.
-* Convert fire-pixel tables (`FP_latitude`, `FP_longitude`, `FP_power`, `FP_confidence`, `FP_day`):
+* Products (collection **002**, archived at **LP DAAC**, verified through NASA CMR on 2026-11-14):
+  **VNP14** (Suomi NPP), **VJ114** (NOAA-20), **VJ214** (NOAA-21) — *VIIRS Active Fires 6-Min L2 Swath 750 m*,
+  the MODIS C6 fire algorithm on VIIRS M-bands. HDF5/NetCDF4 granules, one per 6-minute swath. Not distributed by FIRMS as CSV.
+* **Search** (`viirs750.search`) uses the public CMR API, bounded by the AOI and dates — no credentials needed.
+  Live check: 15 NOAA-21 granules intersect the AOI on 2025-11-01.
+* **Download** needs Earthdata Login (the data URL answers HTTP 302 to `urs.earthdata.nasa.gov`). Supply either
+  `EARTHDATA_TOKEN` (a user token, environment only) or a `~/.netrc` entry for `urs.earthdata.nasa.gov`.
+  Never put credentials in source, `.env.example`, workflows or images. Without credentials `download()` raises
+  and `/api/viirs750/status` reports `credentials: not configured`.
+* Download safeguards: retry with backoff, `.part` resumption, HDF5 signature and size check (corrupted files are
+  deleted, not converted), SHA-256 per granule in `data/raw/viirs750/manifest.json`, duplicate granules skipped.
+* **Converter** (`viirs750.granule_pixels`, written to the LAADS file specification — the earlier `vnp14_to_csv`
+  assumed an `FP_day` variable that does not exist): reads `FP_latitude`, `FP_longitude`, `FP_power`, `FP_confidence`
+  (uint8 %), `FP_SolZenAng` (day when < 85°), and the granule time / `DayNightFlag` attributes; fire-mask classes
+  7/8/9 map to low/nominal/high. Fill values and missing arrays are skipped. Tested on synthetic HDF5 files built to the
+  specification only — **it has not yet been run on a real granule**.
 
 ```bash
-pip install h5py
-python -m app.acquire vnp14 /path/to/granules --satellite "Suomi NPP"
-python -m app.pipeline --only-new
+export EARTHDATA_TOKEN=...            # or ~/.netrc
+cd backend
+python -m app.pipeline --viirs750 2025-11-01 2025-11-07   # search → download → convert → ingest
 ```
 
-Rows are tagged `product_type=750m`, aggregated as stream `"Suomi NPP 750m"`, and calibrated separately
-(`/api/validation?product=750m`, `/api/sensor-harmonizer/calibration?product=750m`). Until data exist those
-endpoints return a clear "not loaded" message. CSV uploads can also be marked 750 m in Data Management.
+Rows are tagged `product_type=750m`, aggregated as separate streams, and calibrated separately from the 375 m model.
+Until real granules are ingested the UI and API say **unavailable**. **Status: blocked by Earthdata credentials.**
 
 ## 5. Uploads
 
@@ -97,3 +107,37 @@ product (375 m / 750 m). The header and a 2 000-row sample are validated before 
 
 Fetched automatically by the pipeline (`weather.py`) when network access exists; cached in
 `data/processed/weather.parquet`. Offline, the forecast trains without weather and says so.
+
+## 7. Population — WorldPop 2020 (`backend/app/population.py`)
+
+| Candidate | Resolution | Year | Licence | Decision |
+|---|---|---|---|---|
+| **WorldPop Global 2000–2020, 1 km, UN-adjusted** | 30″ (~1 km) | 2020 | CC BY 4.0 | **Selected**: single India file (18.3 MB), national total matches UN 2020 |
+| GHSL GHS-POP R2023A | 3″–30″ | 2020/2025/2030 (modelled) | CC BY 4.0 | Global tiles, larger; kept as alternative |
+| NASA SEDAC GPW v4.11 | 30″ | 2020 | CC BY 4.0 | Census-unit areal weighting, coarser input units |
+
+* `python -m app.population` downloads (resumable) `ind_ppp_2020_1km_Aggregated_UNadj.tif`, records SHA-256
+  (`27d08e3e…bec911`, 18,313,124 bytes), reads it in 256-row blocks (never the whole raster), drops NoData, and assigns
+  each pixel by its centre to one 0.25° analysis cell and one 0.05° fine cell — every pixel is counted exactly once.
+* Result: **1,380,004,385** people in the AOI, 4,885 cells (1,360 partially covered at the coast/border).
+* The raster origin is not on the 30″ lattice (`grid_aligned: false`); pixel-centre assignment avoids double counting,
+  but cell-edge totals carry up to ~½-pixel positional uncertainty.
+* Reference year is 2020 throughout; no years are mixed. The GeoTIFF is git-ignored; derived parquet + manifest are committed.
+
+## 8. Infrastructure — OpenStreetMap (`backend/app/infrastructure.py`)
+
+* Source: OpenStreetMap via the Overpass API (three mirrors, retry with backoff), © OpenStreetMap contributors, **ODbL 1.0**.
+  Download time is stored per category. OSM completeness varies by region; absence in OSM is not absence on the ground.
+* Categories (11): hospital, clinic, fire_station, police, school, power_substation, power_plant, railway_station,
+  water_works, communications, industrial_site. Ways/relations use their Overpass centre point.
+* Cleaning: coordinates inside the AOI, duplicate `(osm_id, category)` removed, same-name same-category points within ~50 m merged.
+  `osm_id`, tags and name are preserved.
+* **Not loaded** (reported as missing, never zero): roads, railways and transmission lines (linear networks need
+  line-distance logic), residential settlements (use the population grid instead).
+* `python -m app.infrastructure` refreshes; or `python -m app.pipeline --refresh-exposure` for both layers.
+
+## 9. Orbital elements — CelesTrak TLEs (`backend/app/orbits.py`)
+
+* Current two-line element sets for Terra (25994), Aqua (27424), Suomi NPP (37849), NOAA-20 (43013), NOAA-21 (54234)
+  from CelesTrak GP API; checksum and catalogue number verified; cached in `data/auxiliary/tle/`. TLEs older than 7 days are flagged stale.
+* `python -m app.orbits refresh` / `validate`, or `python -m app.pipeline --refresh-tle`.

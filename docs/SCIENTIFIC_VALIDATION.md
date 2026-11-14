@@ -1,6 +1,6 @@
 # PyroScope - Scientific Validation Report
 
-Generated 2026-11-14T17:11:04+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
+Generated 2026-11-14T19:23:06+00:00 by `python -m app.science_report` from the loaded data. Every number below is computed at generation time; nothing is typed by hand.
 
 ## 1. Sensor coverage actually loaded
 
@@ -199,12 +199,69 @@ Brier skill vs climatology: 0.090.
 
 Regional aggregation: `P(any detection in region) = 1 - prod(1 - p_cell) ** alpha` with α = 0.73 (fitted on calibration years).
 
+### 5a. Forecast candidate-model comparison
+
+* Equal footing: 600,000 training rows (same subsample for every model), isotonic calibration ≤ 2023-12-31, test ≥ 2024-01-01 (629,104 rows).
+* Rule: A candidate replaces XGBoost only if it improves test Brier by >= 2 % relative AND ROC-AUC by >= 0.005 on the main split AND is not worse in Brier on any rolling origin.
+* Decision: **XGBoost retained: hist_gradient_boosting (best alternative) does not meet the rule**.
+
+| Model | Brier | BSS | ROC-AUC | PR-AUC | ECE | Precision@0.6 | Recall@0.6 | Specificity |
+|---|---|---|---|---|---|---|---|---|
+| climatology | 0.10673 | 0.0000 | 0.9021 | 0.7738 | 0.0144 | 0.816 | 0.521 | 0.957 |
+| logistic | 0.10078 | 0.0557 | 0.9122 | 0.8097 | 0.0039 | 0.815 | 0.598 | 0.950 |
+| random_forest | 0.09801 | 0.0817 | 0.9186 | 0.8198 | 0.0053 | 0.829 | 0.587 | 0.956 |
+| hist_gradient_boosting | 0.09756 | 0.0859 | 0.9197 | 0.8216 | 0.0061 | 0.833 | 0.584 | 0.957 |
+| xgboost | 0.09726 | 0.0887 | 0.9201 | 0.8226 | 0.0058 | 0.834 | 0.582 | 0.958 |
+
+Rolling-origin Brier (train → calibrate → test year):
+
+| Test year ends | climatology | logistic | random_forest | hist_gradient_boosting | xgboost |
+|---|---|---|---|---|---|
+| 2021-12-31 | 0.1035 | 0.0899 | 0.0875 | 0.0867 | 0.0867 |
+| 2022-12-31 | 0.1068 | 0.0991 | 0.0960 | 0.0950 | 0.0951 |
+| 2023-12-31 | 0.1135 | 0.1071 | 0.1045 | 0.1030 | 0.1030 |
+
+Not included: lightgbm: Not installed and not added: it is the same histogram gradient-boosting family as XGBoost and HistGradientBoosting, so it would add a dependency without testing a different idea.
+
+### 5b. NOAA-21 → S-NPP cross-calibration study (operational period only)
+
+* Matched days 1,211; operational start 2024-01-17. Operational S-NPP/NOAA-21 count ratio: {'D': 1.0502, 'N': 1.0216}.
+* Acceptance rule: adopt only if better than identity AND national ratio by >= 1 WAPE point on both splits, |bias| <= 5 %, national band coverage >= 80 %, test >= 12 months and >= 10,000 reference detections.
+* Result: **not_calibrated** — no candidate met the declared criteria.
+
+| Split | Train | Test | identity WAPE / bias | national ratio | state ratio | state×season ratio |
+|---|---|---|---|---|---|---|
+| forward | 2024-01–2025-07 | 2025-08–2026-07 | 7.01 % / -1.73 % | 7.15 % / +4.20 % | 7.44 % / +4.16 % | 6.69 % / +3.74 % |
+| backward | 2025-08–2026-07 | 2024-08–2025-07 | 7.93 % / -5.28 % | 7.29 % / -3.65 % | 7.63 % / -3.46 % | 7.36 % / -3.21 % |
+
+(state-month WAPE / bias against S-NPP.) NOAA-21 therefore remains a separate actual stream, not a calibrated S-NPP substitute.
+
+### 5c. SGP4 overpass prediction checked against actual detections
+
+| Satellite | TLE epoch | n | Mean abs residual (min) | 95th pct (min) | Within 10 min |
+|---|---|---|---|---|---|
+| Terra | 2026-11-14T06:19 | 400 | 0.83 | 1.83 | 100.0 % |
+| Aqua | 2026-11-14T06:27 | 400 | 0.82 | 1.83 | 100.0 % |
+| Suomi NPP | 2026-11-14T06:18 | 400 | 0.9 | 2.0 | 100.0 % |
+| NOAA-20 | 2026-11-14T06:38 | 400 | 0.85 | 2.17 | 100.0 % |
+| NOAA-21 | 2026-11-14T05:41 | 400 | 0.86 | 1.84 | 100.0 % |
+
+Residual = recorded FIRMS acq_time − predicted closest approach; recorded times have minute / granule resolution.
+
+### 5d. Exposure layers
+
+* Population: WorldPop Global 2000-2020 1 km UN-adjusted population counts, India, 2020 (CC BY 4.0 (WorldPop, www.worldpop.org; doi:10.5258/SOTON/WP00671)); total in AOI 1,380,004,385; 4,885 0.25° cells; raster grid aligned to 30″: False (pixel-centre assignment, each pixel counted once).
+* Infrastructure (OpenStreetMap, ODbL): hospital 55,454, clinic 22,581, fire_station 727, police 4,466, school 37,707, power_substation 17,140, power_plant 4,431, railway_station 9,013, water_works 2,018, communications 2,705, industrial_site 5,710.
+* Not loaded (reported missing, never zero): roads, railways, transmission_lines, residential_settlements.
+* A nearby population or facility count describes proximity to detected heat, not a prediction that people or assets will burn.
+
 ## 6. Data limitations
 
 * Real Terra-only morning-gap correction is applied to the loaded Terra-only months; there is no ground truth for those months, so its skill is measured only by the simulated withheld-Aqua experiment (3b).
 * Real 2012 seam test uses the loaded pre-2012 MODIS record.
 * NOAA-20: loaded; NOAA-21 loaded. Neither is the default calibration target (kept as separate actual observations).
-* VIIRS 750 m (VNP14/VJ114) is not distributed by FIRMS; a separate 750 m calibration pathway exists but has no data.
+* VIIRS 750 m (VNP14/VJ114/VJ214 v002, LP DAAC): granule search works without credentials, but download needs Earthdata Login, which is not configured here; no 750 m records are loaded and the 750 m calibration is not run.
+* S-NPP VIIRS science-data delivery ceased 2026-11-02 (CMR collection metadata): the forecast reference stream will stop updating; a NOAA-20 retarget is future work.
 * MODIS orbit drift years excluded from calibration: MODIS orbit drift detected in the loaded records (mean day-time local overpass time moved more than 0.25 h from its early baseline): Terra [2023, 2024, 2025, 2026], Aqua [2023, 2024, 2025, 2026]. Those years are excluded from calibration because their diurnal sampling differs from the historical MODIS era.
 * Administrative intelligence (states, districts, land use) covers India only.
 * MODIS row `version` strings 6.03 (2000-2022) and 61.03 (2023 onward) are not defined in readable FIRMS documentation; they are kept verbatim and the collection (C6.1) is taken from the archive name.

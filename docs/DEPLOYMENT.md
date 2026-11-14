@@ -6,7 +6,7 @@ React build. State lives in `data/`: archives, Parquet summaries, the SQLite dat
 ## 1. Local setup
 
 ```bash
-# Python 3.11+ recommended (3.10 works, but cannot install the patched Pillow 13)
+# Python 3.11 (pinned in .python-version, Dockerfile and CI). 3.10 runs but cannot install the patched Pillow 13.
 cd backend
 python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -28,6 +28,10 @@ npm run dev                                        # http://localhost:5173, prox
 | `python -m app.pipeline --validate-only` | Checks archive integrity (ZIP CRC, SHA-256), the hold-out metrics and the seam verdict, then prints JSON. |
 | `python -m app.pipeline --only-new` | Incremental ingest. Each source is checkpointed in `data/processed/datasets.json`. |
 | `--skip-ingest`, `--skip-weather`, `--skip-train` / `--retrain`, `--rebuild-geo`, `--recover-lfs`, `--skip-report` | As named. Unknown flags are rejected. |
+| `--refresh-exposure` | Downloads WorldPop 2020 (India, 1 km) and OpenStreetMap infrastructure, rebuilds exposure layers. |
+| `--refresh-tle` | Fetches current CelesTrak TLEs and re-validates SGP4 overpass prediction against recent detections. |
+| `--compare-forecast` | Runs the forecast candidate-model comparison (≈10–15 min). |
+| `--viirs750 START END` | Searches, downloads (needs `EARTHDATA_TOKEN` or `~/.netrc`) and converts VIIRS 750 m granules; skipped with a logged reason when credentials are absent. |
 
 Each step's outcome and duration is appended to `data/processed/pipeline_state.json` (git-ignored).
 
@@ -36,7 +40,10 @@ Each step's outcome and duration is appended to `data/processed/pipeline_state.j
 ```bash
 cd backend && python -m pytest tests -q
 cd frontend && npm run typecheck && npm run lint && npm test && npm run build
+cd frontend && npx playwright install chromium && npm run e2e   # browser journeys, see END_TO_END_TESTING.md
 ```
+
+Tests run on a temporary copy of `data/pyroscope.db` (set in `tests/conftest.py`); the working database is never modified.
 
 ## 2. Containers
 
