@@ -79,7 +79,185 @@ def acquire(log=print, session=None, retries: int = 4) -> Path:
     return dest
 
 
-def build(path: Path | None = None, log=print) -> dict:
+# --------------------------------------------------------------------------- exact area-weighted allocation
+def _split_axis(lo: np.ndarray, hi: np.ndarray, origin: float, step: float, weight=None):
+    """For pixel edges [lo, hi) along one axis, the (at most two) target-cell indices and the share of the
+    pixel falling in each. `weight` maps a coordinate to a cumulative measure (identity for longitude,
+    sin(lat) for latitude, which makes the y-shares exact spherical-area shares). Pixels are assumed smaller
+    than a target cell (30 arc-seconds vs 0.05 / 0.25 deg)."""
+    f = (lambda x: x) if weight is None else weight
+    i0 = np.floor((lo - origin) / step + 1e-12).astype("int64")
+    edge = origin + (i0 + 1) * step
+    whole = f(hi) - f(lo)
+    first = np.where(hi > edge + 1e-12, (f(np.minimum(edge, hi)) - f(lo)) / whole, 1.0)
+    return i0, i0 + 1, first, 1.0 - first
+
+
+def allocate(block: np.ndarray, valid: np.ndarray, lat_top: np.ndarray, lat_bot: np.ndarray, lon_left: np.ndarray, lon_right: np.ndarray,
+             step: float, origin_lon: float, origin_lat: float) -> pd.DataFrame:
+    """Distribute every valid pixel's population over the target cells it overlaps, in proportion to spherical
+    area (exact on the sphere: dA = R^2 dlambda d(sin phi)). Returns per-cell population, valid area and total area
+    (relative units). Shares of each pixel sum to 1, so totals are conserved and nothing is double counted."""
+    sinw = lambda d: np.sin(np.radians(d))
+    xi0, xi1, fx0, fx1 = _split_axis(lon_left, lon_right, origin_lon, step)
+    yi0, yi1, fy0, fy1 = _split_axis(lat_bot, lat_top, origin_lat, step, sinw)
+    area = (np.radians(lon_right - lon_left))[None, :] * (sinw(lat_top) - sinw(lat_bot))[:, None]
+    vals = np.where(valid, block, 0.0)
+    keys, pops, va, ta = [], [], [], []
+    for yi, fy in ((yi0, fy0), (yi1, fy1)):
+        for xi, fx in ((xi0, fx0), (xi1, fx1)):
+            w = fy[:, None] * fx[None, :]
+            m = w > 0
+            if not m.any():
+                continue
+            Y = np.broadcast_to(yi[:, None], w.shape)[m]
+            X = np.broadcast_to(xi[None, :], w.shape)[m]
+            keys.append(Y * 1_000_000 + X)
+            pops.append((vals * w)[m])
+            va.append((area * w * valid)[m])
+            ta.append((area * w)[m])
+    if not keys:
+        return pd.DataFrame(columns=["iy", "ix", "population", "valid_area", "total_area"])
+    df = pd.DataFrame({"k": np.concatenate(keys), "population": np.concatenate(pops), "valid_area": np.concatenate(va),
+                       "total_area": np.concatenate(ta)}).groupby("k", as_index=False).sum()
+    df["iy"], df["ix"] = df["k"] // 1_000_000, df["k"] % 1_000_000
+    return df.drop(columns="k")
+
+
+def build_area_weighted(path: Path | None = None, log=print, out_dir: Path | None = None) -> dict:
+    """Area-weighted allocation of the raster to the 0.25 deg analysis grid and the 0.05 deg exposure grid,
+    read in row blocks. Pixel boundaries come from the GeoTIFF affine transform (no alignment assumed)."""
+    import rasterio
+    path = path or POP_DIR / SOURCE["file"]
+    out_dir = out_dir or POP_DIR
+    w, s, e, n = AOI_BBOX
+    coarse, fine = [], []
+    total_valid = 0.0
+    with rasterio.open(path) as ds:
+        if ds.crs is None or ds.crs.to_epsg() != 4326:
+            raise ValueError(f"expected EPSG:4326, got {ds.crs}")
+        tr = ds.transform
+        if tr.b != 0 or tr.d != 0:
+            raise ValueError("rotated rasters are not supported")
+        nod = ds.nodata
+        cols = np.arange(ds.width)
+        lon_l, lon_r = tr.c + cols * tr.a, tr.c + (cols + 1) * tr.a
+        inx = (lon_r > w) & (lon_l < e)
+        for r0 in range(0, ds.height, 256):
+            h = min(256, ds.height - r0)
+            rows = np.arange(r0, r0 + h)
+            lat_t, lat_b = tr.f + rows * tr.e, tr.f + (rows + 1) * tr.e
+            iny = (lat_b < n) & (lat_t > s)
+            if not iny.any():
+                continue
+            block = ds.read(1, window=((r0, r0 + h), (0, ds.width))).astype("float64")[iny][:, inx]
+            valid = np.isfinite(block) & (block >= 0)
+            if nod is not None:
+                valid &= block != nod
+            lt, lb, ll, lr = lat_t[iny], lat_b[iny], lon_l[inx], lon_r[inx]
+            total_valid += float(np.where(valid, block, 0).sum())
+            coarse.append(allocate(block, valid, lt, lb, ll, lr, GRID_DEG, -180.0, -90.0))
+            fine.append(allocate(block, valid, lt, lb, ll, lr, FINE_DEG, w, s))
+    agg = lambda frames: pd.concat(frames).groupby(["iy", "ix"], as_index=False).sum()
+    c = agg(coarse)
+    from .config import GRID_NX
+    c["cell_id"] = (c["iy"] * GRID_NX + c["ix"]).astype("int32")
+    c["valid_frac"] = c["valid_area"] / c["total_area"]
+    c = c[c["valid_frac"] > 0]
+    cells_df = pd.DataFrame({"cell_id": c["cell_id"].to_numpy(), "population": c["population"].to_numpy(), "valid_frac": c["valid_frac"].to_numpy()})
+    cells_df["density_km2"] = cells_df["population"] / grid.cell_area_km2(cells_df["cell_id"].to_numpy())
+    f = agg(fine)
+    fdf = pd.DataFrame({"lat": s + (f["iy"] + 0.5) * FINE_DEG, "lon": w + (f["ix"] + 0.5) * FINE_DEG, "population": f["population"]})
+    fdf = fdf[fdf["population"] > 0].round({"lat": 4, "lon": 4})
+    return {"cells": cells_df, "fine": fdf, "total_valid_in_window": total_valid,
+            "conservation_rel_error": abs(float(cells_df["population"].sum()) - total_valid) / max(total_valid, 1)}
+
+
+def compare_methods(path: Path | None = None) -> dict:
+    """Sensitivity of the 0.25 deg cell populations to the assignment rule (pixel centre vs area-weighted)."""
+    aw = build_area_weighted(path)["cells"].set_index("cell_id")["population"]
+    pc = _centre_cells(path).set_index("cell_id")["population"]
+    j = pd.concat([pc.rename("centre"), aw.rename("area")], axis=1).fillna(0.0)
+    j = j[(j["centre"] > 0) | (j["area"] > 0)]
+    rel = (j["area"] - j["centre"]).abs() / j[["area", "centre"]].max(axis=1).clip(lower=1)
+    return {"cells": int(len(j)), "total_centre": float(j["centre"].sum()), "total_area_weighted": float(j["area"].sum()),
+            "total_rel_diff": float(abs(j["area"].sum() - j["centre"].sum()) / max(j["centre"].sum(), 1)),
+            "median_cell_rel_diff": float(rel.median()), "p95_cell_rel_diff": float(rel.quantile(0.95)), "max_cell_rel_diff": float(rel.max()),
+            "cells_changed_over_1pct": int((rel > 0.01).sum()), "cells_changed_over_5pct": int((rel > 0.05).sum())}
+
+
+def _centre_cells(path: Path | None = None) -> pd.DataFrame:
+    """Pixel-centre baseline as a pure function (same rule as build(), no files written)."""
+    import rasterio
+    path = path or POP_DIR / SOURCE["file"]
+    w, s, e, n = AOI_BBOX
+    acc = {}
+    with rasterio.open(path) as ds:
+        tr, nod = ds.transform, ds.nodata
+        lon = tr.c + (np.arange(ds.width) + 0.5) * tr.a
+        for r0 in range(0, ds.height, 256):
+            h = min(256, ds.height - r0)
+            lat = tr.f + (np.arange(r0, r0 + h) + 0.5) * tr.e
+            b = ds.read(1, window=((r0, r0 + h), (0, ds.width))).astype("float64")
+            m = ((lat >= s) & (lat < n))[:, None] & ((lon >= w) & (lon < e))[None, :] & np.isfinite(b) & (b >= 0)
+            if nod is not None:
+                m &= b != nod
+            if not m.any():
+                continue
+            LAT, LON = np.broadcast_to(lat[:, None], b.shape)[m], np.broadcast_to(lon[None, :], b.shape)[m]
+            g = pd.Series(b[m]).groupby(grid.cell_of(LAT, LON)).sum()
+            for k, v in g.items():
+                acc[k] = acc.get(k, 0.0) + v
+    return pd.DataFrame({"cell_id": list(acc), "population": list(acc.values())})
+
+
+def build(path: Path | None = None, log=print, method: str = "area_weighted") -> dict:
+    """Write the derived population layers. method='area_weighted' (default) or 'pixel_centre' (baseline)."""
+    if method == "area_weighted":
+        return _build_area_weighted_files(path, log)
+    if method != "pixel_centre":
+        raise ValueError("method must be area_weighted or pixel_centre")
+    return _build_centre(path, log)
+
+
+def _build_area_weighted_files(path: Path | None, log) -> dict:
+    t0 = datetime.now(timezone.utc)
+    path = path or POP_DIR / SOURCE["file"]
+    r = build_area_weighted(path, log)
+    cells, fdf = r["cells"], r["fine"]
+    POP_DIR.mkdir(parents=True, exist_ok=True)
+    cells.to_parquet(CELLS, index=False)
+    fdf.to_parquet(FINE, index=False)
+    from . import gis_layers
+    pd.DataFrame({"cell_id": cells["cell_id"], "value": cells["population"], "type": "population"}).to_parquet(gis_layers.EXPOSURE_DIR / "population.parquet", index=False)
+    (gis_layers.EXPOSURE_DIR / "population.json").write_text(json.dumps({
+        "kind": "population", "rows": int(len(cells)), "rejected_rows": 0, "source": SOURCE["name"], "licence": SOURCE["licence"],
+        "source_date": str(SOURCE["reference_year"]), "uploaded_by": "pipeline (population.build area_weighted)",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "url": SOURCE["url"]}, indent=1))
+    gis_layers.exposure_by_cell.cache_clear()
+    import rasterio
+    with rasterio.open(path) as ds:
+        tr = ds.transform
+    sens = compare_methods(path)
+    man = {**SOURCE, "sha256": _sha256(path), "bytes": path.stat().st_size, "pixel_deg": tr.a,
+           "transform": [tr.a, tr.b, tr.c, tr.d, tr.e, tr.f],
+           "grid_aligned": bool(abs(tr.c * 120 - round(tr.c * 120)) < 1e-3 and abs(tr.f * 120 - round(tr.f * 120)) < 1e-3),
+           "assignment": "area-weighted: each pixel split over the cells it overlaps by exact spherical area (pixel edges from the affine transform)",
+           "total_population_in_aoi": round(float(cells["population"].sum())), "conservation_rel_error": r["conservation_rel_error"],
+           "cells_0p25": int(len(cells)), "cells_partial_coverage": int((cells["valid_frac"] < 0.999).sum()),
+           "fine_grid_deg": FINE_DEG, "fine_cells": int(len(fdf)), "sensitivity_vs_pixel_centre": sens,
+           "uncertainty": "Residual uncertainty is the WorldPop model itself (not quantified here) plus within-pixel distribution: "
+                          "area weighting assumes people are spread uniformly inside each ~1 km pixel.",
+           "processed_at": t0.isoformat(timespec="seconds"),
+           "processing_seconds": round((datetime.now(timezone.utc) - t0).total_seconds(), 1)}
+    MANIFEST.write_text(json.dumps(man, indent=1), encoding="utf-8")
+    clear()
+    log(f"[population] area-weighted: {man['cells_0p25']} cells, total {man['total_population_in_aoi']:,}; "
+        f"vs centre median cell diff {sens['median_cell_rel_diff']:.4f}")
+    return man
+
+
+def _build_centre(path: Path | None = None, log=print) -> dict:
     """Aggregate the raster to the analysis grid (0.25 deg) and the exposure grid (0.05 deg), block by block."""
     import rasterio
     path = path or POP_DIR / SOURCE["file"]
