@@ -293,14 +293,12 @@ def anomalies_now(window_days: int = 30, level: str = "state") -> dict:
 
 
 # --------------------------------------------------------------------------- critical regions
-CRIT_WEIGHTS = {"forecast": 0.30, "recent": 0.20, "recurrence": 0.15, "frp": 0.10, "observation_gap": 0.10, "forest": 0.10, "settlement": 0.05}
+CRIT_WEIGHTS = {"forecast": 0.30, "recent": 0.20, "recurrence": 0.15, "frp": 0.10, "observation_gap": 0.10, "forest": 0.10, "settlement": 0.05}  # v1, kept for reference
 
 
-@lru_cache(maxsize=64)
-def critical_regions(top: int = 60) -> dict:
-    if not forecast.available():
-        return {"status": "forecast_unavailable", "items": [], "weights": CRIT_WEIGHTS}
-    fc = forecast.issue()
+def district_table(fc: pd.DataFrame, with_anomaly: bool = True) -> tuple[pd.DataFrame, list[str]]:
+    """Per-district inputs for prioritisation from one forecast issue. Unavailable layers -> NaN columns + a note."""
+    from . import gis_layers, linear_gis
     c = store.cells()
     alpha = forecast.meta()["aggregation"]["alpha"]
     df = fc.merge(c[["state", "district", "district_id", "land_use", "lc_forest", "lc_savanna", "lc_urban", "lc_cropland"]], left_on="cell_id", right_index=True)
@@ -308,53 +306,113 @@ def critical_regions(top: int = 60) -> dict:
     rows = []
     for (did, dname, st), g in df.groupby(["district_id", "district", "state"]):
         agg = forecast.aggregate_region(g["p"].to_numpy(), alpha)
+        known = g["observed"].notna()
         rows.append({"district_id": did, "name": f"{dname}, {st}", "state": st, "n_cells": len(g),
                      "p_any": agg["p_any"], "max_cell_p": agg["max_cell"], "expected_cells": agg["expected_cells_with_detection"],
                      "band": float((g["p_hi"] - g["p_lo"]).mean()),
                      "recent30": float(np.expm1(g["f_v30"]).sum()), "recent7": float(np.expm1(g["f_v7"]).sum()),
                      "recurrence": float(g["clim"].mean()) if g["clim"].notna().any() else np.nan,
                      "frp30": float(np.expm1(g["f_frp30"]).sum()), "gap30": float(g["f_gap30"].max()),
-                     "rain7": float(g["f_p30"].mean()) if g["f_p30"].notna().any() else np.nan,
                      "forest": float((g["lc_forest"].fillna(0) + g["lc_savanna"].fillna(0)).mean()), "urban": float(g["lc_urban"].fillna(0).mean()),
+                     "observed_cells": float(g.loc[known, "observed"].sum()) if known.any() else np.nan,
                      "land_use": g["land_use"].mode().iat[0], "land_use_mix": g["land_use"].value_counts().to_dict()})
     r = pd.DataFrame(rows)
-    pct = lambda s: s.rank(pct=True).fillna(0.5)
-    r["frp_per_det"] = r["frp30"] / r["recent30"].clip(lower=1)
-    comp = pd.DataFrame({"forecast": r["max_cell_p"], "recent": pct(r["recent30"] / r["n_cells"]), "recurrence": r["recurrence"].fillna(r["recurrence"].median()),
-                         "frp": pct(r["frp_per_det"].where(r["recent30"] >= 5)), "observation_gap": (r["gap30"] / 30).clip(0, 1),
-                         "forest": r["forest"], "settlement": pct(r["urban"])})
+    notes = []
+    pop = gis_layers.exposure_by_cell("population")
+    if pop is not None:
+        r["population"] = r["district_id"].map(df.assign(v=df["cell_id"].map(pop).fillna(0)).groupby("district_id")["v"].sum())
+    else:
+        notes.append("Population exposure: no population layer loaded (component dropped, not zero)")
+    pts = gis_layers.exposure_by_cell("infrastructure")
+    lin = linear_gis.by_cell()
+    infra = None
+    if pts is not None:
+        infra = df.assign(v=df["cell_id"].map(pts).fillna(0)).groupby("district_id")["v"].sum()
+    if lin is not None:
+        km = lin[lin["category"].isin(["road_major", "railway", "power_line"])].groupby("cell_id")["length_km"].sum()
+        lkm = df.assign(v=df["cell_id"].map(km).fillna(0)).groupby("district_id")["v"].sum()
+        infra = lkm / 10.0 if infra is None else infra + lkm / 10.0      # 10 km of line ~ one mapped facility (documented convention)
+    else:
+        notes.append("Linear infrastructure (roads, railways, power lines): layer not built - infrastructure uses mapped facilities only")
+    if infra is not None:
+        r["infrastructure"] = r["district_id"].map(infra)
+    else:
+        notes.append("Infrastructure exposure: no layer loaded (component dropped, not zero)")
+    if with_anomaly:
+        try:
+            an = anomalies_now(30, "district")
+            z = {it["id"].split(":", 1)[1]: it["z"] for it in an.get("items", [])}
+            r["anomaly_z"] = r["district_id"].map(z)
+            if an.get("status") != "ok":
+                notes.append("Seasonal anomaly: " + an.get("message", "unavailable"))
+        except Exception as exc:  # anomaly is optional context
+            notes.append(f"Seasonal anomaly unavailable ({type(exc).__name__})")
+    return r, notes
+
+
+def critical_regions(top: int = 60) -> dict:
+    from . import critical_scoring as CS
+    return _critical_cached(top, forecast.active_sensor(), CS.active_weights()["version"])
+
+
+@lru_cache(maxsize=64)
+def _critical_cached(top: int, sensor: str, version: str) -> dict:
+    from . import critical_scoring as CS
     from . import gis_layers
-    weights = dict(CRIT_WEIGHTS)
-    unavailable = []
-    for kind, w, lab in (("population", 0.08, "Population exposure"), ("infrastructure", 0.07, "Critical infrastructure proximity")):
-        ex = gis_layers.exposure_by_cell(kind)
-        if ex is None:
-            unavailable.append(f"{lab} (no {kind} layer loaded - weight 0, not treated as zero exposure)")
-            continue
-        per = df.assign(v=df["cell_id"].map(ex).fillna(0)).groupby("district_id")["v"].sum()
-        r[kind] = r["district_id"].map(per).fillna(0).to_numpy()
-        comp[kind] = pct(r[kind])
-        weights[kind] = w
-    tot_w = sum(weights.values())
-    weights = {k: v / tot_w for k, v in weights.items()}
-    r["score"] = sum(comp[k] * w for k, w in weights.items())
-    r["priority"] = pd.cut(r["score"].rank(pct=True), [0, 0.5, 0.8, 0.95, 1.0], labels=["Routine", "Elevated", "High", "Critical"]).astype(str)
-    labels = {"forecast": "calibrated 7-day hotspot probability", "recent": "recent 30-day detections", "recurrence": "historical seasonal recurrence",
-              "frp": "high fire radiative power", "observation_gap": "recent observation gaps (uncertain picture)", "forest": "forest / woodland cover",
-              "settlement": "urban land nearby (exposure proxy)", "population": "population exposure (loaded layer)",
-              "infrastructure": "critical infrastructure nearby (loaded layer)"}
+    if not forecast.available():
+        return {"status": "forecast_unavailable", "items": [], "weights": CS.active_weights()["weights"]}
+    r, notes = district_table(forecast.issue())
+    comp = CS.normalise(r)
+    aw = CS.active_weights()
+    sc, contrib, share = CS.score(comp, aw["weights"])
+    r["score"], r["weight_share_available"] = sc, share
+    r["priority"] = CS.priority_band(sc)
     out = []
     for i, row in r.sort_values("score", ascending=False).head(top).iterrows():
-        contrib = {k: float(comp.at[i, k] * w) for k, w in weights.items()}
-        reasons = [f"{labels[k]} ({comp.at[i, k]:.2f})" for k in sorted(contrib, key=contrib.get, reverse=True)[:3]]
+        cb = contrib.loc[i]
+        reasons = [f"{CS.LABELS[k]} ({comp.at[i, k]:.2f})" for k in cb.sort_values(ascending=False).index[:3] if cb[k] > 0]
+        missing = [k for k in aw["weights"] if pd.isna(comp.at[i, k])]
         out.append({**{k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in row.items()},
-                    "id": f"district:{row['district_id']}", "components": {k: float(comp.at[i, k]) for k in weights}, "reasons": reasons,
-                    "reliability": "reduced - observation gaps" if row["gap30"] >= 4 else "normal"})
-    return {"status": "ok", "issue_date": forecast.meta()["issue_date"], "items": out, "weights": weights, "n_districts": int(len(r)),
-            "not_available": unavailable, "exposure_layers": gis_layers.exposure_status(),
-            "note": "Decision-support ranking of districts. Urban land share from NASA MCD12Q1 is a coarse exposure proxy. Population and "
-                    "infrastructure enter the score only when an administrator has loaded a layer with recorded provenance; otherwise they carry "
-                    "zero weight rather than invented values. Priority bands are score percentiles (top 5% Critical, next 15% High, next 30% Elevated)."}
+                    "id": f"district:{row['district_id']}",
+                    "components": {k: (None if pd.isna(comp.at[i, k]) else float(comp.at[i, k])) for k in CS.COMPONENTS},
+                    "contributions": {k: round(float(cb[k]), 4) for k in aw["weights"]}, "missing_components": missing,
+                    "hazard_part": round(float(cb[[k for k in cb.index if k in CS.HAZARD]].sum()), 4),
+                    "exposure_part": round(float(cb[[k for k in cb.index if k in CS.EXPOSURE]].sum()), 4),
+                    "reasons": reasons, "reliability": "reduced - observation gaps" if row["gap30"] >= 4 else "normal"})
+    m = forecast.meta()
+    return {"status": "ok", "issue_date": m["issue_date"], "items": out, "weights": aw["weights"], "weights_version": aw["version"],
+            "profile": aw["profile"], "n_districts": int(len(r)), "not_available": notes, "exposure_layers": gis_layers.exposure_status(),
+            "reference": {"reference_sensor": m.get("reference_sensor"), "model_version": m.get("model_version"), "serving_status": m.get("serving_status")},
+            "note": "Deterministic decision-support ranking of districts, not a ground-truth risk score. Components are normalised to [0, 1] "
+                    "(percentile ranks for heavy-tailed counts); missing components are dropped per district and the remaining weights renormalised. "
+                    "Population and infrastructure are exposure: they raise monitoring priority, never fire probability. "
+                    "Priority bands are score percentiles (top 5% Critical, next 15% High, next 30% Elevated)."}
+
+
+def critical_sensitivity(top: int = 20) -> dict:
+    """Ranking stability across weight profiles and +/-20 % perturbations, and hazard alignment on past issues."""
+    from . import critical_scoring as CS
+    if not forecast.available():
+        return {"status": "forecast_unavailable"}
+    r, notes = district_table(forecast.issue())
+    comp = CS.normalise(r)
+    aw = CS.active_weights()
+    # history check: the model whose stored issues have the most verified 7-day outcomes (sensor stated)
+    def known_issues(snr):
+        f = forecast.cells_fc(snr)
+        return 0 if f.empty else int(f.groupby("issue_date")["observed"].apply(lambda x: x.notna().any()).sum())
+    hist_sensor = max(forecast.models_available(), key=known_issues)
+    fc = forecast.cells_fc(hist_sensor)
+    past = []
+    for d in sorted(fc["issue_date"].unique()):
+        sub = fc[fc["issue_date"] == d]
+        if sub["observed"].notna().any():
+            past.append((str(pd.Timestamp(d).date()), district_table(sub, with_anomaly=False)[0]))
+    return {"status": "ok", "active": aw, "sensitivity": CS.sensitivity(comp, aw["weights"], top),
+            "historical_alignment": CS.evaluate_against_history(past, top), "historical_alignment_sensor": hist_sensor,
+            "historical_issues": [d for d, _ in past], "profiles": CS.PROFILES, "not_available": notes,
+            "interpretation": "Spearman/overlap near 1 means the ranking barely depends on that choice. Historical alignment uses only past "
+                              "issues with known 7-day outcomes and measures hazard alignment; exposure-weighted profiles are not meant to maximise it."}
 
 
 # --------------------------------------------------------------------------- observation intelligence
@@ -479,5 +537,5 @@ def dashboard_summary() -> dict:
 
 
 def clear():
-    for fn in (regional_comparison, anomalies_now, critical_regions, dashboard_summary, trends, anomaly_series):
+    for fn in (regional_comparison, anomalies_now, _critical_cached, dashboard_summary, trends, anomaly_series):
         fn.cache_clear()
