@@ -5,6 +5,17 @@ import tempfile
 os.environ.setdefault("PYROSCOPE_REPORTS_DIR", tempfile.mkdtemp(prefix="pyroscope_reports_"))
 os.environ.setdefault("PYROSCOPE_PBKDF2_ITERATIONS", "20000")   # faster hashing in tests only
 
+# Tests write alerts, contacts and audit rows: run them on a throw-away copy of data/pyroscope.db so the
+# working database is never modified and every run starts from the same committed state.
+if "DATABASE_URL" not in os.environ:
+    import shutil
+    from pathlib import Path
+    _src = Path(__file__).resolve().parents[2] / "data" / "pyroscope.db"
+    _db = Path(tempfile.mkdtemp(prefix="pyroscope_db_")) / "pyroscope.db"
+    if _src.exists():
+        shutil.copy(_src, _db)
+    os.environ["DATABASE_URL"] = f"sqlite:///{_db.as_posix()}"
+
 
 def pytest_configure(config):
     """Inventory/LFS reports written during tests go to a temp dir, never over data/processed."""
@@ -19,3 +30,14 @@ def pytest_configure(config):
     if acquire.CHECKSUMS.exists():
         shutil.copy(acquire.CHECKSUMS, ck)
     acquire.CHECKSUMS = ck
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Each test starts with empty rate-limit windows (limits stay enabled, as in production)."""
+    from app import security
+    security.reset_rate_limits()
+    yield

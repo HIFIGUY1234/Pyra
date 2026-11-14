@@ -144,12 +144,25 @@ def require(*roles):
     return dep
 
 
+def limited(bucket: str):
+    """Per-client rate limit (see security.check_rate). Keyed by client IP and, when present, the user header/token prefix."""
+    def dep(request: Request):
+        ip = request.client.host if request.client else "unknown"
+        if os.getenv("PYROSCOPE_TRUST_PROXY", "0") == "1":  # behind our nginx: use the forwarded client address
+            ip = (request.headers.get("x-forwarded-for") or ip).split(",")[0].strip()
+        wait = security.check_rate(bucket, ip)
+        if wait is not None:
+            raise HTTPException(429, f"rate limit exceeded for {bucket}; retry in {int(wait) + 1} s",
+                                headers={"Retry-After": str(int(wait) + 1)})
+    return dep
+
+
 class LoginBody(BaseModel):
     username: str = Field(min_length=1, max_length=60)
     password: str = Field(min_length=1, max_length=200)
 
 
-@app.post("/api/auth/login")
+@app.post("/api/auth/login", dependencies=[Depends(limited("login"))])
 def auth_login(body: LoginBody, request: Request):
     with M.Session() as s:
         u = s.scalar(select(M.User).where(M.User.username == body.username))
@@ -211,7 +224,7 @@ def users_list(a: Actor = Depends(require())):
                               "last_login_at": u.last_login_at.isoformat() + "Z" if u.last_login_at else None} for u in s.scalars(select(M.User).order_by(M.User.id))]})
 
 
-@app.post("/api/users")
+@app.post("/api/users", dependencies=[Depends(limited("admin"))])
 def users_create(body: UserBody, a: Actor = Depends(require())):
     with M.Session() as s:
         if s.scalar(select(M.User).where(M.User.username == body.username)):
@@ -454,13 +467,13 @@ def _start_job(only_new, retrain, rebuild_geo=False):
     return ok({"started": True, "job": JOB})
 
 
-@app.post("/api/data/load-repo")
+@app.post("/api/data/load-repo", dependencies=[Depends(limited("processing"))])
 def load_repo(retrain: bool = False, a: Actor = Depends(require())):
     """Scan the repository for FIRMS archives/CSVs, ingest them and rebuild every derived product."""
     return _start_job(only_new=False, retrain=retrain)
 
 
-@app.post("/api/data/process")
+@app.post("/api/data/process", dependencies=[Depends(limited("processing"))])
 def process(retrain: bool = False, a: Actor = Depends(require())):
     """Ingest only new sources (e.g. fresh uploads), then rebuild summaries and calibrations."""
     return _start_job(only_new=True, retrain=retrain)
@@ -471,7 +484,7 @@ def data_status():
     return ok({"job": JOB, "sources": [{k: v for k, v in s.items() if k != "hint"} | {"processed": s["key"] in ingest.load_registry()} for s in ingest.discover_sources()]})
 
 
-@app.post("/api/data/upload")
+@app.post("/api/data/upload", dependencies=[Depends(limited("upload"))])
 async def upload(file: UploadFile = File(...), satellite: str = Form(...), product_type: str = Form("auto"), a: Actor = Depends(require())):
     if satellite not in SATELLITES:
         raise ValueError(f"satellite must be one of {SATELLITES}")
@@ -510,7 +523,7 @@ def data_inventory(refresh: bool = False):
     return ok(json.loads(acquire.REPORT_JSON.read_text()))
 
 
-@app.post("/api/data/recover-lfs")
+@app.post("/api/data/recover-lfs", dependencies=[Depends(limited("admin"))])
 def data_recover_lfs(a: Actor = Depends(require())):
     """Replace Git LFS pointer stubs with the real archives (SHA-256 verified against the pointer)."""
     res = acquire.recover_lfs()
@@ -756,6 +769,129 @@ def obs_overpasses():
     return ok(analytics.overpasses())
 
 
+@app.get("/api/validation/noaa21", dependencies=[Depends(need_data)])
+def validation_noaa21():
+    """NOAA-21 -> S-NPP cross-calibration study with a declared acceptance rule."""
+    from . import noaa21
+    return ok(noaa21.study())
+
+
+@app.get("/api/forecast/comparison")
+def forecast_comparison():
+    """Candidate-model comparison, rolling origins, breakdowns and model cards (python -m app.forecast_eval)."""
+    from . import forecast_eval
+    r = forecast_eval.load()
+    if not r:
+        return ok({"status": "unavailable", "how": "python -m app.forecast_eval"})
+    return ok(r)
+
+
+@app.get("/api/viirs750/status")
+def viirs750_status():
+    from . import viirs750
+    return ok(viirs750.status() | {"products": harmonize.products()})
+
+
+@app.get("/api/exposure/layers")
+def exposure_layers():
+    from . import exposure
+    return ok(exposure.layers())
+
+
+@app.get("/api/exposure/point")
+def exposure_point(lat: float = Query(..., ge=6, le=36), lon: float = Query(..., ge=68, le=98), radius_km: float = Query(10, ge=5, le=50)):
+    from . import exposure
+    return ok(exposure.point(lat, lon, radius_km))
+
+
+@app.get("/api/exposure/hotspots", dependencies=[Depends(need_data)])
+def exposure_hotspots(days: int = Query(7, ge=1, le=30), radius_km: float = Query(5, ge=5, le=50), region: str = "country",
+                      top: int = Query(25, ge=1, le=200)):
+    from . import exposure
+    return ok(exposure.hotspots(days, radius_km, region, top))
+
+
+@app.get("/api/exposure/regions", dependencies=[Depends(need_data)])
+def exposure_regions():
+    from . import exposure
+    return ok(exposure.regions())
+
+
+@app.get("/api/gis/population")
+def gis_population(region: str = "country", min_density: float = Query(0, ge=0)):
+    from . import exposure
+    return ok(exposure.population_layer(region, min_density))
+
+
+@app.get("/api/gis/infrastructure")
+def gis_infrastructure(category: Optional[str] = None, bbox: Optional[str] = None, limit: int = Query(5000, ge=1, le=20000)):
+    from . import exposure, infrastructure
+    if category and category not in infrastructure.CATEGORIES:
+        raise HTTPException(400, f"category must be one of {list(infrastructure.CATEGORIES)}")
+    box = None
+    if bbox:
+        try:
+            box = [float(x) for x in bbox.split(",")]
+            assert len(box) == 4
+        except (ValueError, AssertionError):
+            raise HTTPException(400, "bbox must be w,s,e,n")
+    return ok(exposure.infrastructure_layer(category, box, limit))
+
+
+@app.post("/api/admin/audit-retention", dependencies=[Depends(limited("admin"))])
+def audit_retention(dry_run: bool = True, days: Optional[int] = Query(None, ge=30, le=3650), a: Actor = Depends(require())):
+    """Archive-then-prune routine audit rows older than the retention period. Dry run by default."""
+    from . import retention
+    return ok(retention.prune_audit(days, dry_run=dry_run))
+
+
+@app.get("/api/orbits/status")
+def orbits_status():
+    """Cached TLEs with freshness and the SGP4-vs-observed-detection validation."""
+    from . import orbits
+    tles = {}
+    for sat in orbits.SATS:
+        r = orbits.load_tle(sat)
+        tles[sat] = ({k: r[k] for k in ("catnr", "name", "epoch", "source", "acquired")} | orbits.freshness(r)) if r else None
+    return ok({"tles": tles, "validation": orbits.validation_summary(), "stale_after_days": orbits.STALE_DAYS,
+               "meaning": "Predicted passes are observation opportunities, not fire predictions."})
+
+
+@app.get("/api/orbits/passes")
+def orbits_passes(satellite: str = Query(...), lat: Optional[float] = Query(None, ge=-90, le=90),
+                  lon: Optional[float] = Query(None, ge=-180, le=180), region: Optional[str] = None,
+                  start: Optional[str] = None, hours: float = Query(48, gt=0, le=240)):
+    from . import orbits
+    if satellite not in orbits.SATS:
+        raise HTTPException(400, f"satellite must be one of {list(orbits.SATS)}")
+    if lat is None or lon is None:
+        if not region:
+            raise HTTPException(400, "give lat & lon, or a region id")
+        bb = store.region_bbox(region)
+        if bb is None:
+            raise HTTPException(404, "unknown or empty region")
+        lon, lat = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2
+    try:
+        t0 = datetime.fromisoformat(start.replace("Z", "+00:00")) if start else datetime.now(timezone.utc)
+    except ValueError:
+        raise HTTPException(400, "start must be ISO-8601")
+    if t0.tzinfo is None:
+        t0 = t0.replace(tzinfo=timezone.utc)
+    res = orbits.passes(satellite, float(lat), float(lon), t0, hours)
+    res["validation"] = orbits.validation_summary().get(satellite)
+    return ok(res)
+
+
+@app.post("/api/orbits/refresh", dependencies=[Depends(limited("admin"))])
+def orbits_refresh(a: Actor = Depends(require())):
+    from . import orbits
+    res = orbits.refresh_all(log=lambda *_: None)
+    with M.Session() as s:
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="TLE_REFRESH", entity="orbits", entity_id="celestrak"))
+        s.commit()
+    return ok(res)
+
+
 # --------------------------------------------------------------------------- forecast
 class ForecastBody(BaseModel):
     region_id: Optional[str] = None
@@ -915,7 +1051,7 @@ class LayerBody(BaseModel):
     geojson: dict
 
 
-@app.post("/api/jurisdictions/layers")
+@app.post("/api/jurisdictions/layers", dependencies=[Depends(limited("upload"))])
 def layers_add(body: LayerBody, a: Actor = Depends(require())):
     if body.land_use not in geo.LAND_USE_CLASSES:
         raise ValueError(f"land_use must be one of {geo.LAND_USE_CLASSES}")
@@ -945,7 +1081,7 @@ def layers_delete(layer_id: int, a: Actor = Depends(require())):
     return ok({"deleted": layer_id})
 
 
-@app.post("/api/geo/exposure")
+@app.post("/api/geo/exposure", dependencies=[Depends(limited("upload"))])
 async def exposure_upload(kind: str = Form(...), source: str = Form(..., min_length=3), licence: Optional[str] = Form(None),
                           source_date: Optional[str] = Form(None), file: UploadFile = File(...), a: Actor = Depends(require())):
     if not (file.filename or "").lower().endswith(".csv"):
@@ -973,6 +1109,26 @@ def region_custom(body: CustomRegionBody):
 @app.get("/api/notifications/status")
 def notifications_status():
     return ok(notify.status())
+
+
+@app.get("/api/notifications/check")
+def notifications_check(a: Actor = Depends(require())):
+    """Admin: validate the configured provider without sending (SMTP connect / TLS / login / NOOP)."""
+    return ok(notify.check_connection())
+
+
+@app.post("/api/notifications/test/{contact_id}", dependencies=[Depends(limited("admin"))])
+def notifications_test(contact_id: int, a: Actor = Depends(require())):
+    """Admin: send one clearly labelled TEST message to one verified contact. Not an alert."""
+    with M.Session() as s:
+        c = s.get(M.AuthorityContact, contact_id)
+        if c is None:
+            raise HTTPException(404, "contact not found")
+        res = notify.send_test(c, a.username)
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="NOTIFICATION_TEST", entity="contact", entity_id=str(contact_id),
+                         detail={k: v for k, v in res.items() if k != "error"} | {"error": (res.get("error") or "")[:200]}))
+        s.commit()
+    return ok(res)
 
 
 @app.get("/api/notifications/log")
@@ -1193,7 +1349,7 @@ def reports_list(a: Actor = Depends(actor)):
                           "created_at": r.created_at.isoformat() + "Z", "organisation_id": r.organisation_id} for r in vis]})
 
 
-@app.post("/api/reports/generate", dependencies=[Depends(need_data)])
+@app.post("/api/reports/generate", dependencies=[Depends(need_data), Depends(limited("report"))])
 def reports_generate(body: ReportBody, a: Actor = Depends(actor)):
     store.region_cells(body.region_id)      # validates the region id
     if body.organisation_id is not None:

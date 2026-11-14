@@ -283,44 +283,23 @@ def firms_fetch(source: str, start: str, end: str, bbox=AOI_BBOX, day_range: int
 
 
 # --------------------------------------------------------------------------- VIIRS 750 m converter
-def vnp14_to_csv(granule_dir: str | Path, satellite: str, out: Path | None = None) -> Path:
-    """Convert VNP14 / VJ114 750 m Level-2 NetCDF granules (fire-pixel `FP_*` arrays) into a
-    FIRMS-like CSV with product_type 750m. Requires h5py (pip install h5py)."""
-    import h5py
-    import numpy as np
-    rows = []
+def vnp14_to_csv(granule_dir: str | Path, satellite: str | None = None, out: Path | None = None) -> Path:
+    """Convert VNP14 / VJ114 / VJ214 750 m Level-2 granules in `granule_dir` to a FIRMS-like CSV (product_type 750m).
+    Delegates to `viirs750.convert`, which follows the LAADS VNP14 file specification (FP_* tables, `fire mask`
+    classes 7/8/9, FP_SolZenAng for day/night). The satellite comes from each granule name; `satellite` is
+    accepted for backward compatibility and checked when given."""
+    from . import viirs750
     files = sorted(Path(granule_dir).glob("*.nc")) + sorted(Path(granule_dir).glob("*.h5"))
     if not files:
         raise FileNotFoundError(f"no .nc/.h5 granules in {granule_dir}")
-    for f in files:
-        # granule name: VNP14.AYYYYDDD.HHMM.collection.production.nc
-        parts = f.name.split(".")
-        try:
-            day = datetime.strptime(parts[1][1:], "%Y%j").date()
-            hhmm = parts[2]
-        except (IndexError, ValueError):
-            raise ValueError(f"unexpected granule name {f.name}; expected VNP14.AYYYYDDD.HHMM.*")
-        with h5py.File(f, "r") as h:
-            if "FP_latitude" not in h or h["FP_latitude"].shape[0] == 0:
-                continue
-            g = lambda k: h[k][()] if k in h else np.full(h["FP_latitude"].shape[0], np.nan)
-            lat, lon, frp, conf = g("FP_latitude"), g("FP_longitude"), g("FP_power"), g("FP_confidence")
-            day_flag = g("FP_day")
-            # VNP14 follows MOD14 C6: confidence is a 0-100 percentage. Fire-mask classes 7/8/9 map to l/n/h.
-            vals = set(np.unique(conf[~np.isnan(conf)]).astype(int).tolist()) if np.issubdtype(conf.dtype, np.number) else set()
-            if vals and vals <= {7, 8, 9}:
-                conf = np.vectorize({7: "l", 8: "n", 9: "h"}.get)(conf.astype(int))
-            for i in range(len(lat)):
-                rows.append({"latitude": float(lat[i]), "longitude": float(lon[i]), "acq_date": day.isoformat(), "acq_time": hhmm,
-                             "satellite": satellite, "instrument": "VIIRS", "confidence": conf[i], "frp": float(frp[i]),
-                             "daynight": "D" if (day_flag[i] == 1) else "N", "version": f"VNP14.{parts[3] if len(parts) > 3 else '002'}",
-                             "source_product": "750m"})
-    if not rows:
+    if satellite:
+        bad = [f.name for f in files if viirs750.PREFIX_SAT.get(f.name.split(".")[0]) != satellite]
+        if bad:
+            raise ValueError(f"granules do not belong to {satellite}: {bad[:3]}")
+    res = viirs750.convert(files, out=out)
+    if res is None:
         raise RuntimeError("granules contained no fire pixels")
-    out = out or RAW / f"viirs750_{satellite.replace(' ', '').lower()}_{rows[0]['acq_date']}_{rows[-1]['acq_date']}.csv"
-    pd.DataFrame(rows).to_csv(out, index=False)
-    out.with_suffix(".json").write_text(json.dumps({"satellite": satellite, "product_type": "750m", "source": "VNP14/VJ114 L2 swath"}))
-    return out
+    return res
 
 
 # --------------------------------------------------------------------------- inventory report

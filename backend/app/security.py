@@ -70,3 +70,47 @@ def token_digest(token: str) -> str:
 
 def session_ttl() -> timedelta:
     return timedelta(hours=SESSION_HOURS)
+
+
+# --------------------------------------------------------------------------- rate limiting
+# Sliding-window limiter keyed by (bucket, client). It is per-process: with several backend workers each
+# worker counts separately, so production deployments must ALSO limit at the reverse proxy (frontend/nginx.conf
+# uses limit_req for /api/auth/login, uploads and reports). Disable with PYROSCOPE_RATE_LIMIT=off (tests only).
+import threading as _threading
+import time as _time
+from collections import deque as _deque
+
+RATE_LIMITS = {  # bucket: (max requests, window seconds)
+    "login": (int(os.getenv("PYROSCOPE_RL_LOGIN", "10")), 60),
+    "upload": (int(os.getenv("PYROSCOPE_RL_UPLOAD", "5")), 600),
+    "processing": (int(os.getenv("PYROSCOPE_RL_PROCESSING", "6")), 600),
+    "report": (int(os.getenv("PYROSCOPE_RL_REPORT", "20")), 600),
+    "admin": (int(os.getenv("PYROSCOPE_RL_ADMIN", "30")), 600),
+}
+_hits: dict = {}
+_rl_lock = _threading.Lock()
+
+
+def rate_limit_enabled() -> bool:
+    return os.getenv("PYROSCOPE_RATE_LIMIT", "on").strip().lower() != "off"
+
+
+def check_rate(bucket: str, client: str, now: float | None = None) -> float | None:
+    """Record one hit. Returns None if allowed, else seconds until the next request is allowed."""
+    if not rate_limit_enabled():
+        return None
+    limit, window = RATE_LIMITS[bucket]
+    t = _time.monotonic() if now is None else now
+    with _rl_lock:
+        q = _hits.setdefault((bucket, client), _deque())
+        while q and q[0] <= t - window:
+            q.popleft()
+        if len(q) >= limit:
+            return max(0.0, q[0] + window - t)
+        q.append(t)
+        return None
+
+
+def reset_rate_limits():
+    with _rl_lock:
+        _hits.clear()

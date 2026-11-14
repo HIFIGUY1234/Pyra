@@ -2,7 +2,8 @@
 
     python -m app.pipeline [--recover-lfs] [--only-new] [--skip-ingest] [--skip-weather]
                            [--skip-train | --retrain] [--rebuild-geo] [--skip-report]
-                           [--dry-run] [--validate-only]
+                           [--refresh-exposure] [--refresh-tle] [--compare-forecast]
+                           [--viirs750 START END] [--dry-run] [--validate-only]
 
 Archive discovery -> LFS recovery -> ZIP validation -> CSV extraction / cleaning / satellite + product
 identification / standardisation / de-duplication -> Parquet -> spatial assignment -> quality analysis
@@ -37,6 +38,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     g.add_argument("--retrain", action="store_true", help="retrain the forecast model even if nothing new was ingested")
     ap.add_argument("--rebuild-geo", action="store_true", help="rebuild grid cells, boundaries and land cover")
     ap.add_argument("--skip-report", action="store_true", help="do not regenerate docs/SCIENTIFIC_VALIDATION.md")
+    ap.add_argument("--refresh-exposure", action="store_true", help="download WorldPop 2020 and OpenStreetMap infrastructure, rebuild exposure layers")
+    ap.add_argument("--refresh-tle", action="store_true", help="fetch current TLEs from CelesTrak and re-validate overpass prediction")
+    ap.add_argument("--compare-forecast", action="store_true", help="run the forecast candidate-model comparison (slow)")
+    ap.add_argument("--viirs750", nargs=2, metavar=("START", "END"), help="search, download (Earthdata Login) and convert VIIRS 750 m granules")
     ap.add_argument("--dry-run", action="store_true", help="show what would run (archives, new sources, steps) and change nothing")
     ap.add_argument("--validate-only", action="store_true", help="validate archives and the loaded data (integrity, hold-out, seam); write nothing else")
     return ap.parse_args(argv)   # argparse exits with an error on unknown arguments
@@ -120,6 +125,13 @@ def validate_only() -> dict:
         out["holdout"] = {"status": v.get("status"), "wape_pct": v["overall"].get("wape_pct"), "bias_pct": v["overall"].get("bias_pct"),
                           "morning_gap": {k: v["morning_gap"]["metrics"].get(k) for k in ("wape_pct", "bias_pct", "r2")}}
         out["seam"] = {k: s.get(k) for k in ("mode", "seam_month", "step_raw", "step_harmonized", "artificial_jump_after", "verdict")}
+        out["coverage"] = {k: {x: v.get(x) for x in ("first", "last", "last_typed", "detections")} for k, v in store.spans().items()}
+        from . import noaa21
+        n = noaa21.study()
+        out["noaa21"] = {"status": n.get("status"), "selected": n.get("selected"), "reason": n.get("selection_reason")}
+    from . import orbits, population, infrastructure
+    out["exposure_layers"] = {"population": bool(population.manifest()), "infrastructure": bool(infrastructure.manifest())}
+    out["orbit_validation"] = {k: (v.get("mean_abs_residual_min") if isinstance(v, dict) else None) for k, v in orbits.validation_summary().items()}
     print(json.dumps(out, indent=1, default=str))
     return out
 
@@ -173,6 +185,29 @@ def main(argv=None):
         v = r.step("harmonization_validation", harmonize.validation, "country")
         print(f"[pipeline]    hold-out: {v.get('status')} | WAPE {v['overall'].get('wape_pct'):.1f}% | morning-gap WAPE "
               f"{v['morning_gap']['metrics'].get('wape_pct'):.1f}%")
+        if args.refresh_exposure:
+            from . import infrastructure, population
+            r.step("population", lambda: population.build(population.acquire()))
+            r.step("infrastructure", infrastructure.acquire)
+        else:
+            r.skip("exposure_layers", "pass --refresh-exposure to download WorldPop / OpenStreetMap")
+        if args.refresh_tle:
+            from . import orbits
+            r.step("tle_refresh", orbits.refresh_all)
+            r.step("orbit_validation", orbits.run_validation)
+        else:
+            r.skip("tle_refresh", "pass --refresh-tle")
+        if args.viirs750:
+            from . import viirs750
+            if not viirs750.credentials_status()["configured"]:
+                r.skip("viirs750", "Earthdata Login not configured (EARTHDATA_TOKEN or ~/.netrc)")
+            else:
+                for sat in viirs750.PRODUCTS:
+                    r.step(f"viirs750_{sat}", lambda s=sat: viirs750.download(viirs750.search(s, *args.viirs750)))
+                r.step("viirs750_convert", viirs750.convert)
+        if args.compare_forecast:
+            from . import forecast_eval
+            r.step("forecast_comparison", forecast_eval.compare)
         if args.skip_report:
             r.skip("scientific_report", "--skip-report")
         else:

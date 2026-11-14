@@ -4,10 +4,11 @@
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 from . import acquire, forecast, harmonize, store
-from .config import ROOT
+from .config import DATA, ROOT
 
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 
@@ -166,6 +167,7 @@ def build() -> str:
               f"| 60 % (HIGH) | {c60.get('precision', 0):.3f} | {c60.get('recall', 0):.3f} | {c60.get('false_alarm_rate', 0):.4f} | {c60.get('missed_event_rate', 0):.3f} |",
               f"| 80 % (VERY HIGH) | {c80.get('precision', 0):.3f} | {c80.get('recall', 0):.3f} | {c80.get('false_alarm_rate', 0):.4f} | {c80.get('missed_event_rate', 0):.3f} |", "",
               f"Regional aggregation: `{fm['aggregation']['formula']}` with α = {fm['aggregation']['alpha']:.2f} (fitted on calibration years).", ""]
+    L += _extra_sections()
     caps = inv["capabilities"]
     L += ["## 6. Data limitations", "",
           ("* Real Terra-only morning-gap correction is applied to the loaded Terra-only months; there is no ground truth for those months, "
@@ -174,7 +176,8 @@ def build() -> str:
           ("* Real 2012 seam test uses the loaded pre-2012 MODIS record." if caps["pre_viirs_modis_loaded"] else
            "* Fewer than 12 months of MODIS precede VIIRS: the real seam test falls back to the simulated seam."),
           f"* NOAA-20: {caps['noaa20']}; NOAA-21 loaded. Neither is the default calibration target (kept as separate actual observations).",
-          "* VIIRS 750 m (VNP14/VJ114) is not distributed by FIRMS; a separate 750 m calibration pathway exists but has no data.",
+          "* VIIRS 750 m (VNP14/VJ114/VJ214 v002, LP DAAC): granule search works without credentials, but download needs Earthdata Login, which is not configured here; no 750 m records are loaded and the 750 m calibration is not run.",
+          "* S-NPP VIIRS science-data delivery ceased 2026-11-02 (CMR collection metadata): the forecast reference stream will stop updating; a NOAA-20 retarget is future work.",
           f"* MODIS orbit drift years excluded from calibration: {', '.join(n for n in sh['notes'] if 'drift' in n) or 'none'}",
           "* Administrative intelligence (states, districts, land use) covers India only.",
           "* MODIS row `version` strings 6.03 (2000-2022) and 61.03 (2023 onward) are not defined in readable FIRMS documentation; they are kept verbatim and the collection (C6.1) is taken from the archive name.",
@@ -182,6 +185,61 @@ def build() -> str:
           "* NRT records are provisional and never used for calibration or validation.",
           f"* Month coverage: S-NPP months with full coverage {int((cov['Suomi NPP'] >= 0.999).sum())}; Aqua {int((cov['Aqua'] >= 0.999).sum())}; Terra {int((cov['Terra'] >= 0.999).sum())}."]
     return "\n".join(L) + "\n"
+
+
+def _load(path):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _extra_sections() -> list:
+    """Forecast model comparison, NOAA-21 study, orbit validation and exposure layers, read from their committed outputs."""
+    L = []
+    c = _load(DATA / "processed" / "models" / "forecast_comparison.json")
+    if c:
+        L += ["### 5a. Forecast candidate-model comparison", "",
+              f"* Equal footing: {c['rows']['train_used']:,} training rows (same subsample for every model), isotonic calibration ≤ {c['split']['calibrate_until']}, test ≥ {c['split']['test_from']} ({c['rows']['test']:,} rows).",
+              f"* Rule: {c['selection_rule']}", f"* Decision: **{c['decision']}**.", "",
+              "| Model | Brier | BSS | ROC-AUC | PR-AUC | ECE | Precision@0.6 | Recall@0.6 | Specificity |", "|---|---|---|---|---|---|---|---|---|"]
+        for name, m in c["main"].items():
+            L.append(f"| {name} | {m['brier']:.5f} | {m['brier_skill']:.4f} | {m['roc_auc']:.4f} | {m['pr_auc']:.4f} | {m['ece']:.4f} | {m['precision']:.3f} | {m['recall']:.3f} | {m['specificity']:.3f} |")
+        L += ["", "Rolling-origin Brier (train → calibrate → test year):", "", "| Test year ends | " + " | ".join(c["main"]) + " |", "|---" * (len(c["main"]) + 1) + "|"]
+        for o in c["rolling_origin"]:
+            L.append(f"| {o['test_until']} | " + " | ".join(f"{o['scores'][k]['brier']:.4f}" if k in o["scores"] else "–" for k in c["main"]) + " |")
+        L += ["", "Not included: " + "; ".join(f"{k}: {v}" for k, v in c.get("not_included", {}).items()), ""]
+    n = _load(DATA / "processed" / "noaa21_calibration.json")
+    if n:
+        L += ["### 5b. NOAA-21 → S-NPP cross-calibration study (operational period only)", "",
+              f"* Matched days {n['matched_days']:,}; operational start {n['operational_start']}. Operational S-NPP/NOAA-21 count ratio: {n['overall_ratio_operational']}.",
+              f"* Acceptance rule: {n['criteria']}.", f"* Result: **{n['status']}** — {n['selection_reason']}.", "",
+              "| Split | Train | Test | identity WAPE / bias | national ratio | state ratio | state×season ratio |", "|---|---|---|---|---|---|---|"]
+        for e in n["experiments"]:
+            sm = e["state_month"]
+            L.append(f"| {e['design'].split(':')[0]} | {e['train'][0]}–{e['train'][1]} | {e['test'][0]}–{e['test'][1]} | " +
+                     " | ".join(f"{sm[k]['wape_pct']:.2f} % / {sm[k]['bias_pct']:+.2f} %" for k in ("identity", "national_ratio", "state_ratio", "state_season_ratio")) + " |")
+        L += ["", "(state-month WAPE / bias against S-NPP.) NOAA-21 therefore remains a separate actual stream, not a calibrated S-NPP substitute.", ""]
+    v = _load(DATA / "auxiliary" / "tle" / "validation.json")
+    if v:
+        L += ["### 5c. SGP4 overpass prediction checked against actual detections", "",
+              "| Satellite | TLE epoch | n | Mean abs residual (min) | 95th pct (min) | Within 10 min |", "|---|---|---|---|---|---|"]
+        for k, r in v.items():
+            if isinstance(r, dict) and r.get("validated"):
+                L.append(f"| {k} | {r['tle_epoch'][:16]} | {r['n']} | {r['mean_abs_residual_min']} | {r['p95_abs_residual_min']} | {r['within_10_min_pct']} % |")
+        L += ["", "Residual = recorded FIRMS acq_time − predicted closest approach; recorded times have minute / granule resolution.", ""]
+    pm = _load(DATA / "auxiliary" / "population" / "manifest.json")
+    im = _load(DATA / "auxiliary" / "infrastructure" / "manifest.json")
+    if pm or im:
+        L += ["### 5d. Exposure layers", ""]
+        if pm:
+            L.append(f"* Population: {pm['name']} ({pm['licence']}); total in AOI {pm['total_population_in_aoi']:,}; {pm['cells_0p25']:,} 0.25° cells; raster grid aligned to 30″: {pm['grid_aligned']} (pixel-centre assignment, each pixel counted once).")
+        if im:
+            cats = im.get("categories", {})
+            L.append("* Infrastructure (OpenStreetMap, ODbL): " + ", ".join(f"{k} {v.get('features', 0):,}" if v.get("status") == "loaded" else f"{k} {v.get('status')}" for k, v in cats.items()) + ".")
+            L.append("* Not loaded (reported missing, never zero): " + ", ".join(im.get("not_loaded", {}) or ["roads", "railways", "transmission lines", "residential settlements"]) + ".")
+        L += ["* A nearby population or facility count describes proximity to detected heat, not a prediction that people or assets will burn.", ""]
+    return L
 
 
 def main():
