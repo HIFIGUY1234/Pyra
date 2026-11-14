@@ -54,8 +54,14 @@ Where something is missing, the gap is stated.
 ## Dependency checks (2026-11-15)
 
 * `pip-audit -r backend/requirements.txt` on Python 3.11.9 (with sgp4, rasterio, h5py added): **no known vulnerabilities**. Pillow 13.0.0 installs on 3.11. Python 3.10 still cannot install Pillow 13, so production runs 3.11 (`.python-version`, Dockerfile, CI).
-* `npm audit --omit=dev --audit-level=high`: passes.
+* `npm audit --audit-level=moderate`: 0 vulnerabilities (2026-11-15).
 * Both checks run in CI (`.github/workflows/ci.yml`).
+
+## Software-final additions
+
+* Production start-up guard (`app/system_config.py`): in production the API refuses to start on dev auth, missing admin bootstrap, wildcard CORS, half-configured notification providers or private-network webhooks. `python -m app.system_config` exits non-zero on the same errors; CI runs it with test-only values.
+* `/api/system/credentials` and `/api/viirs750/credentials` report only *configured / not configured*, method, and last success or error. Token contents are never returned; error text passes through a redactor (SMTP password, webhook token, Earthdata token, URL credentials).
+* `npm audit --audit-level=moderate`: **0 vulnerabilities** (react-router-dom 7, vite 8, vitest 5, minimatch override). `no-explicit-any` is now an error and has 0 hits.
 
 ## Known gaps
 

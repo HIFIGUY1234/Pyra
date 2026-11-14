@@ -1,4 +1,12 @@
-# PyroScope — completion report (branch `feature/pyroscope-complete-final`)
+# PyroScope — completion report
+
+> **Latest:** branch `feature/pyroscope-software-final` (2026-11-15) adds the operational sensor transition, linear GIS,
+> area-weighted population, versioned critical scoring, production config validation, background jobs and frontend
+> screens. Current counts: backend **193 passed**, Vitest **24 passed**, lint 0 errors, npm audit 0 vulnerabilities.
+> The authoritative status matrix is now [SOFTWARE_COMPLETION_BEFORE_CREDENTIALS.md](SOFTWARE_COMPLETION_BEFORE_CREDENTIALS.md).
+> The report below is the earlier `feature/pyroscope-complete-final` snapshot and is kept for history; rows it marks
+> NOT IMPLEMENTED for linear infrastructure and the NOAA-20 retarget are superseded.
+
 
 Base: `main` at 7d9ee06. Every metric comes from a generated file: [SCIENTIFIC_VALIDATION.md](SCIENTIFIC_VALIDATION.md) (`python -m app.science_report`), `data/processed/models/forecast_comparison.json`, `data/processed/noaa21_calibration.json`, `data/auxiliary/tle/validation.json` or the exposure manifests. No number was typed in from memory.
 

@@ -133,7 +133,7 @@ def validate_only() -> dict:
         out["noaa21"] = {"status": n.get("status"), "selected": n.get("selected"), "reason": n.get("selection_reason")}
     from . import orbits, population, infrastructure
     out["exposure_layers"] = {"population": bool(population.manifest()), "infrastructure": bool(infrastructure.manifest())}
-    out["orbit_validation"] = {k: (v.get("mean_abs_residual_min") if isinstance(v, dict) else None) for k, v in orbits.validation_summary().items()}
+    out["orbit_validation"] = {k: v.get("mean_abs_residual_min") for k, v in orbits.validation_summary().items() if isinstance(v, dict)}
     print(json.dumps(out, indent=1, default=str))
     return out
 
@@ -192,7 +192,7 @@ def main(argv=None):
         else:
             r.skip("forecast_training_sensors", "pass --sensor-models (or ingest new data) to retrain NOAA-20 / NOAA-21 models")
         from . import bridge, operational
-        bridge.clear(); operational.clear()
+        bridge.clear(recompute=bool(ingested_ok) or bool(args.sensor_models) or bool(getattr(args, "retrain", False))); operational.clear()
         sel = r.step("operational_reference", operational.summary)
         print(f"[pipeline]    operational reference: {sel['operational_reference']} ({sel['operational_status']})")
         r.step("database_sync", db_sync.sync_all)

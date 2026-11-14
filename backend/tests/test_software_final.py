@@ -495,3 +495,38 @@ def test_jobs_cooperative_cancel_and_single_instance():
             break
         time.sleep(0.05)
     assert jobs.get(j["id"])["status"] == "CANCELLED"
+
+
+def test_tle_refresh_failure_is_recorded(tmp_path, monkeypatch):
+    from app import orbits
+    monkeypatch.setattr(orbits, "TLE_DIR", tmp_path)
+    monkeypatch.setattr(orbits, "LAST_REFRESH", tmp_path / "last_refresh.json")
+
+    def boom(sat, session=None):
+        raise ConnectionError("celestrak unreachable")
+    monkeypatch.setattr(orbits, "fetch_tle", boom)
+    out = orbits.refresh_all(log=lambda *_: None)
+    assert all("error" in v for v in out.values())
+    lr = orbits.last_refresh()
+    assert set(lr["failed"]) == set(orbits.SATS) and lr["at"]
+    assert "celestrak unreachable" in next(iter(lr["results"].values()))["error"]
+    stale = orbits.freshness({"epoch": "2020-01-01T00:00:00+00:00"})
+    assert stale["stale"] and stale["warning"]
+
+
+def test_bridge_studies_served_from_stored_result(tmp_path, monkeypatch):
+    import json
+    from app import bridge
+    out = tmp_path / "bridge_calibrations.json"
+    out.write_text(json.dumps({"pairs": [{"target": "NOAA-20", "reference": "Suomi NPP", "status": "not_calibrated"}]}))
+    monkeypatch.setattr(bridge, "OUT", out)
+
+    def no_recompute(*a, **k):
+        raise AssertionError("stored result must be used")
+    monkeypatch.setattr(bridge, "study_pair", no_recompute)
+    bridge.clear()
+    try:
+        s = bridge.studies()
+        assert s["source"] == "stored" and bridge.status("NOAA-20", "Suomi NPP")["status"] == "not_calibrated"
+    finally:
+        bridge.clear()

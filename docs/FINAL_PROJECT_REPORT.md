@@ -78,6 +78,16 @@ Data are split chronologically: training up to 2021, isotonic calibration on 202
 
 Five candidates (climatology, logistic regression, random forest, HistGradientBoosting, XGBoost) were compared on the same 600,000 training rows, the same calibration and the same 629,104 test rows, plus three rolling origins. XGBoost: Brier 0.0973, BSS 0.089, ROC-AUC 0.920, PR-AUC 0.823, ECE 0.006. HistGradientBoosting ties it (0.0976) but does not meet the declared replacement rule, so XGBoost is retained ([MODEL_COMPARISON.md](MODEL_COMPARISON.md)). Results are broken down by state (34, 3 flagged unreliable), month, season, land use, recent activity and observation coverage.
 
+### 8a. Operational sensor transition
+
+S-NPP is now the **historical reference** only; new science delivery ended 2026-11-02. Separate NOAA-20 and NOAA-21
+forecast models are trained on each sensor's own labels (no pooling, no calibrator transfer, NRT and pre-operational
+rows excluded). Test-period results: NOAA-20 Brier 0.0926, BSS 0.097, ROC-AUC 0.926, ECE 0.0078 (493,884 rows);
+NOAA-21 Brier 0.1223, BSS 0.172, ROC-AUC 0.895, ECE 0.0344 (194,661 rows). Both pass criteria C1–C6; the evidence
+default operational reference is NOAA-21. Strict bridge studies (NOAA-20→S-NPP, NOAA-21→S-NPP, NOAA-21→NOAA-20) are all
+*not calibrated*, so the transition is reported as NOT_BRIDGED and the series are never spliced
+([OPERATIONAL_SENSOR_TRANSITION.md](OPERATIONAL_SENSOR_TRANSITION.md)).
+
 ## 9. GIS
 
 State, district, land-use and jurisdiction layers cover **India only**, and the API says so (`global: false`). Industrial and residential classes come only from administrator-supplied jurisdiction layers.
@@ -95,20 +105,20 @@ Organisations see only their own data. Security details: [SECURITY.md](SECURITY.
 * The morning-gap estimates for 2000-11 → 2002-06 have no ground truth. Backward-extrapolation tests suggest they may be about 10 % high nationally.
 * The 2012 seam verdict is *partial*: a genuine ~10 % increase is partly damped at the ±24-month window.
 * There is no orbit-stable Aqua overlap with NOAA-21 (Aqua drift from 2023). A direct NOAA-21 → S-NPP study on the operational period found no adjustment that beats leaving counts unchanged under the declared rule, so NOAA-21 stays a separate actual stream. Its archive includes pre-operational 2023 records.
-* S-NPP VIIRS science-data delivery ceased on 2026-11-02; the forecast reference stream will not receive new labels.
+* S-NPP VIIRS science-data delivery ceased on 2026-11-02. S-NPP forecasts are served only as historical and are flagged STALE_RETIRED_SENSOR; NOAA-21 / NOAA-20 models carry the live forecast, with no bridge to the S-NPP scale.
 * Night-time calibration is weaker than day-time (hold-out night WAPE 31 % vs 13.5 % day).
 * No VIIRS 750 m data (Earthdata credentials needed); the converter is tested only on synthetic files built to the specification.
-* No real notification provider configured; no Docker build executed here (Docker not installed).
-* The population raster is not aligned to the 30″ lattice; infrastructure comes from volunteer-mapped OSM and excludes linear networks.
+* No real notification provider configured. Docker images are built and smoke-tested in CI.
+* The population raster is not aligned to the 30″ lattice; infrastructure comes from volunteer-mapped OSM. Linear networks (roads, rail, power, settlements) are implemented from Geofabrik PBF but the extract is built by the data-integration workflow, not in this sandbox.
 * The MODIS row-version strings `6.03` and `61.03` are not defined in readable FIRMS documentation.
 
 ## 12. Future work
 
 1. Run the implemented Earthdata acquisition on real VNP14/VJ114/VJ214 granules, verify the converter on them, and fit the separate 750 m calibration.
-2. Retarget the forecast to NOAA-20 after the S-NPP end of science delivery.
+2. Refit the per-sensor models as NOAA-21 operational months accumulate; revisit bridges when overlap grows.
 3. A hierarchical (partially pooled) Terra→Aqua model that keeps state detail but borrows the national ratio's temporal stability, chosen by the existing selection framework.
-4. Linear infrastructure (roads, rail, transmission) with line-distance exposure; official facility registers where licensed.
-5. Typing of the remaining API payloads (lint warnings).
+4. Official facility registers where licensed.
+5. Remaining react-refresh lint warnings (32, file structure only).
 
 ## 13. Reproducibility
 

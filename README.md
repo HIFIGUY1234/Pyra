@@ -73,12 +73,23 @@ The forecast is retrained only when new data were ingested. Step outcomes go to 
 
 Containers: `cp .env.example .env && docker compose up --build` serves UI + API on :8080 (see `docs/DEPLOYMENT.md`).
 
+## Operational sensor transition
+
+Suomi NPP is the **historical** reference (science delivery ended 2026-11-02). NOAA-21 and NOAA-20 each have their own
+forecast model, evaluated independently; the operational reference is chosen by criteria C1–C6 (`/reference` in the UI,
+`GET /api/reference/operational`). Any forecast endpoint accepts `?sensor=`. S-NPP is never served as live, and there is
+no silent fallback between sensors. Details: [docs/OPERATIONAL_SENSOR_TRANSITION.md](docs/OPERATIONAL_SENSOR_TRANSITION.md).
+
+Status of everything: [docs/SOFTWARE_COMPLETION_BEFORE_CREDENTIALS.md](docs/SOFTWARE_COMPLETION_BEFORE_CREDENTIALS.md) ·
+what you must set up: [docs/MANUAL_SETUP_AFTER_CODE_COMPLETION.md](docs/MANUAL_SETUP_AFTER_CODE_COMPLETION.md) ·
+[docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) · [docs/CRITICAL_REGION_SCORING.md](docs/CRITICAL_REGION_SCORING.md).
+
 ## Tests & checks
 
 ```bash
-cd backend && python -m pytest tests -q     # 136 tests, on a temp copy of the DB (API, science, LFS, auth, alerts, GIS, orbits, exposure, SMTP/webhook, rate limits)
-cd frontend && npm run typecheck && npm run lint && npm test && npm run build   # 16 Vitest workflow tests
-cd frontend && npx playwright install chromium && npm run e2e                    # 5 browser journeys against the real API
+cd backend && python -m pytest tests -q     # 193 tests, on a temp copy of the DB (API, science, sensor transition, LFS, auth, alerts, GIS, linear GIS, orbits, exposure, scoring, SMTP/webhook, jobs, config)
+cd frontend && npm run typecheck && npm run lint && npm test && npm run build   # 24 Vitest workflow tests; lint 0 errors
+cd frontend && npx playwright install chromium && npm run e2e                    # browser journeys A–E against the real API (run in CI)
 ```
 
 CI (`.github/workflows/ci.yml`) runs these on every push and PR, with the archives left as LFS pointers,

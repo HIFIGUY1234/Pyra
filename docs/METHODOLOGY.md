@@ -119,7 +119,9 @@ A candidate replaces XGBoost only if Brier improves ≥ 2 % relative and ROC-AUC
 Result: XGBoost retained (Brier 0.0973 vs climatology 0.1067; best alternative HistGradientBoosting 0.0976).
 
 **Reference-stream risk:** S-NPP VIIRS science-data delivery ceased on 2026-11-02 (CMR metadata). The forecast target
-is S-NPP-based, so it stops being refreshable with new labels; retargeting to NOAA-20 is future work.
+was S-NPP-based. Separate NOAA-20 and NOAA-21 models are now trained on each sensor's own labels (no pooling, no
+calibrator transfer) and an operational reference is chosen by criteria C1–C6; S-NPP remains the historical reference.
+See [OPERATIONAL_SENSOR_TRANSITION.md](OPERATIONAL_SENSOR_TRANSITION.md).
 
 ## 7a. NOAA-21 cross-calibration study
 

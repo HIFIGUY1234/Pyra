@@ -141,3 +141,23 @@ Fetched automatically by the pipeline (`weather.py`) when network access exists;
 * Current two-line element sets for Terra (25994), Aqua (27424), Suomi NPP (37849), NOAA-20 (43013), NOAA-21 (54234)
   from CelesTrak GP API; checksum and catalogue number verified; cached in `data/auxiliary/tle/`. TLEs older than 7 days are flagged stale.
 * `python -m app.orbits refresh` / `validate`, or `python -m app.pipeline --refresh-tle`.
+
+## 10. Linear infrastructure — Geofabrik PBF (`backend/app/linear_gis.py`)
+
+Roads, railways, power lines and settlements come from the Geofabrik India extract (ODbL). `python -m app.linear_gis fetch`
+downloads the PBF and verifies it against Geofabrik's published MD5; `python -m app.linear_gis build` parses it with osmium,
+keeps lines as lines (GeoParquet, WKB + geo metadata), computes per-0.25°-cell lengths in km and writes a manifest.
+No unrestricted Overpass queries are used. The sandbox cannot reach Geofabrik, so the extract is built by the
+*Data integration* workflow (`linear_gis: true`), which uploads the result as an artifact. Until loaded, the layer is
+reported *not loaded*, never zero.
+
+## 11. Population allocation method
+
+WorldPop pixels are now split across 0.25° cells by exact spherical area (`method="area_weighted"`); the earlier
+pixel-centre method stays available and `population.compare_methods` reports the difference per cell (sensitivity).
+Totals are conserved to float precision (tested on synthetic GeoTIFFs).
+
+## 12. Per-sensor forecast labels
+
+NOAA-20 and NOAA-21 forecast labels use only standard-processing rows from each sensor's operational start
+(NOAA-20 2018-04-01, NOAA-21 2024-01-17); NRT rows are excluded. See [OPERATIONAL_SENSOR_TRANSITION.md](OPERATIONAL_SENSOR_TRANSITION.md).

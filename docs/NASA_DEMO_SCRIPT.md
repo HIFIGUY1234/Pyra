@@ -26,4 +26,6 @@ calibration cache is warm; the first fit takes about 4 s.
 
 **If asked about VIIRS 750 m:** search, download and conversion are implemented for VNP14/VJ114/VJ214 v002. Download needs an Earthdata login that this deployment does not have, so the panel says *unavailable* and nothing is claimed.
 **If asked about NOAA-21:** four ways to convert it to S-NPP-equivalent were tested on the operational period; none beat "leave it unchanged" under the declared rule, so it stays separate.
-**If asked about exposure:** WorldPop 2020 (1.38 billion people in the AOI) and 11 OSM facility categories. Roads, rail and power lines are not loaded and are shown as missing.
+**If asked about exposure:** WorldPop 2020 (1.38 billion people in the AOI) and 11 OSM facility categories. Roads, rail and power lines are implemented from Geofabrik PBF; until the extract is built they are shown as not loaded.
+**If asked about S-NPP retirement:** open **Reference sensor** (`/reference`). S-NPP is the historical reference; NOAA-21 is the operational reference chosen by criteria C1–C6 (NOAA-20 also passes). Each has its own model (`/forecast/models`). Bridges to the S-NPP scale were tested and none passed, so the page says NOT_BRIDGED and the series are not spliced.
+**If asked about readiness:** `/system` shows which credentials are configured (never their values) and the production configuration check.

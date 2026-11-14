@@ -1017,7 +1017,7 @@ def orbits_status():
     for sat in orbits.SATS:
         r = orbits.load_tle(sat)
         tles[sat] = ({k: r[k] for k in ("catnr", "name", "epoch", "source", "acquired")} | orbits.freshness(r)) if r else None
-    return ok({"tles": tles, "validation": orbits.validation_summary(), "stale_after_days": orbits.STALE_DAYS,
+    return ok({"tles": tles, "last_refresh": orbits.last_refresh(), "validation": orbits.validation_summary(), "stale_after_days": orbits.STALE_DAYS,
                "meaning": "Predicted passes are observation opportunities, not fire predictions."})
 
 

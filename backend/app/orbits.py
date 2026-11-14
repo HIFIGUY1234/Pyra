@@ -94,7 +94,24 @@ def refresh_all(log=print, session=None) -> dict:
         except Exception as exc:  # reported, never invented
             out[sat] = {"error": f"{type(exc).__name__}: {exc}"}
             log(f"TLE {sat}: FAILED {exc}")
+    try:  # persist refresh outcome so failures are visible in /api/orbits/status
+        TLE_DIR.mkdir(parents=True, exist_ok=True)
+        LAST_REFRESH.write_text(json.dumps({
+            "at": datetime.now(timezone.utc).isoformat(),
+            "results": {k: ({"ok": False, "error": v["error"]} if "error" in v else {"ok": True, "epoch": v.get("epoch")})
+                        for k, v in out.items()}}, indent=1), encoding="utf-8")
+    except OSError:
+        pass
     return out
+
+
+def last_refresh() -> dict:
+    """Outcome of the most recent refresh_all; failed satellites keep their previous (possibly stale) TLE."""
+    if not LAST_REFRESH.exists():
+        return {"at": None, "results": {}, "failed": []}
+    d = json.loads(LAST_REFRESH.read_text(encoding="utf-8"))
+    d["failed"] = [k for k, v in d.get("results", {}).items() if not v.get("ok")]
+    return d
 
 
 def freshness(rec: dict, at: datetime | None = None) -> dict:
@@ -267,6 +284,7 @@ def validate_from_store(sat: str, n: int = 400, seed: int = 20261114) -> dict:
     return validate(sat, df, rec)
 
 
+LAST_REFRESH = TLE_DIR / "last_refresh.json"
 VALIDATION = DATA / "auxiliary" / "tle" / "validation.json"
 
 

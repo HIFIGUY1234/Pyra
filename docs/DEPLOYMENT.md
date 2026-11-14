@@ -43,6 +43,11 @@ cd frontend && npm run typecheck && npm run lint && npm test && npm run build
 cd frontend && npx playwright install chromium && npm run e2e   # browser journeys, see END_TO_END_TESTING.md
 ```
 
+Counts on 2026-11-15: backend **193 passed**; Vitest **24 passed**; lint 0 errors (32 react-refresh warnings);
+Playwright journeys A–E run in CI. Validate production settings before deploying: `cd backend && python -m app.system_config`
+(non-zero exit on errors). Docker images are built, started and smoke-tested in the CI `docker` job.
+See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) and [MANUAL_SETUP_AFTER_CODE_COMPLETION.md](MANUAL_SETUP_AFTER_CODE_COMPLETION.md).
+
 Tests run on a temporary copy of `data/pyroscope.db` (set in `tests/conftest.py`); the working database is never modified.
 
 ## 2. Containers

@@ -96,8 +96,23 @@ def study_pair(tgt: str, ref: str) -> dict:
             "reference_per_target_ratio": raw_step, "experiments": [fwd, rev], "criteria": accept_strict.__doc__.strip()}
 
 
+_RECOMPUTE = False
+
+
 @lru_cache(maxsize=1)
 def studies() -> dict:
+    """Bridge studies. Served from the stored result (data/processed/bridge_calibrations.json) when present, because a
+    full recomputation takes minutes; the pipeline recomputes after new data (`clear(recompute=True)`)."""
+    global _RECOMPUTE
+    if OUT.exists() and not _RECOMPUTE:
+        try:
+            out = json.loads(OUT.read_text(encoding="utf-8"))
+            if out.get("pairs"):
+                out["source"] = "stored"
+                return out
+        except (OSError, ValueError):
+            pass
+    _RECOMPUTE = False
     out = {"pairs": [study_pair(t, r) for t, r in PAIRS],
            "principle": "Bridges link operational successors to the historical reference scale for comparison only. The historical "
                         "S-NPP-equivalent record is never altered; failed bridges leave the successor as an independent actual stream."}
@@ -115,9 +130,12 @@ def status(tgt: str, ref: str) -> dict:
     return {"target": tgt, "reference": ref, "status": "not_studied"}
 
 
-def clear():
+def clear(recompute: bool = False):
+    global _RECOMPUTE
+    _RECOMPUTE = recompute
     studies.cache_clear()
 
 
 if __name__ == "__main__":
+    clear(recompute=True)
     print(json.dumps(studies(), indent=1, default=str)[:4000])
