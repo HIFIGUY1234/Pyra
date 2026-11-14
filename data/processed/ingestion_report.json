@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-14T14:50:59+00:00",
+ "generated_at": "2026-11-14T15:19:52+00:00",
  "aoi_bbox": [
   68.0,
   6.0,
@@ -65,6 +65,23 @@
      "name": "fire_nrt_M-C61_846937.csv",
      "bytes": 332917,
      "kind": "nrt"
+    },
+    {
+     "name": "Readme.txt",
+     "bytes": 89,
+     "kind": "other"
+    }
+   ]
+  },
+  {
+   "file": "DL_FIRE_M-C61_848456.zip",
+   "status": "valid",
+   "bytes": 11909796,
+   "members": [
+    {
+     "name": "fire_archive_M-C61_848456.csv",
+     "bytes": 53158010,
+     "kind": "archive"
     },
     {
      "name": "Readme.txt",
@@ -140,6 +157,13 @@
    "bytes": 332917
   },
   {
+   "key": "fire_archive_M-C61_848456",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_M-C61_848456.zip",
+   "member": "fire_archive_M-C61_848456.csv",
+   "bytes": 53158010
+  },
+  {
    "key": "fire_archive_SV-C2_846940",
    "origin": "repository",
    "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_SV-C2_846940.zip",
@@ -164,16 +188,16 @@
    },
    "loaded": {
     "archive": {
-     "first": "2012-01-01",
+     "first": "2000-11-01",
      "last": "2026-08-31",
-     "rows": 381857
+     "rows": 594430
     },
     "nrt": {
      "first": "2026-09-01",
      "last": "2026-10-31",
      "rows": 1561
     },
-    "rows": 383418,
+    "rows": 595991,
     "versions": [
      "6.03",
      "6.1NRT",
@@ -183,7 +207,7 @@
      "1km"
     ]
    },
-   "status": "partial"
+   "status": "complete_from_firms_start"
   },
   "Aqua": {
    "expected": {
@@ -194,16 +218,16 @@
    },
    "loaded": {
     "archive": {
-     "first": "2012-01-01",
+     "first": "2002-07-04",
      "last": "2026-08-30",
-     "rows": 852128
+     "rows": 1322914
     },
     "nrt": {
      "first": "2026-09-01",
      "last": "2026-10-31",
      "rows": 2342
     },
-    "rows": 854470,
+    "rows": 1325256,
     "versions": [
      "6.03",
      "6.1NRT",
@@ -213,7 +237,7 @@
      "1km"
     ]
    },
-   "status": "partial"
+   "status": "complete_from_firms_start"
   },
   "Suomi NPP": {
    "expected": {
@@ -301,23 +325,12 @@
    "status": "complete_from_firms_start"
   }
  },
- "missing": [
-  {
-   "satellite": "Terra",
-   "period": "2000-11-01 to 2011-12-31",
-   "how": "FIRMS Archive Download (MODIS C6.1 / VIIRS C2, CSV, AOI (68.0, 6.0, 98.0, 36.0)) or `python -m app.acquire firms MODIS_SP 2000-11-01 2012-01-01`"
-  },
-  {
-   "satellite": "Aqua",
-   "period": "2002-07-04 to 2011-12-31",
-   "how": "FIRMS Archive Download (MODIS C6.1 / VIIRS C2, CSV, AOI (68.0, 6.0, 98.0, 36.0)) or `python -m app.acquire firms MODIS_SP 2002-07-04 2012-01-01`"
-  }
- ],
+ "missing": [],
  "capabilities": {
-  "terra_only_era_loaded": false,
-  "pre_viirs_modis_loaded": false,
-  "real_morning_gap_correction": "blocked: no Terra-only (Nov 2000 - Jun 2002) records loaded",
-  "real_2012_seam_test": "blocked: fewer than 12 months of MODIS records precede the first VIIRS record",
+  "terra_only_era_loaded": true,
+  "pre_viirs_modis_loaded": true,
+  "real_morning_gap_correction": "possible",
+  "real_2012_seam_test": "possible",
   "viirs_750m": "unavailable",
   "noaa20": "loaded"
  },
@@ -495,6 +508,30 @@
     "375m"
    ],
    "processed_at": "2026-11-14T14:48:00+00:00",
+   "error": null
+  },
+  "fire_archive_M-C61_848456": {
+   "file": "fire_archive_M-C61_848456.csv",
+   "rows_kept": 683359,
+   "versions": {
+    "6.03": 683359
+   },
+   "satellites": {
+    "Aqua": {
+     "rows": 470786,
+     "first": "2002-07-04",
+     "last": "2011-12-31"
+    },
+    "Terra": {
+     "rows": 212573,
+     "first": "2000-11-01",
+     "last": "2011-12-31"
+    }
+   },
+   "product_types": [
+    "1km"
+   ],
+   "processed_at": "2026-11-14T15:16:16+00:00",
    "error": null
   }
  }

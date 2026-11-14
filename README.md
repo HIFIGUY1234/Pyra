@@ -19,13 +19,13 @@ probability with a human-in-the-loop authority alert workflow (India focus).
 
 | File | Sensor | Content |
 |---|---|---|
+| `DL_FIRE_M-C61_848456.zip` | MODIS Terra + Aqua, C6.1 | archive Terra 2000-11-01 / Aqua 2002-07-04 → 2011-12-31 |
 | `DL_FIRE_M-C61_846937.zip` | MODIS Terra + Aqua, C6.1 | archive 2012-01 → 2026-08, NRT 2026-09 → 10 |
 | `DL_FIRE_SV-C2_846940.zip` | Suomi NPP VIIRS 375 m, C2 | archive 2012-01-20 → 2026-07, NRT → 2026-10 |
 | `DL_FIRE_J1V-C2_846938.zip` | NOAA-20 VIIRS 375 m, C2 | archive 2018-04-01 → 2026-07, NRT → 2026-10 |
 | `DL_FIRE_J2V-C2_846939.zip` | NOAA-21 VIIRS 375 m, C2 | archive 2023-03 → 2026-07, NRT → 2026-10 |
 
-Area: bounding box 68–98° E, 6–36° N (India). **Not included:** MODIS before 2012 (FIRMS starts
-2000-11-01), VIIRS 750 m. See the ingestion report and `docs/DATA_ACQUISITION.md`.
+Area: bounding box 68–98° E, 6–36° N (India). **Not included:** VIIRS 750 m (not in FIRMS). See the ingestion report and `docs/DATA_ACQUISITION.md`.
 
 The archives are LFS objects. A plain clone gives 133-byte pointer files; PyroScope detects them and says so.
 

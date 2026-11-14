@@ -321,5 +321,49 @@
   ],
   "processed_at": "2026-11-14T14:48:00+00:00",
   "has_anomaly_type": false
+ },
+ "fire_archive_M-C61_848456": {
+  "key": "fire_archive_M-C61_848456",
+  "origin": "repository",
+  "file": "fire_archive_M-C61_848456.csv",
+  "container": "DL_FIRE_M-C61_848456.zip",
+  "bytes": 53158010,
+  "quality": {
+   "rows_read": 683359,
+   "dropped_invalid_coordinates": 0,
+   "dropped_invalid_timestamp": 0,
+   "dropped_unknown_sensor": 0,
+   "instrument_relabelled": 0,
+   "confidence_missing": 0,
+   "frp_missing": 0,
+   "frp_invalid_negative": 0,
+   "frp_extreme_gt_10000MW": 2,
+   "scan_track_invalid": 0,
+   "brightness_outside_200_700K": 0,
+   "daynight_missing": 0,
+   "anomaly_type_missing": 0,
+   "duplicates_removed": 0,
+   "rows_kept": 683359
+  },
+  "versions": {
+   "6.03": 683359
+  },
+  "satellites": {
+   "Aqua": {
+    "rows": 470786,
+    "first": "2002-07-04",
+    "last": "2011-12-31"
+   },
+   "Terra": {
+    "rows": 212573,
+    "first": "2000-11-01",
+    "last": "2011-12-31"
+   }
+  },
+  "product_types": [
+   "1km"
+  ],
+  "processed_at": "2026-11-14T15:16:16+00:00",
+  "has_anomaly_type": true
  }
 }

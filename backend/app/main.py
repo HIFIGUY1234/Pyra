@@ -600,13 +600,16 @@ def mg_correct(body: RunBody):
     df, _ = harmonize.series(body.region, sp)
     v = harmonize.validation(body.region, sp)
     real, _ = harmonize.series(body.region, None)
-    real_to = real[(real["cov_terra"] >= 0.5) & (real["cov_aqua"] < 0.5)]
+    real_to = real[(real["cov_terra"] >= 0.5) & (real["cov_aqua"] < 0.5)].copy()
+    aqua_first = (store.spans().get("Aqua") or {}).get("first", "9999")
+    real_to["kind"] = np.where(real_to["date"] < aqua_first, "pre_aqua_era", "aqua_outage")
     sim = df[df["withheld_aqua"]][["date", "terra", "aqua", "aqua_est", "aqua_est_lo", "aqua_est_hi"]].copy()
     sim["difference"] = sim["aqua_est"] - sim["terra"]
     return ok({"region": store.region_label(body.region), "split": sp, "terra_only_end": harmonize.fit(sp).terra_only_end,
-               "real_terra_only_period": rec(real_to[["date", "terra", "aqua_est", "aqua_est_lo", "aqua_est_hi"]]),
-               "real_terra_only_message": None if len(real_to) else "The loaded MODIS record contains no Terra-only months (it starts in 2012, after Aqua's launch). "
-                                                                    "Upload MODIS data for 2000-2002 to correct the real Terra-only era.",
+               "real_terra_only_period": rec(real_to[["date", "kind", "terra", "aqua_est", "aqua_est_lo", "aqua_est_hi"]]),
+               "real_terra_only_months": {"pre_aqua_era": int((real_to["kind"] == "pre_aqua_era").sum()), "aqua_outage": int((real_to["kind"] == "aqua_outage").sum())},
+               "real_terra_only_message": None if len(real_to) else "The loaded MODIS record contains no Terra-only months. "
+                                                                    "Upload MODIS C6.1 data from Nov 2000 to correct the real Terra-only era.",
                "simulated": rec(sim), "simulated_validation": v.get("morning_gap"),
                "label": "Morning-Gap Corrected Estimate - a statistical estimate of afternoon (Aqua) activity, NOT satellite detections."})
 

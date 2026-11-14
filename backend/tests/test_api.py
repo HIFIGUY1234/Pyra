@@ -68,9 +68,14 @@ def test_validation_is_chronological_and_reported():
 
 def test_seam_does_not_force_smoothness():
     s = c.get("/api/validation/seam-test").json()
-    assert s["mode"] == "simulated" and s["real_seam_possible"] is False
+    if s["real_seam_possible"]:
+        assert s["mode"] == "real" and s["seam_month"].startswith("2012")
+    else:
+        assert s["mode"] == "simulated"
     assert s["artificial_jump_after"] < s["artificial_jump_before"]
-    assert abs(s["step_harmonized"] - 1.0) > 1e-6          # a genuine change remains
+    assert abs(s["step_harmonized"] - 1.0) > 1e-6          # not forced flat
+    sim = c.get("/api/validation/seam-test?split=201701").json()
+    assert sim["mode"] == "simulated" and sim["artificial_jump_after"] < sim["artificial_jump_before"]
 
 
 def test_missing_days_are_null_not_zero():

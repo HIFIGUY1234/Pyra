@@ -66,7 +66,8 @@ def build() -> str:
     for st, m in v["by_stage"].items():
         L.append(_mrow(f"· stage {st}", m))
     L += ["", f"Uncertainty band (5–95 % of replicates, nominal 90 %): empirical coverage on held-out months **{f(v.get('band_coverage_pct'), 1, '%')}** "
-              "(above nominal = conservative / wide band).", "", "### 3a. Monthly performance (held-out)", "", "| Month | n | WAPE | Bias |", "|---|---|---|---|"]
+              + ("(close to nominal: well calibrated)." if abs((v.get('band_coverage_pct') or 0) - 90) <= 5 else
+                 "(above nominal: conservative / wide band)." if (v.get('band_coverage_pct') or 0) > 90 else "(below nominal: band too narrow)."), "", "### 3a. Monthly performance (held-out)", "", "| Month | n | WAPE | Bias |", "|---|---|---|---|"]
     for r in v["by_month"]:
         L.append(f"| {MONTHS[r['month'] - 1]} | {r['n']} | {f(r.get('wape_pct'), 1, '%')} | {f(r.get('bias_pct'), 1, '%')} |")
     mgv = v["morning_gap"]
@@ -100,10 +101,14 @@ def build() -> str:
               f"| 60 % (HIGH) | {c60.get('precision', 0):.3f} | {c60.get('recall', 0):.3f} | {c60.get('false_alarm_rate', 0):.4f} | {c60.get('missed_event_rate', 0):.3f} |",
               f"| 80 % (VERY HIGH) | {c80.get('precision', 0):.3f} | {c80.get('recall', 0):.3f} | {c80.get('false_alarm_rate', 0):.4f} | {c80.get('missed_event_rate', 0):.3f} |", "",
               f"Regional aggregation: `{fm['aggregation']['formula']}` with α = {fm['aggregation']['alpha']:.2f} (fitted on calibration years).", ""]
+    caps = inv["capabilities"]
     L += ["## 6. Data limitations", "",
-          "* No MODIS records before 2012-01-01 are loaded (FIRMS C6.1 starts 2000-11-01). The real Terra-only morning-gap correction (Nov 2000 – Jun 2002) "
-          "and the real 2012 MODIS→VIIRS seam test therefore cannot be run on this data; the code runs them automatically once those records are ingested.",
-          "* NOAA-20 VIIRS records are not in the repository; NOAA-21 is present but is not used as a calibration target.",
+          ("* Real Terra-only morning-gap correction is applied to the loaded Terra-only months; there is no ground truth for those months, "
+           "so its skill is measured only by the simulated withheld-Aqua experiment (3b)." if caps["terra_only_era_loaded"] else
+           "* No Terra-only MODIS records are loaded: the real morning-gap correction cannot be applied."),
+          ("* Real 2012 seam test uses the loaded pre-2012 MODIS record." if caps["pre_viirs_modis_loaded"] else
+           "* Fewer than 12 months of MODIS precede VIIRS: the real seam test falls back to the simulated seam."),
+          f"* NOAA-20: {caps['noaa20']}; NOAA-21 loaded. Neither is the default calibration target (kept as separate actual observations).",
           "* VIIRS 750 m (VNP14/VJ114) is not distributed by FIRMS; a separate 750 m calibration pathway exists but has no data.",
           f"* MODIS orbit drift years excluded from calibration: {', '.join(n for n in sh['notes'] if 'drift' in n) or 'none'}",
           "* Administrative intelligence (states, districts, land use) covers India only.",
