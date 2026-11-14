@@ -41,36 +41,105 @@ DAY_SZA = 85.0
 CLASS = {7: "l", 8: "n", 9: "h"}
 
 
+ACCESS_STATE = GRANULE_DIR / "access_state.json"
+PRODUCT_START = {"VNP14": "2012-01-17", "VJ114": "2018-01-01", "VJ214": "2023-02-10"}
+PLATFORM_ATTR = {"VNP14": ("NPP", "SUOMI", "S-NPP", "SNPP"), "VJ114": ("NOAA-20", "NOAA20", "JPSS-1", "J1"),
+                 "VJ214": ("NOAA-21", "NOAA21", "JPSS-2", "J2")}
+
+
+def _redact(msg: str) -> str:
+    """Remove any credential material from an error message before it is stored or returned."""
+    import re
+    tok = os.getenv("EARTHDATA_TOKEN")
+    if tok:
+        msg = msg.replace(tok, "***")
+    msg = re.sub(r"(?i)(authorization|bearer|token|password)[=: ]+\S+", r"\1=***", msg)
+    return msg[:300]
+
+
+def _record_access(ok: bool, error: str | None = None):
+    try:
+        st = json.loads(ACCESS_STATE.read_text()) if ACCESS_STATE.exists() else {}
+        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        if ok:
+            st["last_success"] = now
+        else:
+            st["last_error"], st["last_error_at"] = _redact(error or "unknown error"), now
+        GRANULE_DIR.mkdir(parents=True, exist_ok=True)
+        ACCESS_STATE.write_text(json.dumps(st))
+    except OSError:
+        pass
+
+
 # --------------------------------------------------------------------------- search (public)
 def search(satellite: str, start: str, end: str, bbox=AOI_BBOX, session=None, page_size: int = 200, max_pages: int = 50) -> list[dict]:
+    """CMR granule search (no login needed). Paginates with the CMR-Search-After header (CMR's recommended
+    deep-paging method), falls back to page_num, and de-duplicates by GranuleUR."""
     import requests
+    if satellite not in PRODUCTS:
+        raise ValueError(f"satellite must be one of {list(PRODUCTS)}")
+    if not (pd.Timestamp(start) <= pd.Timestamp(end)):
+        raise ValueError("start must be on or before end")
+    w, s_, e, n = bbox
+    if not (-180 <= w < e <= 180 and -90 <= s_ < n <= 90):
+        raise ValueError("bbox must be west,south,east,north within valid bounds")
     s = session or requests
     short, ver = PRODUCTS[satellite]
-    out, page = [], 1
+    out, seen, page, after = [], set(), 1, None
     while page <= max_pages:
-        r = s.get(CMR, params={"short_name": short, "version": ver, "temporal": f"{start}T00:00:00Z,{end}T23:59:59Z",
-                               "bounding_box": ",".join(str(x) for x in bbox), "page_size": page_size, "page_num": page}, timeout=60)
+        params = {"short_name": short, "version": ver, "temporal": f"{start}T00:00:00Z,{end}T23:59:59Z",
+                  "bounding_box": ",".join(str(x) for x in bbox), "page_size": page_size}
+        headers = {"CMR-Search-After": after} if after else {}
+        if not after:
+            params["page_num"] = page
+        r = s.get(CMR, params=params, headers=headers, timeout=60) if headers else s.get(CMR, params=params, timeout=60)
         r.raise_for_status()
         items = r.json().get("items", [])
+        nxt = getattr(r, "headers", {}).get("CMR-Search-After") if hasattr(r, "headers") else None
         for it in items:
             u = it["umm"]
             url = next((x["URL"] for x in u.get("RelatedUrls", []) if x["URL"].startswith("https") and x["URL"].endswith(".nc")), None)
             size = next((a.get("Size") for a in u.get("DataGranule", {}).get("ArchiveAndDistributionInformation", [])), None)
             unit = next((a.get("SizeUnit") for a in u.get("DataGranule", {}).get("ArchiveAndDistributionInformation", [])), "MB")
+            if u["GranuleUR"] in seen:
+                continue
+            seen.add(u["GranuleUR"])
             out.append({"granule": u["GranuleUR"], "url": url, "satellite": satellite, "product": short, "version": ver,
                         "daynight": u.get("DataGranule", {}).get("DayNightFlag"),
                         "size_bytes_approx": int(size * (1 << 20 if unit == "MB" else 1 << 10)) if size else None})
         if len(items) < page_size:
             break
+        after = nxt or None
         page += 1
     return out
 
 
 # --------------------------------------------------------------------------- download (Earthdata Login)
+def _netrc_has_urs() -> bool:
+    import netrc as _n
+    for name in (".netrc", "_netrc"):
+        p = Path.home() / name
+        if p.exists():
+            try:
+                if _n.netrc(str(p)).authenticators("urs.earthdata.nasa.gov"):
+                    return True
+            except (_n.NetrcParseError, OSError):
+                return False
+    return False
+
+
 def credentials_status() -> dict:
+    """Configured / method / last access only. Never returns or logs credential contents."""
     tok = bool(os.getenv("EARTHDATA_TOKEN"))
-    netrc = any((Path.home() / n).exists() for n in (".netrc", "_netrc"))
-    return {"configured": tok or netrc, "method": "token" if tok else ("netrc" if netrc else None),
+    netrc = _netrc_has_urs()
+    st = {}
+    try:
+        st = json.loads(ACCESS_STATE.read_text()) if ACCESS_STATE.exists() else {}
+    except (OSError, ValueError):
+        pass
+    return {"configured": tok or netrc, "state": "CONFIGURED" if (tok or netrc) else "NOT_CONFIGURED",
+            "method": "token" if tok else ("netrc" if netrc else None),
+            "last_success": st.get("last_success"), "last_error": st.get("last_error"), "last_error_at": st.get("last_error_at"),
             "how": "Set EARTHDATA_TOKEN (Earthdata Login > Generate Token) in the backend environment, or add "
                    "'machine urs.earthdata.nasa.gov login <user> password <pass>' to ~/.netrc. Never commit either."}
 
@@ -130,12 +199,19 @@ def download(granules: list[dict], session=None, retries: int = 4, sleep=time.sl
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_suffix(".nc.part")
+        if not g.get("url"):
+            stats["failed"] += 1
+            m["granules"][g["granule"]] = {**g, "status": "no_download_url"}
+            continue
         try:
             _download(g["url"], tmp, None, s, retries, sleep, log)
         except Exception as exc:
             stats["failed"] += 1
-            m["granules"][g["granule"]] = {**g, "status": "download_failed", "error": f"{type(exc).__name__}: {exc}"}
+            err = _redact(f"{type(exc).__name__}: {exc}")
+            m["granules"][g["granule"]] = {**g, "status": "download_failed", "error": err}
+            _record_access(False, err)
             continue
+        _record_access(True)
         size = tmp.stat().st_size
         approx = g.get("size_bytes_approx")
         if (approx and abs(size - approx) > 0.02 * approx + 4096) or not _valid_hdf5(tmp):
@@ -183,9 +259,55 @@ def _attr(h, key):
     return str(v)
 
 
+def validate_granule(path: Path) -> dict:
+    """Structural checks against the VNP14 file specification: FP_* arrays present and equal length, fill values,
+    coordinate bounds, timestamp inside the product record, platform and collection consistent with the file name.
+    Raises ValueError for violations that make the granule unusable; returns diagnostics otherwise."""
+    import h5py
+    parts = path.name.split(".")
+    if len(parts) < 4 or parts[0] not in PREFIX_SAT or not parts[1].startswith("A") or len(parts[1]) != 8:
+        raise ValueError(f"unexpected granule name {path.name}; expected VNP14|VJ114|VJ214.AYYYYDDD.HHMM.VVV.*")
+    day = datetime.strptime(parts[1][1:], "%Y%j").date()
+    if not (pd.Timestamp(PRODUCT_START[parts[0]]).date() <= day <= datetime.now(timezone.utc).date()):
+        raise ValueError(f"{path.name}: acquisition date {day} outside the {parts[0]} record")
+    hhmm = parts[2]
+    if not (len(hhmm) == 4 and hhmm.isdigit() and int(hhmm[:2]) < 24 and int(hhmm[2:]) < 60):
+        raise ValueError(f"{path.name}: invalid acquisition time {hhmm}")
+    if parts[3] != PRODUCTS[PREFIX_SAT[parts[0]]][1]:
+        raise ValueError(f"{path.name}: collection {parts[3]} is not the supported {PRODUCTS[PREFIX_SAT[parts[0]]][1]}")
+    diag = {"granule": path.name, "date": day.isoformat(), "time": hhmm, "product": parts[0], "collection": parts[3]}
+    with h5py.File(path, "r") as h:
+        names = ("FP_latitude", "FP_longitude", "FP_power", "FP_confidence", "FP_line", "FP_sample", "FP_SolZenAng")
+        lens = {nm: (_find(h, nm).shape[0] if _find(h, nm) is not None else None) for nm in names}
+        present = {k: v for k, v in lens.items() if v is not None}
+        diag["fire_pixels"] = present.get("FP_latitude", 0)
+        diag["missing_datasets"] = [k for k, v in lens.items() if v is None]
+        if present and len(set(present.values())) > 1:
+            raise ValueError(f"{path.name}: FP_* arrays have different lengths {present}")
+        if diag["fire_pixels"] and ("FP_latitude" in diag["missing_datasets"] or "FP_longitude" in diag["missing_datasets"]):
+            raise ValueError(f"{path.name}: fire-pixel coordinates missing")
+        n = diag["fire_pixels"]
+        if n:
+            lat, lon = _arr(_find(h, "FP_latitude"), n), _arr(_find(h, "FP_longitude"), n)
+            diag["fill_coordinates"] = int((~np.isfinite(lat) | ~np.isfinite(lon)).sum())
+            diag["out_of_bounds"] = int(((np.abs(lat) > 90) | (np.abs(lon) > 180)).sum())
+            pw = _arr(_find(h, "FP_power"), n)
+            diag["negative_frp"] = int((pw < 0).sum())
+        fm = _find(h, "fire mask")
+        diag["fire_mask_shape"] = list(fm.shape) if fm is not None else None
+        diag["algorithm_qa_present"] = _find(h, "algorithm QA") is not None
+        plat = " ".join(str(_attr(h, k) or "") for k in ("PlatformShortName", "SatelliteInstrument", "platform", "Platform"))
+        diag["platform_attribute"] = plat.strip() or None
+        if plat.strip() and not any(t in plat.upper() for t in PLATFORM_ATTR[parts[0]]):
+            raise ValueError(f"{path.name}: platform attribute '{plat.strip()}' does not match {PREFIX_SAT[parts[0]]}")
+        diag["daynight_flag"] = _attr(h, "DayNightFlag")
+    return diag
+
+
 def granule_pixels(path: Path) -> pd.DataFrame:
     """Fire pixels of one granule as FIRMS-like rows (product_type 750m). Never invents pixels: an empty FP table
-    gives an empty frame."""
+    gives an empty frame. The granule is validated first (validate_granule)."""
+    validate_granule(path)
     import h5py
     parts = path.name.split(".")
     if len(parts) < 4 or parts[0] not in PREFIX_SAT or not parts[1].startswith("A"):
@@ -251,7 +373,13 @@ def status() -> dict:
     m = manifest()
     gr = m.get("granules", {})
     ok = [g for g in gr.values() if g.get("status") == "ok"]
+    converted = sorted(RAW.glob("viirs750_*.csv"))
     return {"credentials": credentials_status(), "granules_downloaded": len(ok),
+            "converted_files": [p.name for p in converted],
+            "real_data_verification": ("VERIFIED_WITH_AUTHENTIC_GRANULES" if ok and converted else
+                                       "BLOCKED_BY_CREDENTIALS" if not credentials_status()["configured"] else "PENDING_DOWNLOAD"),
+            "verification_note": "Converter and validator are tested on HDF5 fixtures built from the LAADS VNP14 file specification. "
+                                 "Fixtures do not prove compatibility with real granules; that needs at least one authentic downloaded granule.",
             "granules_failed": sum(1 for g in gr.values() if g.get("status") != "ok"),
             "by_product": pd.Series([g["product"] for g in ok]).value_counts().to_dict() if ok else {},
             "products": {s: {"short_name": p, "version": v} for s, (p, v) in PRODUCTS.items()},
