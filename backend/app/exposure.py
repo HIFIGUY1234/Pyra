@@ -9,12 +9,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from . import forecast, grid, infrastructure, ingest, population, store
+from . import forecast, grid, infrastructure, ingest, linear_gis, population, store
 from .analytics import data_end
 
 HIGH_FRP_MW = 50.0
-MEANING = ("Exposure = people (WorldPop 2020) or mapped facilities (OpenStreetMap) within the radius of a location. "
-           "It is not a prediction that anything will burn; 'unavailable' means no layer is loaded, not zero.")
+MEANING = ("Exposure = people (WorldPop 2020) or mapped facilities / lines (OpenStreetMap) within the radius of a location. "
+           "It is not a prediction that anything will burn or is damaged; 'unavailable' means no layer is loaded, not zero.")
 
 
 def layers() -> dict:
@@ -31,9 +31,23 @@ def layers() -> dict:
             "meaning": MEANING}
 
 
+def linear_proximity(lat: float, lon: float, radius_km: float) -> dict | None:
+    """Nearest road / railway / power line / power facility / settlement and line length inside the buffer.
+    None when the linear layer has not been built (unavailable, not zero)."""
+    if linear_gis.manifest() is None:
+        return None
+    out = {}
+    for cat in ("road_major", "railway", "power_line", "power_facility", "settlement"):
+        nr = linear_gis.nearest(lat, lon, cat, max_km=max(radius_km * 3, 25))
+        w = linear_gis.within(lat, lon, radius_km, cat)
+        out[cat] = {"nearest_km": nr.get("distance_km"), "nearest_name": nr.get("name"), "status": nr.get("status"),
+                    "features_within": w.get("features"), "length_km_within": w.get("length_km")}
+    return out
+
+
 def point(lat: float, lon: float, radius_km: float = 10.0) -> dict:
     pop = population.people_within(lat, lon, radius_km)
-    return {"lat": lat, "lon": lon, "radius_km": radius_km,
+    return {"lat": lat, "lon": lon, "radius_km": radius_km, "linear": linear_proximity(lat, lon, radius_km),
             "population": None if pop is None else round(float(pop[0])),
             "population_reference_year": (population.manifest() or {}).get("reference_year"),
             "infrastructure": infrastructure.nearby(lat, lon, radius_km) if infrastructure.manifest() else None,
@@ -79,7 +93,11 @@ def hotspots(days: int = 7, radius_km: float = 5.0, region: str = "country", top
     else:
         out["population"] = None
     sort = "population" if pop is not None else "frp_max"
-    items = g.sort_values([sort, "frp_max"], ascending=False).head(top)
+    items = g.sort_values([sort, "frp_max"], ascending=False).head(top).copy()
+    if linear_gis.manifest() is not None:      # actual-detection proximity to linear infrastructure (top items only)
+        for cat in ("road_major", "railway", "power_line"):
+            items[f"nearest_{cat}_km"] = [linear_gis.nearest(a, b, cat, 25).get("distance_km") for a, b in zip(items["lat"], items["lon"])]
+    out["linear_layer"] = "loaded" if linear_gis.manifest() is not None else "unavailable"
     out["items"] = [{k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in r.items()} for r in items.round(3).to_dict("records")]
     return out
 
