@@ -92,7 +92,7 @@ export function AuthControl({ onChange }: { onChange: () => void }) {
     } catch (e) { setErr(errMsg(e)) }
   }
   const logout = async () => {
-    try { await api('/api/auth/logout', { method: 'POST' }) } catch { /* session may already be gone */ }
+    try { await api<unknown>('/api/auth/logout', { method: 'POST' }) } catch { /* session may already be gone */ }
     setAuthToken(null); onChange(); me.reload()
   }
   return (

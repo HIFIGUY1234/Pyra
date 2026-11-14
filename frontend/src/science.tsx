@@ -10,6 +10,7 @@ import { seq } from './map'
 import { KindBadge, ValidationMethod } from './completion'
 import { ModelSelectionPanel, SeamRobustnessPanel, SeamVerdict, type Seam } from './validation_extra'
 import { Noaa21Panel, Viirs750Panel } from './completion_final'
+import type { Anomalies, Calendar, CalendarDay, CalibMonth, HarmCompare, HarmSummary, HarmYear, Metric, MorningGapAnalysis, MorningGapRun, RegionTrend, SensorCalib, StateFactor, Trends, Uncertainty, Validation } from './types'
 
 /* ------------------------------------------------------------------ shared helpers */
 export const enc = (r: string) => encodeURIComponent(r)
@@ -31,7 +32,7 @@ export function PageHead({ idx, title, intro, badges, actions }: { idx: string; 
 }
 
 /** Loading / error / empty wrapper using Argon empty-state cards (never dummy numbers). */
-export function Load({ loading, error, data, children, what }: { loading: boolean; error: string | null; data: any; children: ReactNode; what: string }) {
+export function Load({ loading, error, data, children, what }: { loading: boolean; error: string | null; data: unknown; children: ReactNode; what: string }) {
   if (error) return <EmptyStateCard title={`Could not load ${what}`} description={<span className="text-red-300">{error}</span>} />
   if (loading && !data) return <Card><CardBody className="animate-pulse py-12 text-center text-sm text-slate-400">Loading {what}…</CardBody></Card>
   if (!data) return null
@@ -71,10 +72,10 @@ function FitNotes({ notes }: { notes?: string[] }) {
   return <Banner tone="warning" title="Calibration notes">{notes.map((n, i) => <div key={i}>{n}</div>)}</Banner>
 }
 
-function MetricsTable({ rows }: { rows: { name: ReactNode; m?: any }[] }) {
+function MetricsTable({ rows }: { rows: { name: ReactNode; m?: Metric }[] }) {
   return (
     <Table headers={['Model', 'n months', 'MAE', 'RMSE', 'WAPE', 'MAPE', 'Bias', 'R²']}>
-      {rows.filter((r) => r.m).map((r, i) => (
+      {rows.filter((r): r is { name: ReactNode; m: Metric } => !!r.m).map((r, i) => (
         <tr key={i} className="hover:bg-[#172033]/60">
           <Td>{r.name}</Td><Td right>{num(r.m.n)}</Td><Td right>{num(r.m.mae)}</Td><Td right>{num(r.m.rmse)}</Td>
           <Td right>{num(r.m.wape_pct, 1)}%</Td><Td right>{num(r.m.mape_pct, 1)}%</Td><Td right>{num(r.m.bias_pct, 1)}%</Td><Td right>{num(r.m.r2, 3)}</Td>
@@ -85,7 +86,7 @@ function MetricsTable({ rows }: { rows: { name: ReactNode; m?: any }[] }) {
 }
 
 /** Monthly calibration ratios (day & night) with bootstrap band, grouped by month of year. */
-function RatioByMonth({ byMonth, yLabel }: { byMonth: any[]; yLabel: string }) {
+function RatioByMonth({ byMonth, yLabel }: { byMonth: CalibMonth[]; yLabel: string }) {
   const rows = MONTHS.map((m, i) => {
     const d = byMonth.find((r) => r.moy === i + 1 && r.daynight === 'day')
     const n = byMonth.find((r) => r.moy === i + 1 && r.daynight === 'night')
@@ -99,7 +100,7 @@ function RatioByMonth({ byMonth, yLabel }: { byMonth: any[]; yLabel: string }) {
   )
 }
 
-function CalibTable({ byMonth }: { byMonth: any[] }) {
+function CalibTable({ byMonth }: { byMonth: CalibMonth[] }) {
   return (
     <Table headers={['Month', 'Pass', 'Learned ratio', 'Band (5–95%)', 'Silent-cell rate', 'Predictor detections', 'Reliable']}>
       {byMonth.map((r, i) => (
@@ -113,7 +114,7 @@ function CalibTable({ byMonth }: { byMonth: any[] }) {
   )
 }
 
-function StateFactors({ rows, label }: { rows: any[]; label: string }) {
+function StateFactors({ rows, label }: { rows: StateFactor[]; label: string }) {
   return (
     <Table headers={['State', label, 'Predictor detections', 'Data weight']}>
       {rows.slice(0, 18).map((r) => (
@@ -128,14 +129,14 @@ export function MorningGapPage() {
   const { region } = useApp()
   const [split, setSplit] = useState<number | null>(null)
   const q = `region=${enc(region)}${split ? `&split=${split}` : ''}`
-  const { data, loading, error } = useApi<any>(`/api/morning-gap/analysis?${q}`)
-  const [run, setRun] = useState<any>(null)
+  const { data, loading, error } = useApi<MorningGapAnalysis>(`/api/morning-gap/analysis?${q}`)
+  const [run, setRun] = useState<MorningGapRun | null>(null)
   const [busy, setBusy] = useState(false)
   const [runErr, setRunErr] = useState<string | null>(null)
   useEffect(() => setRun(null), [region, split])
   const doRun = () => {
     setBusy(true); setRunErr(null)
-    api('/api/morning-gap/correct', { body: { region, split } }).then(setRun).catch((e) => setRunErr(e.message)).finally(() => setBusy(false))
+    api<MorningGapRun>('/api/morning-gap/correct', { body: { region, split } }).then(setRun).catch((e) => setRunErr(e.message)).finally(() => setBusy(false))
   }
   const series = useMemo(() => withBand(data?.series || [], 'band', 'aqua_est_lo', 'aqua_est_hi'), [data])
 
@@ -179,7 +180,7 @@ export function MorningGapPage() {
               </Panel>
               <Panel title="Leave-one-year-out skill by month" sub="Out-of-sample error of the Terra→Aqua step." pad={false}>
                 <Table headers={['Month', 'WAPE', 'Bias', 'Years', 'Mean actual']}>
-                  {(data.calibration?.loyo?.by_month || []).map((r: any) => (
+                  {(data.calibration?.loyo?.by_month || []).map((r) => (
                     <tr key={r.moy}><Td>{MONTHS[r.moy - 1]}</Td><Td right>{pct(r.wape, 1)}</Td><Td right>{pct(r.bias, 1)}</Td><Td right>{r.n_years}</Td><Td right>{num(r.mean_actual)}</Td></tr>
                   ))}
                 </Table>
@@ -198,7 +199,7 @@ export function MorningGapPage() {
               <Banner tone="info" title="Label">{run.label}</Banner>
               {run.real_terra_only_message ? <Banner tone="warning">{run.real_terra_only_message}</Banner> : (
                 <Table headers={['Month', 'Terra (actual)', 'Corrected Aqua-equivalent', 'Band', 'Difference']}>
-                  {run.real_terra_only_period.map((r: any) => (
+                  {run.real_terra_only_period.map((r) => (
                     <tr key={r.date}><Td mono>{r.date.slice(0, 7)}</Td><Td right>{num(r.terra)}</Td><Td right>{num(r.aqua_est)}</Td><Td mono>{num(r.aqua_est_lo)} – {num(r.aqua_est_hi)}</Td><Td right>{num(r.aqua_est - r.terra)}</Td></tr>
                   ))}
                 </Table>
@@ -240,13 +241,13 @@ export function HarmonizerPage() {
 
 function HarmTimeline({ region, split }: { region: string; split: number | null }) {
   const q = `region=${enc(region)}${split ? `&split=${split}` : ''}`
-  const { data, loading, error } = useApi<any>(`/api/harmonization/summary?${q}`)
-  const [yearly, setYearly] = useState<any[] | null>(null)
+  const { data, loading, error } = useApi<HarmSummary>(`/api/harmonization/summary?${q}`)
+  const [yearly, setYearly] = useState<HarmYear[] | null>(null)
   useEffect(() => {
     setYearly(null)
-    api('/api/sensor-harmonizer/process', { body: { region, split } }).then((d: any) => setYearly(d.yearly)).catch(() => setYearly([]))
+    api<{ yearly: HarmYear[] }>('/api/sensor-harmonizer/process', { body: { region, split } }).then((d) => setYearly(d.yearly)).catch(() => setYearly([]))
   }, [region, split])
-  const rows = useMemo(() => (data?.series || []).map((r: any) => ({
+  const rows = useMemo(() => (data?.series || []).map((r) => ({
     ...r, actual: r.provenance === 'actual_viirs' ? r.viirs : null, est: isEst(r.provenance) ? r.harmonized : null,
     band: isEst(r.provenance) && r.harm_lo != null ? [r.harm_lo, r.harm_hi] : null, veq_cmp: r.veq,
   })), [data])
@@ -287,14 +288,14 @@ function HarmTimeline({ region, split }: { region: string; split: number | null 
 }
 
 function HarmCompare({ region }: { region: string }) {
-  const { data, loading, error } = useApi<any>(`/api/harmonization/compare?region=${enc(region)}`)
+  const { data, loading, error } = useApi<HarmCompare>(`/api/harmonization/compare?region=${enc(region)}`)
   return (
     <Load loading={loading} error={error} data={data} what="sensor comparison">
       {data && <>
         <Banner tone="warning" title="Why counts cannot be added">{data.warning}</Banner>
         <Panel title={`Sensor characteristics - ${data.region}`} badge={<Prov kind="actual" />} pad={false}>
           <Table headers={['Sensor', 'Detections', 'Mean pixel area', 'Low-conf share', 'High-conf share', 'Night share', 'Mean FRP', 'Static-source share', 'Overpass (LST h)']}>
-            {data.characteristics.map((c: any) => (
+            {data.characteristics.map((c) => (
               <tr key={c.satellite}>
                 <Td><span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full" style={{ background: SAT_COLOR[c.satellite] }} />{c.label}</span></Td>
                 <Td right>{num(c.detections)}</Td><Td right>{num(c.mean_pixel_area_km2, 2)} km²</Td><Td right>{pct(c.low_conf_share, 1)}</Td><Td right>{pct(c.high_conf_share, 1)}</Td>
@@ -308,13 +309,13 @@ function HarmCompare({ region }: { region: string }) {
             <Series data={data.yearly} x="year" monthly={false} height={260} bars={[{ key: 'terra', name: 'Terra', color: C.terra }, { key: 'aqua', name: 'Aqua', color: C.aqua }, { key: 'viirs', name: 'S-NPP VIIRS', color: C.viirs }]} />
           </Panel>
           <Panel title="VIIRS detections per Aqua detection, by month" sub="The ratio is strongly seasonal - one global factor would be wrong.">
-            <StatusBars data={data.by_month.map((r: any) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="viirs_per_aqua" name="VIIRS / Aqua" yFmt={r2} colorOf={() => C.viirs} />
+            <StatusBars data={data.by_month.map((r) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="viirs_per_aqua" name="VIIRS / Aqua" yFmt={r2} colorOf={() => C.viirs} />
           </Panel>
         </div>
         <div className="grid gap-4 xl:grid-cols-2">
           <Panel title="Year-to-year ratios" pad={false}>
             <Table headers={['Year', 'VIIRS / Aqua', 'Aqua / Terra']}>
-              {data.yearly.map((y: any) => <tr key={y.year}><Td>{y.year}</Td><Td right>{r2(y.viirs_per_aqua)}</Td><Td right>{r2(y.aqua_per_terra)}</Td></tr>)}
+              {data.yearly.map((y) => <tr key={y.year}><Td>{y.year}</Td><Td right>{r2(y.viirs_per_aqua)}</Td><Td right>{r2(y.aqua_per_terra)}</Td></tr>)}
             </Table>
           </Panel>
           <Panel title="State × month cells: Aqua vs VIIRS (log-log)" badge={<Prov kind="actual" />}>
@@ -330,7 +331,7 @@ function HarmCalib({ split }: { split: number | null }) {
   const { meta } = useApp()
   const [state, setState] = useState('')
   const q = [split ? `split=${split}` : '', state ? `state=${enc(state)}` : ''].filter(Boolean).join('&')
-  const { data, loading, error } = useApi<any>(`/api/sensor-harmonizer/calibration${q ? `?${q}` : ''}`)
+  const { data, loading, error } = useApi<SensorCalib>(`/api/sensor-harmonizer/calibration${q ? `?${q}` : ''}`)
   return (
     <Load loading={loading} error={error} data={data} what="calibration model">
       {data && <>
@@ -343,7 +344,7 @@ function HarmCalib({ split }: { split: number | null }) {
           </Panel>
           <Panel title="Leave-one-year-out skill by month" sub={`${data.calibration?.loyo?.n_years ?? '–'} calibration years, each withheld in turn.`} pad={false}>
             <Table headers={['Month', 'WAPE', 'Bias', 'Mean actual']}>
-              {(data.calibration?.loyo?.by_month || []).map((r: any) => <tr key={r.moy}><Td>{MONTHS[r.moy - 1]}</Td><Td right>{pct(r.wape, 1)}</Td><Td right>{pct(r.bias, 1)}</Td><Td right>{num(r.mean_actual)}</Td></tr>)}
+              {(data.calibration?.loyo?.by_month || []).map((r) => <tr key={r.moy}><Td>{MONTHS[r.moy - 1]}</Td><Td right>{pct(r.wape, 1)}</Td><Td right>{pct(r.bias, 1)}</Td><Td right>{num(r.mean_actual)}</Td></tr>)}
             </Table>
           </Panel>
         </div>
@@ -360,7 +361,7 @@ function HarmCalib({ split }: { split: number | null }) {
 export function UncertaintyPage() {
   const { region } = useApp()
   const [split, setSplit] = useState<number | null>(null)
-  const { data, loading, error } = useApi<any>(`/api/uncertainty?region=${enc(region)}${split ? `&split=${split}` : ''}`)
+  const { data, loading, error } = useApi<Uncertainty>(`/api/uncertainty?region=${enc(region)}${split ? `&split=${split}` : ''}`)
   const rows = useMemo(() => withBand(data?.series || [], 'band', 'veq_lo', 'veq_hi'), [data])
   return (
     <div className="space-y-5">
@@ -386,13 +387,13 @@ export function UncertaintyPage() {
               <Series data={data.by_year} x="year" monthly={false} height={240} yFmt={pf} bars={[{ key: 'rel_width', name: 'Median relative width', color: C.est }]} lines={[{ key: 'coverage', name: 'Aqua coverage', color: C.aqua, dots: true }]} />
             </Panel>
             <Panel title="Relative band width by calendar month" sub="Low-activity months have wider relative bands.">
-              <StatusBars data={data.by_month.map((r: any) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="rel_width" name="Median relative width" yFmt={pf} colorOf={(r) => (r.rel_width > 1 ? TIER_COLOR.HIGH : r.rel_width > 0.6 ? TIER_COLOR.MODERATE : C.est)} />
+              <StatusBars data={data.by_month.map((r) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="rel_width" name="Median relative width" yFmt={pf} colorOf={(r) => (r.rel_width > 1 ? TIER_COLOR.HIGH : r.rel_width > 0.6 ? TIER_COLOR.MODERATE : C.est)} />
             </Panel>
           </div>
           <Panel title={`Weak calibration relationships (${data.weak_calibrations.length})`} sub="Month × pass combinations flagged unreliable (too few predictor detections or unstable ratio). Estimates that depend on them are less trustworthy." pad={false}>
             {data.weak_calibrations.length === 0 ? <p className="p-4 text-xs text-emerald-300">No weak relationships flagged.</p> : (
               <Table headers={['Step', 'Month', 'Pass', 'Ratio', 'Band', 'Predictor detections']}>
-                {data.weak_calibrations.map((w: any, i: number) => (
+                {data.weak_calibrations.map((w, i: number) => (
                   <tr key={i} className="bg-red-500/5"><Td>{w.pair === 'mg' ? 'Terra→Aqua' : 'Aqua→VIIRS'}</Td><Td>{MONTHS[w.moy - 1]}</Td><Td>{titleCase(w.daynight)}</Td><Td right>{r2(w.ratio)}</Td><Td mono>{r2(w.ratio_lo)} – {r2(w.ratio_hi)}</Td><Td right>{num(w.predictor_detections)}</Td></tr>
                 ))}
               </Table>
@@ -413,10 +414,10 @@ export function ValidationPage() {
   const [split, setSplit] = useState<number | null>(null)
   const [win, setWin] = useState(24)
   const sp = split ? `&split=${split}` : ''
-  const v = useApi<any>(`/api/validation?region=${enc(region)}${sp}`)
+  const v = useApi<Validation>(`/api/validation?region=${enc(region)}${sp}`)
   const s = useApi<Seam & { mode?: string; seam_month?: string; status?: string; status_rule?: string; explanation?: string; real_seam_possible?: boolean; real_seam_note?: string; reference_sensor?: string; step_true?: number | null; series?: Record<string, unknown>[] }>(`/api/validation/seam-test?region=${enc(region)}${sp}&window=${win}`)
   const d = v.data, sm = s.data
-  const vrows = useMemo(() => (d?.series || []).map((r: any) => ({ ...r, band: r.veq_lo == null ? null : [r.veq_lo, r.veq_hi], test: r.withheld_viirs ? r.viirs : null, train: r.withheld_viirs ? null : r.viirs })), [d])
+  const vrows = useMemo(() => (d?.series || []).map((r) => ({ ...r, band: r.veq_lo == null ? null : [r.veq_lo, r.veq_hi], test: r.withheld_viirs ? r.viirs : null, train: r.withheld_viirs ? null : r.viirs })), [d])
   return (
     <div className="space-y-5">
       <PageHead idx="06" title="Validation & 2012 Seam Test" badges={<Prov kind="experiment" />}
@@ -445,13 +446,13 @@ export function ValidationPage() {
                 { name: '· from Aqua (sensor step)', m: d.by_stage?.sensor_calibrated }, { name: '· from Terra only (both steps)', m: d.by_stage?.morning_gap_sensor }, { name: 'Morning-gap step (20-month Aqua blocks withheld)', m: d.morning_gap?.metrics }, { name: '· constant Aqua/Terra ratio', m: d.morning_gap?.baseline_constant_ratio }]} />
             </Panel>
             <Panel title="Monthly calibration performance (WAPE)" sub="Colour reinforces the good / moderate / poor rule; values are labelled.">
-              <StatusBars data={(d.by_month || []).map((r: any) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="wape_pct" name="WAPE %" yFmt={(x) => `${Math.round(x)}%`}
+              <StatusBars data={(d.by_month || []).map((r) => ({ ...r, label: MONTHS[r.month - 1] }))} x="label" y="wape_pct" name="WAPE %" yFmt={(x) => `${Math.round(x)}%`}
                 colorOf={(r) => (r.wape_pct <= 20 ? TIER_COLOR.LOW : r.wape_pct <= 40 ? TIER_COLOR.MODERATE : TIER_COLOR.VERY_HIGH)} />
             </Panel>
           </div>
           <Panel title="Yearly totals in the withheld period" pad={false}>
             <Table headers={['Year', 'Actual VIIRS', 'Estimate', 'Band', 'Raw MODIS', 'Error']}>
-              {(d.by_year || []).map((y: any) => <tr key={y.year}><Td>{y.year}</Td><Td right>{num(y.actual)}</Td><Td right>{num(y.estimate)}</Td><Td mono>{num(y.lo)} – {num(y.hi)}</Td><Td right>{num(y.raw_modis)}</Td><Td right>{pct((y.estimate - y.actual) / y.actual, 1)}</Td></tr>)}
+              {(d.by_year || []).map((y) => <tr key={y.year}><Td>{y.year}</Td><Td right>{num(y.actual)}</Td><Td right>{num(y.estimate)}</Td><Td mono>{num(y.lo)} – {num(y.hi)}</Td><Td right>{num(y.raw_modis)}</Td><Td right>{pct((y.estimate - y.actual) / y.actual, 1)}</Td></tr>)}
             </Table>
           </Panel>
         </>}
@@ -491,20 +492,20 @@ export function CalendarPage() {
   const [year, setYear] = useState<number | null>(null)
   const [src, setSrc] = useState('Suomi NPP')
   const [metric, setMetric] = useState<'count' | 'frp'>('count')
-  const { data, loading, error } = useApi<any>(`/api/calendar?region=${enc(region)}${year ? `&year=${year}` : ''}`)
-  const days: any[] = useMemo(() => data?.days || [], [data])
+  const { data, loading, error } = useApi<Calendar>(`/api/calendar?region=${enc(region)}${year ? `&year=${year}` : ''}`)
+  const days: CalendarDay[] = useMemo(() => data?.days || [], [data])
   const frp = metric === 'frp' && src !== 'veq'
-  const val = (d: any) => (src === 'veq' ? d.veq : frp ? d[`${src}|frp`] : d[src])
+  const val = (d: CalendarDay) => (src === 'veq' ? d.veq : frp ? d[`${src}|frp`] : d[src])
   const max = useMemo(() => Math.max(1, ...days.map((d) => Number(val(d)) || 0)), [days, src, metric]) // eslint-disable-line react-hooks/exhaustive-deps
   const weeks = useMemo(() => {
-    if (!days.length) return [] as any[][]
+    if (!days.length) return [] as (CalendarDay | null)[][]
     const first = new Date(days[0].date + 'T00:00:00Z').getUTCDay()
-    const cells: any[] = Array(first).fill(null).concat(days)
-    const out: any[][] = []
+    const cells: (CalendarDay | null)[] = Array<CalendarDay | null>(first).fill(null).concat(days)
+    const out: (CalendarDay | null)[][] = []
     for (let i = 0; i < cells.length; i += 7) out.push(cells.slice(i, i + 7))
     return out
   }, [days])
-  const monthRows = useMemo(() => withBand((data?.months || []).map((m: any) => ({ ...m, label: MONTHS[m.month - 1] })), 'band', 'veq_lo', 'veq_hi'), [data])
+  const monthRows = useMemo(() => withBand((data?.months || []).map((m) => ({ ...m, label: MONTHS[m.month - 1] })), 'band', 'veq_lo', 'veq_hi'), [data])
   return (
     <div className="space-y-5">
       <PageHead idx="07" title="Burning Activity Calendar" badges={<><Prov kind="actual" />{src === 'veq' && <Prov kind="veq" />}</>}
@@ -555,7 +556,7 @@ export function CalendarPage() {
           </Panel>
           <Panel title="Monthly coverage" sub="Fraction of days each sensor was observing - read every bar together with its coverage." pad={false}>
             <Table headers={['Month', 'Terra cov.', 'Aqua cov.', 'VIIRS cov.', 'Provenance']}>
-              {(data.months || []).map((m: any) => <tr key={m.month}><Td>{MONTHS[m.month - 1]}</Td><Td right>{pct(m.cov_terra)}</Td><Td right>{pct(m.cov_aqua)}</Td><Td right>{pct(m.cov_viirs)}</Td><Td><Prov kind={m.provenance === 'actual_viirs' ? 'actual' : 'veq'} text={titleCase(m.provenance)} /></Td></tr>)}
+              {(data.months || []).map((m) => <tr key={m.month}><Td>{MONTHS[m.month - 1]}</Td><Td right>{pct(m.cov_terra)}</Td><Td right>{pct(m.cov_aqua)}</Td><Td right>{pct(m.cov_viirs)}</Td><Td><Prov kind={m.provenance === 'actual_viirs' ? 'actual' : 'veq'} text={titleCase(m.provenance)} /></Td></tr>)}
             </Table>
           </Panel>
         </>}
@@ -568,10 +569,10 @@ export function CalendarPage() {
 export function TrendsPage() {
   const { region, setRegion } = useApp()
   const [level, setLevel] = useState<'state' | 'district'>('state')
-  const { data, loading, error } = useApi<any>(`/api/historical-trends?region=${enc(region)}`)
-  const reg = useApi<any>(`/api/historical-trends/regions?level=${level}`)
+  const { data, loading, error } = useApi<Trends>(`/api/historical-trends?region=${enc(region)}`)
+  const reg = useApi<{ items: RegionTrend[]; sensor?: string }>(`/api/historical-trends/regions?level=${level}`)
   const monthly = useMemo(() => withBand(data?.monthly || [], 'band', 'harm_lo', 'harm_hi'), [data])
-  const yearly = useMemo(() => withBand((data?.yearly || []).filter((y: any) => y.complete), 'band', 'harm_lo', 'harm_hi'), [data])
+  const yearly = useMemo(() => withBand((data?.yearly || []).filter((y) => y.complete), 'band', 'harm_lo', 'harm_hi'), [data])
   const seasonal = useMemo(() => withBand(data?.seasonal || [], 'band', 'harmonized_p10', 'harmonized_p90'), [data])
   const t = data?.trend_harmonized
   return (
@@ -584,7 +585,7 @@ export function TrendsPage() {
             <ArgonStatCard title="Historical average / year" value={compact(data.historical_average_per_year)} subValue="harmonized, complete years" provenance="Harmonized Estimate" />
             <ArgonStatCard title="Linear trend" value={t ? `${t.pct_per_year >= 0 ? '+' : ''}${num(t.pct_per_year, 1)}% / yr` : '–'} subValue={t ? `${t.significant_95 ? 'significant' : 'NOT significant'} at 95% (t = ${num(t.t_stat, 2)}, ${t.n_years} yrs)` : ''} provenance="Harmonized Estimate" />
             <ArgonStatCard title="Peak month" value={data.peak_month} subValue={`${pct(data.peak_month_share)} of annual activity`} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Years on record" value={num(data.yearly?.length)} subValue={`${(data.yearly || []).filter((y: any) => !y.complete).length} incomplete year(s) excluded from trend`} provenance="Actual Observation" />
+            <ArgonStatCard title="Years on record" value={num(data.yearly?.length)} subValue={`${(data.yearly || []).filter((y) => !y.complete).length} incomplete year(s) excluded from trend`} provenance="Actual Observation" />
           </div>
           <Panel title={`Yearly activity - ${data.region}`} sub={data.trend_note} badge={<Prov kind="veq" />}>
             <Series data={yearly} x="year" monthly={false} height={260} bands={[{ key: 'band', name: 'Harmonized band', color: C.est }]}
@@ -609,7 +610,7 @@ export function TrendsPage() {
         <Load loading={reg.loading} error={reg.error} data={reg.data} what="regional comparison">
           <div className="max-h-[480px] overflow-y-auto">
             <Table headers={['Region', 'Mean / yr', 'per 1000 km²', 'Latest yr', 'Peak', 'Trend / yr', 'Mean FRP', '']}>
-              {(reg.data?.items || []).map((r: any) => (
+              {(reg.data?.items || []).map((r) => (
                 <tr key={r.id} className={`hover:bg-[#172033]/60 ${r.id === region ? 'bg-orange-500/10' : ''}`}>
                   <Td>{r.name}</Td><Td right>{num(r.mean_per_year)}</Td><Td right>{num(r.per_1000km2)}</Td><Td right>{num(r.latest_year)}</Td><Td>{r.peak_month}</Td>
                   <Td right><span className={r.trend_significant ? 'font-semibold' : 'text-slate-500'}>{r.trend_pct_per_year >= 0 ? '+' : ''}{num(r.trend_pct_per_year, 1)}%{r.trend_significant ? '' : ' (n.s.)'}</span></Td>
@@ -631,10 +632,10 @@ export function AnomaliesPage() {
   const { region, setRegion } = useApp()
   const [level, setLevel] = useState<'state' | 'district'>('state')
   const [win, setWin] = useState(30)
-  const { data, loading, error, reload } = useApi<any>(`/api/anomalies?region=${enc(region)}&level=${level}&window_days=${win}`)
+  const { data, loading, error, reload } = useApi<Anomalies>(`/api/anomalies?region=${enc(region)}&level=${level}&window_days=${win}`)
   const ser = data?.series
   const rows = useMemo(() => withBand(ser?.series || [], 'band', 'baseline_p10', 'baseline_p90'), [ser])
-  const flagged = rows.filter((r: any) => r.flag === 'high' || r.flag === 'low')
+  const flagged = rows.filter((r) => r.flag === 'high' || r.flag === 'low')
   const cur = data?.current
   return (
     <div className="space-y-5">
@@ -659,7 +660,7 @@ export function AnomaliesPage() {
             <Panel title={`Flagged months (${flagged.length})`} pad={false}>
               <div className="max-h-72 overflow-y-auto">
                 <Table headers={['Month', 'Observed', 'Seasonal median', 'z', 'Flag', 'Isolation forest', 'Coverage']}>
-                  {flagged.slice().reverse().map((r: any) => (
+                  {flagged.slice().reverse().map((r) => (
                     <tr key={r.date}><Td mono>{r.date.slice(0, 7)}</Td><Td right>{num(r.observed)}</Td><Td right>{num(r.baseline_median)}</Td><Td right>{r2(r.z)}</Td>
                       <Td><span className="font-semibold uppercase" style={{ color: FLAG_COLOR[r.flag] }}>{r.flag === 'high' ? '▲ high' : '▼ low'}</span></Td>
                       <Td>{r.iforest_outlier ? 'outlier' : '–'}</Td><Td right>{pct(r.coverage)}</Td></tr>
@@ -672,7 +673,7 @@ export function AnomaliesPage() {
             sub={cur?.provisional_nrt ? cur?.nrt_note : cur?.disclaimer} pad={false}>
             {cur?.status !== 'ok' || !cur?.items?.length ? <p className="p-4 text-xs text-slate-400">{cur?.message || 'No region is outside its seasonal range in this window.'}</p> : (
               <Table headers={['Region', 'Current', 'Seasonal median', 'z', 'Direction', 'Contributing factors', '']}>
-                {cur.items.map((it: any) => (
+                {cur.items.map((it) => (
                   <tr key={it.id} className="hover:bg-[#172033]/60">
                     <Td>{it.name}</Td><Td right>{num(it.current)}</Td><Td right>{num(it.median)}</Td><Td right>{r2(it.z)}</Td>
                     <Td><span className="font-semibold uppercase" style={{ color: it.direction === 'above' ? TIER_COLOR.HIGH : '#3987e5' }}>{it.direction === 'above' ? '▲ above' : '▼ below'}</span></Td>

@@ -58,8 +58,7 @@ export function BaseMap({ children, height = 560, bbox, showStates = true, class
 }
 
 /** Grid cells as rectangles on the shared canvas renderer. `cells` need west/south/east/north or lat/lon (0.25 deg). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callers pass several API row shapes; the layer only reads CellLike fields
-export function CellLayer<T extends CellLike = any>({ cells, colorOf, opacityOf, onClick, popup, stroke }: {
+export function CellLayer<T extends CellLike = CellLike>({ cells, colorOf, opacityOf, onClick, popup, stroke }: {
   cells: readonly T[]; colorOf: (c: T) => string; opacityOf?: (c: T) => number; onClick?: (c: T) => void; popup?: (c: T) => string; stroke?: (c: T) => string | undefined
 }) {
   const map = useMap()
@@ -81,8 +80,7 @@ export function CellLayer<T extends CellLike = any>({ cells, colorOf, opacityOf,
 }
 
 /** Point markers with a distinct shape per instrument (circle = VIIRS, square = MODIS) so identity is not colour-only. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see CellLayer
-export function PointLayer<T extends PointLike = any>({ points, colorOf, isSquare, popup, onClick, radius = 3.5 }: { points: readonly T[]; colorOf: (p: T) => string; isSquare: (p: T) => boolean; popup?: (p: T) => string; onClick?: (p: T) => void; radius?: number }) {
+export function PointLayer<T extends PointLike = PointLike>({ points, colorOf, isSquare, popup, onClick, radius = 3.5 }: { points: readonly T[]; colorOf: (p: T) => string; isSquare: (p: T) => boolean; popup?: (p: T) => string; onClick?: (p: T) => void; radius?: number }) {
   const map = useMap()
   useEffect(() => {
     const group = L.layerGroup()

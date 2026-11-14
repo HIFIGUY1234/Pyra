@@ -29,7 +29,7 @@ export const titleCase = (s?: string | null) => (s || '').toLowerCase().replace(
 export type Meta = {
   has_data: boolean; states?: string[]; districts?: { id: string; name: string; state: string }[]; users: { username: string; display_name: string; role: string }[]
   spans?: Record<string, { first: string; last: string }>; data_end?: string; default_split?: number; forecast_available?: boolean; issue_dates?: string[]
-  land_use_classes: string[]; satellites: string[]; auth_mode?: 'dev' | 'production'
+  land_use_classes: string[]; satellites: string[]; auth_mode?: 'dev' | 'production'; anomaly_types?: Record<string, string>
 }
 type Ctx = { user: string; setUser: (u: string) => void; role: string; region: string; setRegion: (r: string) => void; meta: Meta | null; reloadMeta: () => void }
 export const AppCtx = createContext<Ctx>(null as unknown as Ctx)
@@ -44,8 +44,7 @@ export const getAuthToken = () => authToken
 export const setAuthToken = (t: string | null) => { authToken = t; if (t) sessionStorage.setItem('pyro_token', t); else sessionStorage.removeItem('pyro_token') }
 const authHeaders = (): Record<string, string> => (authToken ? { Authorization: `Bearer ${authToken}` } : { 'X-User': currentUser })
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see useApi
-export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
+export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
   const headers: Record<string, string> = authHeaders()
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
   const r = await fetch(path, { method: opts.method || (opts.body !== undefined || opts.form ? 'POST' : 'GET'), headers, body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined) })
@@ -67,8 +66,7 @@ export async function download(path: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- callers that do not pass a response type get the untyped JSON
-export function useApi<T = any>(path: string | null, deps: unknown[] = []) {
+export function useApi<T = unknown>(path: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)

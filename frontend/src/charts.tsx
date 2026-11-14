@@ -44,8 +44,7 @@ export function Series({ data, x = 'date', lines = [], bands = [], bars = [], he
 }
 
 /** Bars whose colour is a status (e.g. tier) per row; the label carries the meaning, colour only reinforces it. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped API rows default to any; typed callers get checked colorOf
-export function StatusBars<T extends Row = any>({ data, x, y, colorOf, height = 220, yFmt, name }: { data: readonly T[]; x: string; y: string; colorOf: (row: T) => string; height?: number; yFmt?: (v: number) => string; name: string }) {
+export function StatusBars<T extends Row = Row>({ data, x, y, colorOf, height = 220, yFmt, name }: { data: readonly T[]; x: string; y: string; colorOf: (row: T) => string; height?: number; yFmt?: (v: number) => string; name: string }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={data as T[]} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
@@ -78,7 +77,6 @@ export function LogScatter({ data, xName, yName, color, height = 280, guide }: {
 }
 
 /** Add `[lo, hi]` range fields so <Area> can draw a band. Null when either bound is missing. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- see StatusBars
-export function withBand<T extends Row = any>(rows: readonly T[], out: string, lo: string, hi: string): (T & Record<string, unknown>)[] {
+export function withBand<T extends Row = Row>(rows: readonly T[], out: string, lo: string, hi: string): (T & Record<string, unknown>)[] {
   return rows.map((r) => ({ ...r, [out]: get(r, lo) == null || get(r, hi) == null ? null : [get(r, lo), get(r, hi)] }))
 }

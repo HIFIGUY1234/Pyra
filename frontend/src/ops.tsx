@@ -11,11 +11,12 @@ import { BaseMap, BoxDraw, CellLayer, PointLayer, Swatch, seq } from './map'
 import { enc, Load, PageHead, Panel, Td } from './science'
 import { NotificationLogCard } from './completion'
 import { ExposurePanel, ForecastComparisonPanel, OrbitPanel } from './completion_final'
+import type { AlertList, Alternatives, AuditRow, CellDetail, CellLayerResponse, Created, CriticalRegions, DashboardSummary, DensityCell, EvaluateResult, ForecastModel, GeoCells, GridCells, Hotspot, HotspotResponse, ObservationQuality, OrgLocation, OrgOverview, Organisation, Overpasses, RankingItem, RegionForecast, ReportCreated, ThresholdResponse, Trends } from './types'
 
-const esc = (s: any) => String(s ?? '–').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+const esc = (s: unknown) => String(s ?? '–').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 const isoDay = (d: Date) => d.toISOString().slice(0, 10)
 const addDays = (s: string, n: number) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return isoDay(d) }
-const tierOf = (c: any) => c.tier || 'UNKNOWN'
+const tierOf = (c: { tier?: string }) => c.tier || 'UNKNOWN'
 const GOV_ROLES = ['gov_officer', 'admin']
 
 /* ================================================================== 02 Live Fire Map */
@@ -35,30 +36,30 @@ export function LiveMapPage() {
   const [minConf, setMinConf] = useState(0)
   const [layers, setLayers] = useState<Layer[]>(['hotspots'])
   const [draw, setDraw] = useState(false)
-  const [sel, setSel] = useState<any>(null)
+  const [sel, setSel] = useState<Hotspot | null>(null)
   const on = (l: Layer) => layers.includes(l)
   const ym = (s: string) => Number(s.slice(0, 4)) * 100 + Number(s.slice(5, 7))
   const rq = region === 'country' ? '' : `&region=${enc(region)}`
   const hsQ = `/api/hotspots?start=${start}&end=${stop}${rq}&satellites=${enc(sats.join(','))}${dn ? `&daynight=${dn}` : ''}${minConf ? `&min_conf=${minConf}` : ''}&limit=6000`
-  const hs = useApi<any>(on('hotspots') && sats.length ? hsQ : null)
+  const hs = useApi<HotspotResponse>(on('hotspots') && sats.length ? hsQ : null)
   const cellsNeeded = on('harmonized') || on('modis') || on('viirs')
-  const cl = useApi<any>(cellsNeeded ? `/api/hotspots/cell-layer?ym_from=${ym(start)}&ym_to=${ym(stop)}&region=${enc(region)}` : null)
-  const fc = useApi<any>(on('forecast') ? `/api/forecast/${enc(region)}/grid-cells` : null)
-  const geo = useApi<any>(`/api/geo/cells?region=${enc(region)}`)
-  const hist = useApi<any>(`/api/historical-trends?region=${enc(region)}`)
-  const anomalyLabel: Record<string, string> = (meta as any)?.anomaly_types || {}
+  const cl = useApi<CellLayerResponse>(cellsNeeded ? `/api/hotspots/cell-layer?ym_from=${ym(start)}&ym_to=${ym(stop)}&region=${enc(region)}` : null)
+  const fc = useApi<GridCells>(on('forecast') ? `/api/forecast/${enc(region)}/grid-cells` : null)
+  const geo = useApi<GeoCells>(`/api/geo/cells?region=${enc(region)}`)
+  const hist = useApi<Trends>(`/api/historical-trends?region=${enc(region)}`)
+  const anomalyLabel: Record<string, string> = meta?.anomaly_types || {}
 
-  const cellRows: any[] = cl.data?.cells || []
-  const cellVal = (c: any, l: Layer) => (l === 'harmonized' ? c.veq : l === 'modis' ? (c.Terra || 0) + (c.Aqua || 0) : (c['Suomi NPP'] || 0) + (c['NOAA-20'] || 0) + (c['NOAA-21'] || 0))
+  const cellRows: DensityCell[] = cl.data?.cells || []
+  const cellVal = (c: DensityCell, l: Layer) => (l === 'harmonized' ? c.veq ?? 0 : l === 'modis' ? (c.Terra || 0) + (c.Aqua || 0) : (c['Suomi NPP'] || 0) + (c['NOAA-20'] || 0) + (c['NOAA-21'] || 0))
   const densityLayers = (['modis', 'viirs', 'harmonized'] as Layer[]).filter(on)
   const toggle = (l: Layer) => setLayers((x) => (x.includes(l) ? x.filter((y) => y !== l) : [...x, l]))
-  const hotspotPopup = (p: any) => `<div style="font-size:12px;line-height:1.5"><b>${esc(SAT_LABEL[p.satellite] || p.satellite)}</b> · ${esc(p.product_type)} · <i>Actual observation</i><br/>
+  const hotspotPopup = (p: Hotspot) => `<div style="font-size:12px;line-height:1.5"><b>${esc(SAT_LABEL[p.satellite] || p.satellite)}</b> · ${esc(p.product_type)} · <i>Actual observation</i><br/>
     ${esc(p.timestamp_utc)} (${p.daynight === 'D' ? 'day' : 'night'})<br/>Lat ${num(p.latitude, 4)}, Lon ${num(p.longitude, 4)}<br/>
     Confidence: <b>${esc(p.confidence_raw)}</b> (${esc(p.confidence_class)}, std. score ${num(p.confidence_score, 2)})<br/>
     FRP: ${p.frp_mw == null ? 'n/a' : `${num(p.frp_mw, 1)} MW`} · pixel ${num(p.pixel_area_km2, 2)} km² (scan ${num(p.scan, 2)} × track ${num(p.track, 2)})<br/>
-    Type: ${p.anomaly_type == null ? 'not provided (NRT)' : esc(anomalyLabel[String(p.anomaly_type)] || p.anomaly_type)}${p.static_share > 0.3 ? ' · <b>cell often hosts static sources</b>' : ''}<br/>
+    Type: ${p.anomaly_type == null ? 'not provided (NRT)' : esc(anomalyLabel[String(p.anomaly_type)] || p.anomaly_type)}${(p.static_share ?? 0) > 0.3 ? ' · <b>cell often hosts static sources</b>' : ''}<br/>
     ${esc(p.district || '')} ${esc(p.state || '')} · land use: ${esc(p.land_use)}</div>`
-  const yearly = (hist.data?.yearly || []).map((y: any) => ({ ...y, band: y.harm_lo == null ? null : [y.harm_lo, y.harm_hi] }))
+  const yearly = (hist.data?.yearly || []).map((y) => ({ ...y, band: y.harm_lo == null ? null : [y.harm_lo, y.harm_hi] }))
 
   return (
     <div className="space-y-5">
@@ -149,15 +150,15 @@ export function ForecastPage() {
   const [level, setLevel] = useState<'district' | 'state'>('district')
   const [cellId, setCellId] = useState<number | null>(null)
   const iq = issue ? `?issue_date=${issue}` : ''
-  const model = useApi<any>('/api/forecast/model')
-  const f = useApi<any>(model.data?.available ? `/api/forecast/${enc(region)}${iq}` : null)
-  const cells = useApi<any>(model.data?.available ? `/api/forecast/${enc(region)}/grid-cells${iq}` : null)
-  const rank = useApi<any>(model.data?.available ? `/api/forecast/ranking?level=${level}&top=40` : null)
-  const cell = useApi<any>(cellId != null ? `/api/forecast/cell/${cellId}` : null)
-  const geo = useApi<any>(`/api/geo/cells?region=${enc(region)}`)
+  const model = useApi<ForecastModel>('/api/forecast/model')
+  const f = useApi<RegionForecast>(model.data?.available ? `/api/forecast/${enc(region)}${iq}` : null)
+  const cells = useApi<GridCells>(model.data?.available ? `/api/forecast/${enc(region)}/grid-cells${iq}` : null)
+  const rank = useApi<{ items: RankingItem[] }>(model.data?.available ? `/api/forecast/ranking?level=${level}&top=40` : null)
+  const cell = useApi<CellDetail>(cellId != null ? `/api/forecast/cell/${cellId}` : null)
+  const geo = useApi<GeoCells>(`/api/geo/cells?region=${enc(region)}`)
   useEffect(() => setCellId(null), [region, issue])
   const d = f.data, m = model.data
-  if (model.data && !m.available) return <EmptyStateCard title="No trained forecast model" description={m.message} action={<Link to="/data" className="text-xs text-orange-300 underline">Open Data Management</Link>} />
+  if (m && !m.available) return <EmptyStateCard title="No trained forecast model" description={m.message} action={<Link to="/data" className="text-xs text-orange-300 underline">Open Data Management</Link>} />
 
   return (
     <div className="space-y-5">
@@ -210,11 +211,11 @@ export function ForecastPage() {
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
             <Panel title="Seven-day prediction timeline" badge={<Prov kind="forecast" />} sub="Cumulative probability of a detection by each day.">
-              <Series data={d.timeline} x="date" monthly={false} height={220} yFmt={(v) => `${Math.round(v * 100)}%`} yDomain={[0, 1]} xFmt={(v) => String(v).slice(5)}
+              <Series data={d.timeline ?? []} x="date" monthly={false} height={220} yFmt={(v) => `${Math.round(v * 100)}%`} yDomain={[0, 1]} xFmt={(v) => String(v).slice(5)}
                 lines={[{ key: 'p_any_by_day', name: 'Regional', color: C.viirs, dots: true }, { key: 'max_cell_by_day', name: 'Highest cell', color: TIER_COLOR.VERY_HIGH, dots: true }]} />
             </Panel>
             <Panel title="Contributing factors" sub="Grouped SHAP-style contributions (log-odds) across the region's cells.">
-              <StatusBars data={(d.factors || []).map((x: any) => ({ ...x, label: x.group.split(' ').slice(0, 2).join(' ') }))} x="label" y="contribution" name="Contribution" yFmt={(v) => num(v, 2)} height={220}
+              <StatusBars data={(d.factors || []).map((x) => ({ ...x, label: x.group.split(' ').slice(0, 2).join(' ') }))} x="label" y="contribution" name="Contribution" yFmt={(v) => num(v, 2)} height={220}
                 colorOf={(r) => (r.contribution >= 0 ? TIER_COLOR.HIGH : '#3987e5')} />
             </Panel>
             <Panel title="Supporting conditions (regional mean)" badge={<Prov kind="actual" text="NASA POWER / FIRMS" />}>
@@ -228,12 +229,12 @@ export function ForecastPage() {
           <div className="grid gap-4 xl:grid-cols-2">
             <Panel title="Historical comparison: forecast vs what was observed" sub="Past issue dates in the hold-out period." pad={false}>
               <div className="max-h-80 overflow-y-auto"><Table headers={['Issued', 'Regional p', 'Highest cell', 'Expected cells', 'Observed cells', 'Any detection']}>
-                {(d.history || []).slice().reverse().map((h: any) => <tr key={h.issue_date}><Td mono>{h.issue_date}</Td><Td right>{pct(h.p_any)}</Td><Td right>{pct(h.max_cell)}</Td><Td right>{num(h.expected_cells, 1)}</Td><Td right>{num(h.observed_cells)}</Td><Td>{h.observed_any == null ? '–' : h.observed_any ? 'yes' : 'no'}</Td></tr>)}
+                {(d.history || []).slice().reverse().map((h) => <tr key={h.issue_date}><Td mono>{h.issue_date}</Td><Td right>{pct(h.p_any)}</Td><Td right>{pct(h.max_cell)}</Td><Td right>{num(h.expected_cells, 1)}</Td><Td right>{num(h.observed_cells)}</Td><Td>{h.observed_any == null ? '–' : h.observed_any ? 'yes' : 'no'}</Td></tr>)}
               </Table></div>
             </Panel>
             <Panel title="Highest-risk regions" actions={<Tabs value={level} onChange={setLevel} options={[{ value: 'district', label: 'Districts' }, { value: 'state', label: 'States' }]} />} pad={false}>
               <div className="max-h-80 overflow-y-auto"><Table headers={['Region', 'Tier', 'Joint p', 'Highest cell', 'High / V.high cells', 'Coverage', '']}>
-                {(rank.data?.items || []).map((r: any) => <tr key={r.id} className={r.id === region ? 'bg-orange-500/10' : ''}><Td>{r.name}</Td><Td><RiskTierBadge tier={r.tier} /></Td><Td right>{pct(r.p_any)}</Td><Td right>{pct(r.max_cell)}</Td><Td right>{r.cells_high} / {r.cells_very_high}</Td><Td right>{pct(r.coverage)}</Td><Td><Button size="xs" variant="outline" onClick={() => setRegion(r.id)}>Open</Button></Td></tr>)}
+                {(rank.data?.items || []).map((r) => <tr key={r.id} className={r.id === region ? 'bg-orange-500/10' : ''}><Td>{r.name}</Td><Td><RiskTierBadge tier={r.tier} /></Td><Td right>{pct(r.p_any)}</Td><Td right>{pct(r.max_cell)}</Td><Td right>{r.cells_high} / {r.cells_very_high}</Td><Td right>{pct(r.coverage)}</Td><Td><Button size="xs" variant="outline" onClick={() => setRegion(r.id)}>Open</Button></Td></tr>)}
               </Table></div>
             </Panel>
           </div>
@@ -245,7 +246,7 @@ export function ForecastPage() {
   )
 }
 
-function CellPanel({ cell, cellId }: { cell: { data: any; loading: boolean; error: string | null }; cellId: number | null }) {
+function CellPanel({ cell, cellId }: { cell: { data: CellDetail | null; loading: boolean; error: string | null }; cellId: number | null }) {
   const c = cell.data
   if (cellId == null) return <Panel title="Grid cell detail"><p className="text-xs text-slate-400">Click a grid cell on the map to see its probability, drivers, land use and responsible authority.</p></Panel>
   return (
@@ -257,7 +258,7 @@ function CellPanel({ cell, cellId }: { cell: { data: any; loading: boolean; erro
           <Series data={(c.daily_cumulative || []).map((p: number, i: number) => ({ day: `D${i + 1}`, p }))} x="day" monthly={false} height={110} legend={false} yFmt={(v) => `${Math.round(v * 100)}%`} yDomain={[0, 1]} lines={[{ key: 'p', name: 'Cumulative p', color: C.viirs, dots: true }]} />
           <div>
             <div className="mb-1 font-semibold text-slate-200">Drivers (log-odds contribution)</div>
-            {(c.factors || []).map((g: any) => (
+            {(c.factors || []).map((g) => (
               <div key={g.group} className="flex items-center gap-2 py-0.5">
                 <span className="w-40 shrink-0 truncate text-slate-300" title={g.group}>{g.group}</span>
                 <div className="relative h-2 flex-1 rounded bg-[#172033]"><i className="absolute top-0 h-2 rounded" style={{ left: g.contribution >= 0 ? '50%' : `${50 - Math.min(50, Math.abs(g.contribution) * 25)}%`, width: `${Math.min(50, Math.abs(g.contribution) * 25)}%`, background: g.contribution >= 0 ? TIER_COLOR.HIGH : '#3987e5' }} /></div>
@@ -268,7 +269,7 @@ function CellPanel({ cell, cellId }: { cell: { data: any; loading: boolean; erro
           <div className="rounded border border-[#26324a] p-2">
             <div className="font-semibold text-slate-200">Jurisdiction · {c.jurisdiction?.land_use}</div>
             <div className="text-slate-400">{c.jurisdiction?.district || '–'}, {c.jurisdiction?.state || '–'}</div>
-            <ul className="mt-1 list-disc pl-4 text-slate-300">{(c.jurisdiction?.authorities || []).map((a: any, i: number) => <li key={i}>L{a.level} {a.role_title} - {a.authority} {a.verified_contact ? <span className="text-emerald-300">(verified contact)</span> : <span className="text-amber-300">(no verified contact)</span>}</li>)}</ul>
+            <ul className="mt-1 list-disc pl-4 text-slate-300">{(c.jurisdiction?.authorities || []).map((a, i: number) => <li key={i}>L{a.level} {a.role_title} - {a.authority} {a.verified_contact ? <span className="text-emerald-300">(verified contact)</span> : <span className="text-amber-300">(no verified contact)</span>}</li>)}</ul>
             {c.jurisdiction?.routing_status === 'ADMIN_JURISDICTION_REVIEW_REQUIRED' && <div className="mt-1 font-semibold text-amber-300">{c.jurisdiction?.message}</div>}
             <div className="mt-1 text-[11px] text-slate-500">{c.jurisdiction?.note}</div>
           </div>
@@ -278,8 +279,8 @@ function CellPanel({ cell, cellId }: { cell: { data: any; loading: boolean; erro
   )
 }
 
-function ModelCard({ m }: { m: any }) {
-  const rel = (m.reliability || []).map((r: any, i: number) => ({ ...r, uncal: m.reliability_uncalibrated?.[i]?.observed, ideal: r.mean_pred }))
+function ModelCard({ m }: { m: ForecastModel }) {
+  const rel = (m.reliability || []).map((r, i: number) => ({ ...r, uncal: m.reliability_uncalibrated?.[i]?.observed, ideal: r.mean_pred }))
   return (
     <Panel title="Model, calibration & threshold validation" badge={<Prov kind="forecast" />} sub={`${m.target_kind}. ${m.trained_on}`}>
       <div className="space-y-4">
@@ -303,8 +304,8 @@ function ModelCard({ m }: { m: any }) {
               {['60', '80'].map((t) => { const c = m.test?.confusion?.[t]; return c && <tr key={t}><Td>≥ {t}%</Td><Td right>{compact(c.tp)}</Td><Td right>{compact(c.fp)}</Td><Td right>{compact(c.fn)}</Td><Td right>{compact(c.tn)}</Td><Td right>{pct(c.precision, 1)}</Td><Td right>{pct(c.recall, 1)}</Td><Td right>{pct(c.false_alarm_rate, 1)}</Td><Td right>{pct(c.false_alarm_ratio, 1)}</Td><Td right>{pct(c.missed_event_rate, 1)}</Td></tr> })}
             </Table>
             <div className="mt-3 mb-1 text-xs font-semibold text-slate-200">Feature importance (gain share, top 10)</div>
-            <StatusBars data={(m.feature_importance || []).slice(0, 10).map((f: any) => ({ ...f, short: f.feature }))} x="short" y="gain_share" name="Gain share" yFmt={(v) => `${Math.round(v * 100)}%`} height={180} colorOf={() => C.viirs} />
-            <p className="text-[11px] text-slate-500">{(m.feature_importance || []).slice(0, 10).map((f: any) => `${f.feature} = ${f.label}`).join(' · ')}</p>
+            <StatusBars data={(m.feature_importance || []).slice(0, 10).map((f) => ({ ...f, short: f.feature }))} x="short" y="gain_share" name="Gain share" yFmt={(v) => `${Math.round(v * 100)}%`} height={180} colorOf={() => C.viirs} />
+            <p className="text-[11px] text-slate-500">{(m.feature_importance || []).slice(0, 10).map((f) => `${f.feature} = ${f.label}`).join(' · ')}</p>
           </div>
         </div>
       </div>
@@ -317,24 +318,24 @@ const REASON_COLOR = ['#3987e5', '#f97316', '#9085e9', '#d55181']
 export function ObservationsPage() {
   const { region } = useApp()
   const [days, setDays] = useState(30)
-  const q = useApi<any>(`/api/observations/quality?region=${enc(region)}&days=${days}`)
-  const alt = useApi<any>(`/api/observations/alternatives?days=${days}`)
-  const ov = useApi<any>('/api/observations/overpasses')
+  const q = useApi<ObservationQuality>(`/api/observations/quality?region=${enc(region)}&days=${days}`)
+  const alt = useApi<Alternatives>(`/api/observations/alternatives?days=${days}`)
+  const ov = useApi<Overpasses>('/api/observations/overpasses')
   const reasons = Object.keys(alt.data?.counts || {})
   const rc = (r: string) => REASON_COLOR[Math.max(0, reasons.indexOf(r)) % REASON_COLOR.length]
   const hist = useMemo(() => {
-    const out: Record<string, any> = {}
+    const out: Record<string, { lst: number } & Record<string, number>> = {}
     for (const h of ov.data?.observed_local_time_histogram || []) {
       const k = h.lst_bin
       out[k] = out[k] || { lst: k }
       out[k][h.satellite] = (out[k][h.satellite] || 0) + h.n
     }
-    return Object.values(out).sort((a: any, b: any) => a.lst - b.lst)
+    return Object.values(out).sort((a, b) => a.lst - b.lst)
   }, [ov.data])
   const drift = useMemo(() => {
-    const out: Record<string, any> = {}
+    const out: Record<string, { year: number } & Record<string, number | null>> = {}
     for (const r of ov.data?.orbit_drift || []) { out[r.year] = out[r.year] || { year: r.year }; out[r.year][r.satellite] = r.drift_h }
-    return Object.values(out).sort((a: any, b: any) => a.year - b.year)
+    return Object.values(out).sort((a, b) => a.year - b.year)
   }, [ov.data])
   const d = q.data
   return (
@@ -354,7 +355,7 @@ export function ObservationsPage() {
           <p className="text-[11px] text-slate-500">{d.obscuration?.cloud_note}</p>
           <Panel title={`Sensor-by-sensor observation record - ${d.region}`} pad={false}>
             <Table headers={['Sensor', 'Loaded', 'Days observing', 'Gap days', 'Days with detections', 'Detections', 'Low / high conf.', 'Mean pixel', 'Night share', 'Last detection']}>
-              {d.sensors.map((s: any) => (
+              {d.sensors.map((s) => (
                 <tr key={s.satellite} className={s.loaded ? '' : 'opacity-60'}>
                   <Td><span className="inline-flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-full" style={{ background: SAT_COLOR[s.satellite] }} />{s.label}</span></Td>
                   <Td>{s.loaded ? 'yes' : <span className="text-amber-300">not loaded</span>}</Td>
@@ -367,7 +368,7 @@ export function ObservationsPage() {
           </Panel>
           {Array.isArray(d.alternatives_on_gap_days) && d.alternatives_on_gap_days.length > 0 && (
             <Panel title="Alternative sensors on reference-sensor gap days" pad={false}>
-              <Table headers={Object.keys(d.alternatives_on_gap_days[0])}>{d.alternatives_on_gap_days.map((r: any, i: number) => <tr key={i}>{Object.values(r).map((v: any, j) => <Td key={j}>{typeof v === 'number' ? num(v, 2) : String(v)}</Td>)}</tr>)}</Table>
+              <Table headers={Object.keys(d.alternatives_on_gap_days[0])}>{d.alternatives_on_gap_days.map((r, i: number) => <tr key={i}>{Object.values(r).map((v, j) => <Td key={j}>{typeof v === 'number' ? num(v, 2) : String(v)}</Td>)}</tr>)}</Table>
             </Panel>
           )}
         </>}
@@ -377,7 +378,7 @@ export function ObservationsPage() {
           <Card className="overflow-hidden">
             <div className="flex flex-wrap items-center gap-3 border-b border-[#26324a] px-4 py-2 text-xs text-slate-400">
               <span>Cells where additional monitoring may be needed (last {alt.data.window_days} days)</span>
-              {reasons.map((r) => <Swatch key={r} color={rc(r)} label={`${r} (${alt.data.counts[r]})`} square />)}
+              {reasons.map((r) => <Swatch key={r} color={rc(r)} label={`${r} (${alt.data?.counts[r]})`} square />)}
             </div>
             <BaseMap height={460}>
               <CellLayer cells={alt.data.items} colorOf={(c) => rc(c.reason)} opacityOf={() => 0.75}
@@ -386,7 +387,7 @@ export function ObservationsPage() {
           </Card>
           <Panel title="Monitoring-gap cells" pad={false}>
             <div className="max-h-[460px] overflow-y-auto"><Table headers={['Area', 'Reason', 'MODIS', 'VIIRS', 'Forecast']}>
-              {alt.data.items.map((c: any) => <tr key={c.cell_id}><Td>{c.district || '–'}<div className="text-[10px] text-slate-500">{c.state}</div></Td><Td><span style={{ color: rc(c.reason) }}>{c.reason}</span></Td><Td right>{num((c.Terra || 0) + (c.Aqua || 0))}</Td><Td right>{num((c['Suomi NPP'] || 0) + (c['NOAA-21'] || 0))}</Td><Td right>{pct(c.p)}</Td></tr>)}
+              {alt.data.items.map((c) => <tr key={c.cell_id}><Td>{c.district || '–'}<div className="text-[10px] text-slate-500">{c.state}</div></Td><Td><span style={{ color: rc(c.reason) }}>{c.reason}</span></Td><Td right>{num((c.Terra || 0) + (c.Aqua || 0))}</Td><Td right>{num((c['Suomi NPP'] || 0) + (c['NOAA-21'] || 0))}</Td><Td right>{pct(c.p)}</Td></tr>)}
             </Table></div>
           </Panel>
         </div>}
@@ -397,15 +398,15 @@ export function ObservationsPage() {
           <div className="grid gap-4 xl:grid-cols-3">
             <Panel title="Nominal local equator-crossing times" pad={false}>
               <Table headers={['Sensor', 'Day pass', 'Night pass']}>
-                {Object.entries(ov.data.nominal_local_time_hours || {}).map(([s, t]: any) => <tr key={s}><Td>{SAT_LABEL[s] || s}</Td><Td right>{t.day.toFixed(1)} h</Td><Td right>{t.night.toFixed(1)} h</Td></tr>)}
+                {Object.entries(ov.data.nominal_local_time_hours || {}).map(([s, t]) => <tr key={s}><Td>{SAT_LABEL[s] || s}</Td><Td right>{t.day.toFixed(1)} h</Td><Td right>{t.night.toFixed(1)} h</Td></tr>)}
               </Table>
             </Panel>
             <Panel title="Observed local solar time of detections" sub="From the data itself (recent window).">
-              <Series data={hist} x="lst" monthly={false} height={220} xFmt={(v) => `${v}h`} bars={Object.keys(SAT_COLOR).filter((s) => hist.some((h: any) => h[s])).map((s) => ({ key: s, name: SAT_LABEL[s], color: SAT_COLOR[s], stack: 'a' }))} />
+              <Series data={hist} x="lst" monthly={false} height={220} xFmt={(v) => `${v}h`} bars={Object.keys(SAT_COLOR).filter((s) => hist.some((h) => h[s])).map((s) => ({ key: s, name: SAT_LABEL[s], color: SAT_COLOR[s], stack: 'a' }))} />
             </Panel>
             <Panel title="Orbit drift (day-pass LST vs baseline, hours)" sub="Terra and Aqua drifted late in their missions; drifted years are excluded from calibration.">
               <Series data={drift} x="year" monthly={false} height={220} yFmt={(v) => num(v, 2)} yDomain={['auto', 'auto']} refs={[{ y: 0.25, label: '+0.25 h' }, { y: -0.25, label: '−0.25 h' }]}
-                lines={['Terra', 'Aqua', 'Suomi NPP', 'NOAA-20', 'NOAA-21'].filter((s) => drift.some((r: any) => r[s] != null)).map((s) => ({ key: s, name: SAT_LABEL[s], color: SAT_COLOR[s], dots: true }))} />
+                lines={['Terra', 'Aqua', 'Suomi NPP', 'NOAA-20', 'NOAA-21'].filter((s) => drift.some((r) => r[s] != null)).map((s) => ({ key: s, name: SAT_LABEL[s], color: SAT_COLOR[s], dots: true }))} />
             </Panel>
           </div>
         </>}
@@ -424,17 +425,17 @@ export function GovernmentPage() {
   const [msg, setMsg] = useState<{ tone: 'success' | 'danger' | 'info'; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const lu = landUse ? `&land_use=${enc(landUse)}` : ''
-  const adv = useApi<any>(`/api/alerts?alert_type=ADVISORY&open_only=true&limit=50${lu}`)
-  const det = useApi<any>(`/api/alerts?alert_type=UNVERIFIED_SATELLITE_DETECTION&open_only=true&limit=50${lu}`)
-  const crit = useApi<any>('/api/critical-regions?top=20')
-  const cells = useApi<any>(`/api/forecast/${enc(region)}/grid-cells`)
-  const thr = useApi<any>('/api/thresholds/config')
-  const dash = useApi<any>('/api/dashboard/summary')
-  const audit = useApi<any>(can ? '/api/audit?limit=25' : null)
+  const adv = useApi<AlertList>(`/api/alerts?alert_type=ADVISORY&open_only=true&limit=50${lu}`)
+  const det = useApi<AlertList>(`/api/alerts?alert_type=UNVERIFIED_SATELLITE_DETECTION&open_only=true&limit=50${lu}`)
+  const crit = useApi<CriticalRegions>('/api/critical-regions?top=20')
+  const cells = useApi<GridCells>(`/api/forecast/${enc(region)}/grid-cells`)
+  const thr = useApi<ThresholdResponse>('/api/thresholds/config')
+  const dash = useApi<DashboardSummary>('/api/dashboard/summary')
+  const audit = useApi<{ items: AuditRow[] }>(can ? '/api/audit?limit=25' : null)
   const reload = () => { adv.reload(); det.reload(); audit.reload() }
   const evaluate = () => {
     setBusy(true); setMsg(null)
-    api('/api/alerts/evaluate', { body: {} }).then((s: any) => {
+    api<EvaluateResult>('/api/alerts/evaluate', { body: {} }).then((s) => {
       setMsg({ tone: s.status === 'ok' ? 'success' : 'info', text: s.status === 'ok' ? `Evaluation complete for issue ${s.issue_date ?? 'latest'}: ${s.created ?? 0} advisories created (${s.jurisdiction_review_required ?? 0} need administrator jurisdiction review, ${s.held_insufficient_evidence ?? 0} held for insufficient evidence), ${s.duplicates_skipped ?? 0} duplicates skipped, ${s.cooldown_suppressed ?? 0} suppressed by cooldown, ${s.superseded ?? 0} superseded, ${s.downgraded ?? 0} downgraded, ${s.detection_alerts_created ?? 0} unverified detection alerts.` : s.message || s.status })
       reload()
     }).catch((e) => setMsg({ tone: 'danger', text: e.message })).finally(() => setBusy(false))
@@ -442,22 +443,22 @@ export function GovernmentPage() {
   const act = (id: string, a: string) => {
     const note = a === 'reject' || a === 'escalate' ? window.prompt(`Reason for ${a}:`) ?? undefined : undefined
     if ((a === 'reject' || a === 'escalate') && note === undefined) return
-    api(`/api/alerts/${enc(id)}/${a}`, { body: { note } }).then(() => { setMsg({ tone: 'success', text: `${id}: ${a} recorded in the audit log.` }); reload() }).catch((e) => setMsg({ tone: 'danger', text: e.message }))
+    api<unknown>(`/api/alerts/${enc(id)}/${a}`, { body: { note } }).then(() => { setMsg({ tone: 'success', text: `${id}: ${a} recorded in the audit log.` }); reload() }).catch((e) => setMsg({ tone: 'danger', text: e.message }))
   }
   const report = () => {
-    api('/api/reports/generate', { body: { region_id: region, format: 'pdf', kind: 'full' } }).then((r: any) => download(`/api/reports/${r.id}/download`, r.file)).catch((e) => setMsg({ tone: 'danger', text: e.message }))
+    api<ReportCreated>('/api/reports/generate', { body: { region_id: region, format: 'pdf', kind: 'full' } }).then((r) => download(`/api/reports/${r.id}/download`, r.file)).catch((e) => setMsg({ tone: 'danger', text: e.message }))
   }
-  const fcells = useMemo(() => (cells.data?.cells || []).filter((c: any) => !landUse || c.land_use === landUse), [cells.data, landUse])
-  const def = (thr.data?.configs || []).find((c: any) => c.scope_type === 'default')
-  const tl = (dash.data?.timeline || []).map((r: any) => ({ ...r, band: r.veq_lo == null ? null : [r.veq_lo, r.veq_hi] }))
+  const fcells = useMemo(() => (cells.data?.cells || []).filter((c) => !landUse || c.land_use === landUse), [cells.data, landUse])
+  const def = (thr.data?.configs || []).find((c) => c.scope_type === 'default')
+  const tl = (dash.data?.timeline || []).map((r) => ({ ...r, band: r.veq_lo == null ? null : [r.veq_lo, r.veq_hi] }))
 
-  const Feed = ({ title, data, kind }: { title: string; data: any; kind: 'adv' | 'det' }) => (
+  const Feed = ({ title, data, kind }: { title: string; data: { data: AlertList | null; loading: boolean; error: string | null }; kind: 'adv' | 'det' }) => (
     <Panel title={`${title} (${data.data?.total ?? '…'})`} badge={kind === 'adv' ? <Prov kind="forecast" text="Predicted pre-fire risk advisory" /> : <Prov kind="actual" text="Unverified satellite detection" />} pad={false}>
       <Load loading={data.loading} error={data.error} data={data.data} what="alerts">
         {data.data?.items?.length ? <div className="max-h-[420px] overflow-y-auto"><Table headers={['Alert', kind === 'adv' ? 'Probability' : 'Detection', 'Region / land use', 'Status / routing', can ? 'Actions' : '']}>
-          {data.data.items.map((a: any) => (
+          {data.data.items.map((a) => (
             <tr key={a.alert_id} className="align-top hover:bg-[#172033]/60">
-              <Td><div className="font-mono text-[11px] text-slate-200">{a.alert_id}</div><div className="mt-0.5">{kind === 'adv' ? <RiskTierBadge tier={a.risk_category} /> : <span className="text-[11px] text-sky-300">{SAT_LABEL[a.satellite] || a.satellite}</span>}</div><div className="text-[10px] text-slate-500">{titleCase(a.alert_type)}</div></Td>
+              <Td><div className="font-mono text-[11px] text-slate-200">{a.alert_id}</div><div className="mt-0.5">{kind === 'adv' ? <RiskTierBadge tier={a.risk_category} /> : <span className="text-[11px] text-sky-300">{SAT_LABEL[a.satellite ?? ''] || a.satellite}</span>}</div><div className="text-[10px] text-slate-500">{titleCase(a.alert_type)}</div></Td>
               <Td>{kind === 'adv' ? <><strong>{pct(a.probability)}</strong><div className="text-[10px] text-slate-400">{pct(a.p_lower)}–{pct(a.p_upper)} · {a.n_cells ?? '–'} cells</div></> : <>{a.frp_mw == null ? 'FRP n/a' : `${num(a.frp_mw, 1)} MW`}<div className="text-[10px] text-slate-400">{a.issue_date}</div></>}</Td>
               <Td>{a.region_name}<div className="text-[10px] text-slate-400">{a.land_use} · {a.state}</div></Td>
               <Td><div className="text-[11px] font-semibold">{titleCase(a.status)}</div><div className={`text-[10px] ${a.routing_status === 'ROUTED_TO_VERIFIED_CONTACT' ? 'text-emerald-300' : 'text-amber-300'}`}>{titleCase(a.routing_status)}</div></Td>
@@ -502,7 +503,7 @@ export function GovernmentPage() {
         </Card>
         <Panel title="Critical regions" sub="Priority combines forecast, recurrence, FRP, gaps and exposure." pad={false}>
           <div className="max-h-[440px] overflow-y-auto"><Table headers={['District', 'Priority', 'p', '']}>
-            {(crit.data?.items || []).filter((c: any) => !landUse || c.land_use === landUse).map((c: any) => (
+            {(crit.data?.items || []).filter((c) => !landUse || c.land_use === landUse).map((c) => (
               <tr key={c.id}><Td>{c.name}<div className="text-[10px] text-slate-500">{c.state} · {c.land_use}</div></Td><Td><RiskTierBadge tier={c.priority} customLabel={titleCase(c.priority)} /></Td><Td right>{pct(c.p_any)}</Td><Td><Button size="xs" variant="outline" onClick={() => setRegion(c.id)}>Focus</Button></Td></tr>
             ))}
           </Table></div>
@@ -513,7 +514,7 @@ export function GovernmentPage() {
           <Series data={tl} height={200} legend={false} bands={[{ key: 'band', name: 'Band', color: C.est }]} lines={[{ key: 'harmonized', name: 'Harmonized', color: C.est }]} />
         </Panel>
         <Panel title="Active thresholds" sub={thr.data?.governance} actions={<Link to="/thresholds" className="text-xs text-orange-300 underline">Configure</Link>}>
-          {def ? <div className="space-y-1">{(def.tiers || []).map((t: any) => <div key={t.name} className="flex items-center justify-between text-xs"><RiskTierBadge tier={t.name} /><span className="font-mono text-slate-300">{Math.round(t.min * 100)}–{Math.round(t.max * 100)}%</span></div>)}
+          {def ? <div className="space-y-1">{(def.tiers || []).map((t) => <div key={t.name} className="flex items-center justify-between text-xs"><RiskTierBadge tier={t.name} /><span className="font-mono text-slate-300">{Math.round(t.min * 100)}–{Math.round(t.max * 100)}%</span></div>)}
             <div className="pt-1 text-[11px] text-slate-400">cooldown {def.cooldown_hours} h · evidence ≥ {def.evidence_min} indicators · {(thr.data?.configs || []).length - 1} override(s)</div></div> : <p className="text-xs text-slate-400">Loading…</p>}
         </Panel>
         <Panel title="Reports" sub="Official advisory report for the active region (PDF).">
@@ -524,7 +525,7 @@ export function GovernmentPage() {
       {can && <Panel title="Monitoring history (audit log)" pad={false}>
         <Load loading={audit.loading} error={audit.error} data={audit.data} what="audit log">
           <div className="max-h-80 overflow-y-auto"><Table headers={['When (UTC)', 'Actor', 'Action', 'Entity', 'Detail']}>
-            {(audit.data?.items || []).map((r: any, i: number) => <tr key={i}><Td mono>{r.at?.slice(0, 16).replace('T', ' ')}</Td><Td>{r.actor} <span className="text-slate-500">({r.role})</span></Td><Td>{titleCase(r.action)}</Td><Td mono>{r.entity_id}</Td><Td><span className="text-[10px] text-slate-400">{r.detail ? JSON.stringify(r.detail).slice(0, 120) : ''}</span></Td></tr>)}
+            {(audit.data?.items || []).map((r, i: number) => <tr key={i}><Td mono>{r.at?.slice(0, 16).replace('T', ' ')}</Td><Td>{r.actor} <span className="text-slate-500">({r.role})</span></Td><Td>{titleCase(r.action)}</Td><Td mono>{r.entity_id}</Td><Td><span className="text-[10px] text-slate-400">{r.detail ? JSON.stringify(r.detail).slice(0, 120) : ''}</span></Td></tr>)}
           </Table></div>
         </Load>
       </Panel>}
@@ -540,19 +541,19 @@ const TAGS = ['Industrial', 'Utility Corridor', 'Agricultural Cooperative', 'War
 export function OrganisationPage() {
   const { role } = useApp()
   const can = role === 'org_user' || role === 'admin'
-  const orgs = useApi<any>(can ? '/api/organisations' : null)
+  const orgs = useApi<{ items: Organisation[] }>(can ? '/api/organisations' : null)
   const [orgId, setOrgId] = useState<number | null>(null)
-  const ov = useApi<any>(orgId != null ? `/api/organisations/${orgId}/overview` : null)
+  const ov = useApi<OrgOverview>(orgId != null ? `/api/organisations/${orgId}/overview` : null)
   const [org, setOrg] = useState({ name: '', sector: SECTORS[0], contact_email: '' })
   const [loc, setLoc] = useState({ name: '', land_use_tag: TAGS[0], latitude: '30.9', longitude: '75.85', buffer_km: '25', alert_threshold: '0.6', notify_safety_team: true })
   const [msg, setMsg] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
   useEffect(() => { if (orgId == null && orgs.data?.items?.length) setOrgId(orgs.data.items[0].id) }, [orgs.data, orgId])
-  const fail = (e: any) => setMsg({ tone: 'danger', text: e.message })
-  const createOrg = () => api('/api/organisations', { body: { ...org, contact_email: org.contact_email || null } }).then((r: any) => { setMsg({ tone: 'success', text: `Registered ${r.name}.` }); setOrg({ ...org, name: '', contact_email: '' }); orgs.reload(); setOrgId(r.id) }).catch(fail)
-  const addLoc = () => orgId != null && api(`/api/organisations/${orgId}/locations`, { body: { ...loc, latitude: Number(loc.latitude), longitude: Number(loc.longitude), buffer_km: Number(loc.buffer_km), alert_threshold: Number(loc.alert_threshold) } })
+  const fail = (e: unknown) => setMsg({ tone: 'danger', text: e instanceof Error ? e.message : String(e) })
+  const createOrg = () => api<Created>('/api/organisations', { body: { ...org, contact_email: org.contact_email || null } }).then((r) => { setMsg({ tone: 'success', text: `Registered ${r.name}.` }); setOrg({ ...org, name: '', contact_email: '' }); orgs.reload(); setOrgId(r.id) }).catch(fail)
+  const addLoc = () => orgId != null && api<unknown>(`/api/organisations/${orgId}/locations`, { body: { ...loc, latitude: Number(loc.latitude), longitude: Number(loc.longitude), buffer_km: Number(loc.buffer_km), alert_threshold: Number(loc.alert_threshold) } })
     .then(() => { setMsg({ tone: 'success', text: `Added ${loc.name}.` }); setLoc({ ...loc, name: '' }); ov.reload(); orgs.reload() }).catch(fail)
-  const delLoc = (id: number) => orgId != null && window.confirm('Remove this monitoring location?') && api(`/api/organisations/${orgId}/locations/${id}`, { method: 'DELETE' }).then(() => { ov.reload(); orgs.reload() }).catch(fail)
-  const report = (rid: string, fmt: 'pdf' | 'csv') => api('/api/reports/generate', { body: { region_id: rid, format: fmt, kind: fmt === 'csv' ? 'forecast_cells' : 'full', organisation_id: orgId } }).then((r: any) => download(`/api/reports/${r.id}/download`, r.file)).catch(fail)
+  const delLoc = (id: number) => orgId != null && window.confirm('Remove this monitoring location?') && api<unknown>(`/api/organisations/${orgId}/locations/${id}`, { method: 'DELETE' }).then(() => { ov.reload(); orgs.reload() }).catch(fail)
+  const report = (rid: string, fmt: 'pdf' | 'csv') => api<ReportCreated>('/api/reports/generate', { body: { region_id: rid, format: fmt, kind: fmt === 'csv' ? 'forecast_cells' : 'full', organisation_id: orgId } }).then((r) => download(`/api/reports/${r.id}/download`, r.file)).catch(fail)
 
   if (!can) return (
     <div className="space-y-5">
@@ -568,7 +569,7 @@ export function OrganisationPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Panel title="Your organisations" pad={false}>
           <Load loading={orgs.loading} error={orgs.error} data={orgs.data} what="organisations">
-            {orgs.data?.items?.length ? <ul className="divide-y divide-[#26324a]">{orgs.data.items.map((o: any) => (
+            {orgs.data?.items?.length ? <ul className="divide-y divide-[#26324a]">{orgs.data.items.map((o) => (
               <li key={o.id}><button onClick={() => setOrgId(o.id)} className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-xs ${o.id === orgId ? 'bg-orange-500/10 text-white' : 'text-slate-300 hover:bg-[#172033]'}`}>
                 <span><Building2 className="mr-1.5 inline h-3.5 w-3.5 text-orange-400" />{o.name}<span className="block pl-5 text-[10px] text-slate-500">{o.sector}</span></span><span className="text-slate-400">{o.locations} site(s)</span></button></li>))}</ul>
               : <p className="p-4 text-xs text-slate-400">No organisation registered yet.</p>}
@@ -599,16 +600,16 @@ export function OrganisationPage() {
         {ov.data && <>
           <p className="text-[11px] text-slate-500">{ov.data.privacy}</p>
           {ov.data.locations.length === 0 && <EmptyStateCard title="No monitoring locations" description="Add a facility above to start monitoring nearby fire activity and forecast risk." />}
-          {ov.data.locations.map((l: any) => <LocationCard key={l.id} l={l} onDelete={() => delLoc(l.id)} onReport={(f) => report(l.region_id, f)} />)}
+          {ov.data.locations.map((l) => <LocationCard key={l.id} l={l} onDelete={() => delLoc(l.id)} onReport={(f) => report(l.region_id, f)} />)}
         </>}
       </Load>}
     </div>
   )
 }
 
-function LocationCard({ l, onDelete, onReport }: { l: any; onDelete: () => void; onReport: (f: 'pdf' | 'csv') => void }) {
-  const fc = l.forecast || {}
-  const hist = (l.history || []).filter((h: any) => h.complete)
+function LocationCard({ l, onDelete, onReport }: { l: OrgLocation; onDelete: () => void; onReport: (f: 'pdf' | 'csv') => void }) {
+  const fc: RegionForecast = l.forecast || {}
+  const hist = (l.history || []).filter((h) => h.complete)
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26324a] px-5 py-3">
@@ -625,7 +626,7 @@ function LocationCard({ l, onDelete, onReport }: { l: any; onDelete: () => void;
             <div className="rounded border border-[#26324a] p-2"><div className="text-[10px] uppercase text-slate-400">Detections in buffer, 7 d</div><div className="text-xl font-bold text-white">{num(l.nearby_7d?.total)}</div><div className="text-[10px] text-slate-500">nearest {l.nearby_7d?.nearest_km == null ? '–' : `${num(l.nearby_7d.nearest_km, 1)} km`}</div></div>
             <div className="rounded border border-[#26324a] p-2"><div className="text-[10px] uppercase text-slate-400">Max FRP</div><div className="text-xl font-bold text-white">{l.nearby_7d?.max_frp_mw == null ? '–' : `${num(l.nearby_7d.max_frp_mw, 0)}`}</div><div className="text-[10px] text-slate-500">MW</div></div>
           </div>
-          <div className="flex flex-wrap gap-2 text-[11px]">{Object.entries(l.nearby_7d?.by_satellite || {}).map(([s, n]: any) => <Swatch key={s} color={SAT_COLOR[s]} label={`${SAT_LABEL[s] || s}: ${n}`} square={s === 'Terra' || s === 'Aqua'} />)}</div>
+          <div className="flex flex-wrap gap-2 text-[11px]">{Object.entries(l.nearby_7d?.by_satellite || {}).map(([s, n]) => <Swatch key={s} color={SAT_COLOR[s]} label={`${SAT_LABEL[s] || s}: ${n}`} square={s === 'Terra' || s === 'Aqua'} />)}</div>
           {fc.status !== 'ok' && fc.message && <Banner tone="info">{fc.message}</Banner>}
           <p className="text-[10px] text-slate-500">Detections are actual observations, not confirmed fires. Probability = chance of a detectable VIIRS hotspot, not of damage.</p>
         </div>

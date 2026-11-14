@@ -23,10 +23,7 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
-      // API payloads are dynamic JSON produced by the FastAPI backend and rendered defensively
-      // (null-safe formatting everywhere). Kept visible as warnings rather than failing the build;
-      // typing every payload is tracked in docs/COMPLETION_REPORT.md.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
     },
   },
 )
