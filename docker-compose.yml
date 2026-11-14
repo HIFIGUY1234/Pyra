@@ -1,0 +1,25 @@
+# Local / single-host deployment. Put a TLS-terminating reverse proxy in front for production.
+#   cp .env.example .env   # then edit
+#   docker compose up --build
+services:
+  backend:
+    build: { context: ., dockerfile: backend/Dockerfile }
+    env_file: [.env]
+    environment:
+      PYROSCOPE_REPORTS_DIR: /app/data/reports
+    volumes:
+      - ./data:/app/data            # archives, Parquet, SQLite database, reports (persistent)
+      - ./docs:/app/docs            # generated scientific report
+      - ./DL_FIRE_M-C61_846937.zip:/app/DL_FIRE_M-C61_846937.zip:ro
+      - ./DL_FIRE_M-C61_848456.zip:/app/DL_FIRE_M-C61_848456.zip:ro
+      - ./DL_FIRE_SV-C2_846940.zip:/app/DL_FIRE_SV-C2_846940.zip:ro
+      - ./DL_FIRE_J1V-C2_846938.zip:/app/DL_FIRE_J1V-C2_846938.zip:ro
+      - ./DL_FIRE_J2V-C2_846939.zip:/app/DL_FIRE_J2V-C2_846939.zip:ro
+    restart: unless-stopped
+
+  frontend:
+    build: { context: ., dockerfile: frontend/Dockerfile }
+    depends_on:
+      backend: { condition: service_healthy }
+    ports: ["8080:80"]
+    restart: unless-stopped

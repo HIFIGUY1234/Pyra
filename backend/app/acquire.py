@@ -190,7 +190,7 @@ def _download(url: str, tmp: Path, expected_size: int | None, session, retries: 
 
 
 def recover_lfs(base_url: str = LFS_MEDIA, log=print, root: Path | None = None, session=None, retries: int = 4,
-                sleep=None, report_path: Path | None = LFS_REPORT) -> list[dict]:
+                sleep=None, report_path: Path | None | bool = None) -> list[dict]:
     """Replace Git LFS pointer stubs with the real archives.
 
     * expected size and SHA-256 come from the pointer;
@@ -233,7 +233,8 @@ def recover_lfs(base_url: str = LFS_MEDIA, log=print, root: Path | None = None, 
             continue
         tmp.replace(z)
         out.append({"file": z.name, "status": "recovered", "sha256": got, "bytes": size})
-    if report_path is not None:
+    report_path = LFS_REPORT if report_path is None else report_path   # resolved at call time; False disables the report
+    if report_path:
         report_path.write_text(json.dumps({"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                                            "base_url": base_url, "results": out}, indent=1))
     return out

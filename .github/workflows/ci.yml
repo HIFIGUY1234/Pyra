@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      # Archives stay as Git LFS pointer stubs here (lfs: false): CI never downloads the multi-hundred-MB
+      # FIRMS archives. The tracked Parquet summaries are enough for the API / science tests, and the
+      # pointer stubs exercise the LFS-detection path.
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Archives are pointer stubs, never parsed as ZIPs
+        run: |
+          for z in DL_FIRE_*.zip; do head -c 40 "$z" | grep -q "git-lfs" && echo "$z: LFS pointer"; done
+      - name: Pipeline CLI (dry run, unknown args rejected)
+        working-directory: backend
+        run: |
+          python -m app.pipeline --dry-run --only-new
+          if python -m app.pipeline --definitely-not-an-option; then exit 1; fi
+      - name: Unit, integration and science tests
+        working-directory: backend
+        run: python -m pytest tests -q
+
+  backend-security:
+    name: Backend dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pip-audit
+      - run: pip-audit -r backend/requirements.txt --progress-spinner off
+
+  frontend:
+    name: Frontend build, lint and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Dependency audit (high and critical)
+        run: npm audit --omit=dev --audit-level=high

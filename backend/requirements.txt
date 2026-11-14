@@ -9,7 +9,8 @@ sqlalchemy>=2.0
 python-multipart>=0.0.9
 shapely>=2.0
 reportlab>=4.0
-pillow>=10
+pillow>=13.0; python_version >= "3.11"   # 12.x has open CVEs (pip-audit)
+pillow>=10; python_version < "3.11"     # Python 3.10 cannot get the patched release: upgrade Python for production
 requests>=2.31
 # optional: PostgreSQL / PostGIS backend (set DATABASE_URL)
 # psycopg[binary]>=3.1
