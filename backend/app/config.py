@@ -5,12 +5,29 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path):
+    """Minimal .env reader (KEY=VALUE, '#' comments). Never overrides variables already set."""
+    if not path.exists():
+        return
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        v = v.split(" #", 1)[0].strip().strip('"').strip("'")
+        if k.strip() and v:
+            os.environ.setdefault(k.strip(), v)
+
+
+_load_dotenv(ROOT / ".env")
 DATA = ROOT / "data"
 PROCESSED = DATA / "processed"
 HOTSPOTS = PROCESSED / "hotspots"
 UPLOADS = DATA / "uploads"
 AUX = DATA / "auxiliary"
-REPORTS = DATA / "reports"
+REPORTS = Path(os.getenv("PYROSCOPE_REPORTS_DIR", str(DATA / "reports")))
 MODELS = PROCESSED / "models"
 
 for _p in (PROCESSED, HOTSPOTS, UPLOADS, AUX, REPORTS, MODELS):

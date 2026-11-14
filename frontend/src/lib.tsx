@@ -28,7 +28,7 @@ export const titleCase = (s?: string | null) => (s || '').toLowerCase().replace(
 export type Meta = {
   has_data: boolean; states?: string[]; districts?: { id: string; name: string; state: string }[]; users: { username: string; display_name: string; role: string }[]
   spans?: Record<string, { first: string; last: string }>; data_end?: string; default_split?: number; forecast_available?: boolean; issue_dates?: string[]
-  land_use_classes: string[]; satellites: string[]
+  land_use_classes: string[]; satellites: string[]; auth_mode?: 'dev' | 'production'
 }
 type Ctx = { user: string; setUser: (u: string) => void; role: string; region: string; setRegion: (r: string) => void; meta: Meta | null; reloadMeta: () => void }
 export const AppCtx = createContext<Ctx>(null as any)
@@ -37,11 +37,17 @@ export const useApp = () => useContext(AppCtx)
 let currentUser = localStorage.getItem('pyro_user') || 'analyst'
 export const setApiUser = (u: string) => { currentUser = u; localStorage.setItem('pyro_user', u) }
 export const getApiUser = () => currentUser
+// Bearer session token (real authentication). Kept in sessionStorage so it ends with the browser session.
+let authToken: string | null = sessionStorage.getItem('pyro_token')
+export const getAuthToken = () => authToken
+export const setAuthToken = (t: string | null) => { authToken = t; if (t) sessionStorage.setItem('pyro_token', t); else sessionStorage.removeItem('pyro_token') }
+const authHeaders = (): Record<string, string> => (authToken ? { Authorization: `Bearer ${authToken}` } : { 'X-User': currentUser })
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: any; form?: FormData } = {}): Promise<T> {
-  const headers: Record<string, string> = { 'X-User': currentUser }
+  const headers: Record<string, string> = authHeaders()
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
   const r = await fetch(path, { method: opts.method || (opts.body !== undefined || opts.form ? 'POST' : 'GET'), headers, body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined) })
+  if (r.status === 401 && authToken && path !== '/api/auth/login') setAuthToken(null)   // expired / revoked session
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`
     try { const j = await r.json(); msg = typeof j.detail === 'string' ? j.detail : Array.isArray(j.detail) ? j.detail.map((d: any) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ') : JSON.stringify(j) } catch { /* keep status text */ }
@@ -51,7 +57,7 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 export async function download(path: string, filename: string) {
-  const r = await fetch(path, { headers: { 'X-User': currentUser } })
+  const r = await fetch(path, { headers: authHeaders() })
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
   const url = URL.createObjectURL(await r.blob())
   const a = document.createElement('a')

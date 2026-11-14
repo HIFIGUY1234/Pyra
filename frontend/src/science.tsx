@@ -7,6 +7,7 @@ import { api, useApi, useApp, num, pct, compact, titleCase, Prov, Tabs, SplitPic
 import { Banner, Button, Card, CardBody, CardHeader, EmptyStateCard, Table, UncertaintyNote, ArgonStatCard } from './argon'
 import { Series, StatusBars, LogScatter, withBand } from './charts'
 import { seq } from './map'
+import { KindBadge, ValidationMethod } from './completion'
 
 /* ------------------------------------------------------------------ shared helpers */
 export const enc = (r: string) => encodeURIComponent(r)
@@ -144,6 +145,9 @@ export function MorningGapPage() {
       <Load loading={loading} error={error} data={data} what="morning-gap analysis">
         {data && <>
           <FitNotes notes={data.calibration?.notes} />
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300"><KindBadge kind={data.mode} />
+            {data.mode_message && <span>{data.mode_message}</span>}
+            {data.by_daynight_overlap && <span className="text-slate-400">Overlap Aqua/Terra ratio — day {num(data.by_daynight_overlap.day?.aqua_per_terra, 2)}, night {num(data.by_daynight_overlap.night?.aqua_per_terra, 2)}</span>}</div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <ArgonStatCard title="Months Aqua < Terra (day+night)" value={pct(data.share_months_aqua_below_terra)} subValue="Afternoon is NOT always higher - learned, not assumed" provenance="Actual Observation" />
             <ArgonStatCard title="Months Aqua night < Terra night" value={pct(data.share_months_aqua_night_below_terra_night)} subValue="01:30 pass sees fewer fires than 22:30" provenance="Actual Observation" />
@@ -425,6 +429,7 @@ export function ValidationPage() {
             <ArgonStatCard title="Band coverage" value={d.band_coverage_pct == null ? '–' : `${num(d.band_coverage_pct, 0)}%`} subValue="target ≈ 90% for a 5–95% band" provenance="Harmonized Estimate" />
           </div>
           <FitNotes notes={d.notes} />
+          <ValidationMethod v={d} seam={sm} />
           <Panel title={`Withheld period: estimate vs actual VIIRS - ${d.region}`} badge={<Prov kind="experiment" />}
             sub={`Training years ${d.train_years?.[0] ?? '–'}–${d.train_years?.slice(-1)[0] ?? '–'}. Test months ${String(d.test_period?.[0] ?? '').slice(0, 4)}–${String(d.test_period?.[1] ?? '').slice(0, 4)}; Terra-only simulation up to ${d.terra_only_end ?? '–'}.`}>
             <Series data={vrows} height={300} bands={[{ key: 'band', name: 'Estimate band', color: C.est }]}

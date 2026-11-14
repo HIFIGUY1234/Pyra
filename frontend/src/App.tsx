@@ -42,6 +42,7 @@ import {
   api,
   download,
   getApiUser,
+  getAuthToken,
   setApiUser,
   useApi,
   num,
@@ -71,6 +72,7 @@ import {
   type ProvenanceType,
 } from './argon'
 import { AnomaliesPage, CalendarPage, HarmonizerPage, MorningGapPage, TrendsPage, UncertaintyPage, ValidationPage } from './science'
+import { AuthControl, CoverageCard, InventoryCard, LoginGate } from './completion'
 import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
 
 /* ==========================================================================
@@ -1496,6 +1498,8 @@ function DataManagementPage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [selectedSatellite, setSelectedSatellite] = useState<string>('Terra')
+  const [selectedProduct, setSelectedProduct] = useState<'375m' | '750m'>('375m')
+  const isViirsUpload = !['Terra', 'Aqua'].includes(selectedSatellite)
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadResult, setUploadResult] = useState<any | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -1542,7 +1546,7 @@ function DataManagementPage() {
       const form = new FormData()
       form.append('file', selectedFile)
       form.append('satellite', selectedSatellite)
-      form.append('product_type', 'auto')
+      form.append('product_type', isViirsUpload ? selectedProduct : '1km')
       const res = await api('/api/data/upload', { method: 'POST', form })
       setUploadResult(res)
       reloadStatus()
@@ -1709,6 +1713,18 @@ function DataManagementPage() {
                     </option>
                   ))}
                 </select>
+                {isViirsUpload && (
+                  <select
+                    aria-label="VIIRS product"
+                    value={selectedProduct}
+                    onChange={(e) => setSelectedProduct(e.target.value as '375m' | '750m')}
+                    className="mt-2 w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm text-white"
+                    title="375 m and 750 m are different products and are never pooled"
+                  >
+                    <option value="375m">VIIRS 375 m (FIRMS VNP14IMGT / VJ114IMGT)</option>
+                    <option value="750m">VIIRS 750 m (VNP14 / VJ114 continuity product)</option>
+                  </select>
+                )}
               </FormGroup>
 
               <FormGroup
@@ -1795,6 +1811,8 @@ function DataManagementPage() {
           </div>
         </CardBody>
       </Card>
+      <InventoryCard />
+      <CoverageCard />
     </div>
   )
 }
@@ -2456,6 +2474,8 @@ function ArgonShell() {
   const [user, setUserState] = useState<string>(getApiUser())
   const [region, setRegion] = useState<string>('country')
   const { data: meta, reload: reloadMeta } = useApi<Meta>('/api/meta')
+  const [authVersion, setAuthVersion] = useState(0)
+  const me = useApi<any>('/api/auth/me', [authVersion, user])
 
   const setUser = (u: string) => {
     setApiUser(u)
@@ -2463,9 +2483,10 @@ function ArgonShell() {
   }
 
   const role = useMemo(() => {
+    if (me.data?.role) return me.data.role as string            // authoritative: the server's view of who we are
     const found = meta?.users?.find((x) => x.username === user)
     return found?.role || 'analyst'
-  }, [meta, user])
+  }, [meta, user, me.data])
 
   const activeSection = useMemo(() => {
     return (
@@ -2524,7 +2545,8 @@ function ArgonShell() {
 
             <div className="flex flex-wrap items-center gap-3">
               <RegionPicker allowCustom />
-              <div className="flex items-center gap-1.5 rounded-lg border border-[#26324a] bg-[#0B0F19] px-2.5 py-1 text-xs">
+              <AuthControl onChange={() => { setAuthVersion((n) => n + 1); reloadMeta() }} />
+              {!getAuthToken() && meta?.auth_mode !== 'production' && <div className="flex items-center gap-1.5 rounded-lg border border-[#26324a] bg-[#0B0F19] px-2.5 py-1 text-xs">
                 <UserCheck className="h-3.5 w-3.5 text-orange-400" />
                 <select
                   aria-label="Active operator profile"
@@ -2544,13 +2566,14 @@ function ArgonShell() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </div>}
             </div>
           </header>
 
           {/* Main Content Area with React Router v6 Routes */}
           <main className="flex-1 overflow-y-auto bg-[#0B0F19] p-4 lg:p-6">
             <div className="mx-auto max-w-[1500px]">
+              <LoginGate>
               <Routes>
                 <Route path="/" element={<OverviewDashboardPage />} />
                 <Route path="/alerts" element={<AlertsTablePage />} />
@@ -2575,6 +2598,7 @@ function ArgonShell() {
                 <Route path="/organisation" element={<OrganisationPage />} />
                 <Route path="*" element={<OverviewDashboardPage />} />
               </Routes>
+              </LoginGate>
             </div>
           </main>
         </div>

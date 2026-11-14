@@ -112,9 +112,10 @@ def stable_years(sat: str) -> set:
 # --------------------------------------------------------------------------- cached loaders
 @lru_cache(maxsize=1)
 def cells() -> pd.DataFrame:
+    from .gis_layers import apply_overrides
     df = pd.read_parquet(PROCESSED / "cells.parquet")
     df["state"] = df["state"].fillna(OUTSIDE)
-    return df.set_index("cell_id", drop=False)
+    return apply_overrides(df.set_index("cell_id", drop=False))   # administrator jurisdiction layers win
 
 
 @lru_cache(maxsize=1)
@@ -149,6 +150,8 @@ def has_data() -> bool:
 def clear_caches():
     for f in (cells, daily, monthly, spans, districts, states, month_axis, coverage, region_cells, cell_static, orbit):
         f.cache_clear()
+    from .gis_layers import clear as _gclear
+    _gclear()
 
 
 # --------------------------------------------------------------------------- time axis & coverage
@@ -174,7 +177,7 @@ def coverage() -> pd.DataFrame:
     files (FIRMS `type` present); NRT months are provisional."""
     ax = month_axis()
     out = {}
-    for sat in SATELLITES:
+    for sat in SATELLITES + sorted(k for k in spans() if k not in SATELLITES):   # + product streams e.g. "Suomi NPP 750m"
         sp = spans().get(sat)
         if not sp:
             out[sat] = np.zeros(len(ax))
@@ -197,6 +200,26 @@ def sensor_available(sat: str, day) -> bool | None:
 
 
 # --------------------------------------------------------------------------- regions
+CUSTOM = PROCESSED / "custom_regions.json"
+
+
+def custom_regions() -> dict:
+    return json.loads(CUSTOM.read_text()) if CUSTOM.exists() else {}
+
+
+def add_custom_region(name: str, geojson: dict) -> dict:
+    """Store a drawn polygon as a region: the grid cells whose centres fall inside it."""
+    import hashlib
+    from .gis_layers import cells_in_geojson
+    ids = cells_in_geojson(geojson)
+    rid = hashlib.sha1(json.dumps(geojson, sort_keys=True).encode()).hexdigest()[:10]
+    reg = custom_regions()
+    reg[rid] = {"name": name[:120], "cell_ids": ids, "geojson": geojson}
+    CUSTOM.write_text(json.dumps(reg))
+    region_cells.cache_clear()
+    return {"region_id": f"custom:{rid}", "name": name, "n_cells": len(ids),
+            "rule": "grid cells (0.25 deg) whose centre lies inside the polygon; regional totals use exactly these cells"}
+
 @lru_cache(maxsize=256)
 def region_cells(region_id: str) -> tuple:
     """Resolve a region id to grid cells.
@@ -214,6 +237,11 @@ def region_cells(region_id: str) -> tuple:
         return tuple(c.index[(c["land_use"] == val) & c["in_country"]].tolist())
     if kind == "cell":
         return (int(val),)
+    if kind == "custom":
+        reg = custom_regions()
+        if val not in reg:
+            raise ValueError(f"unknown custom region {val}")
+        return tuple(int(x) for x in reg[val]["cell_ids"])
     if kind == "bbox":
         w, s, e, n = (float(x) for x in val.split(","))
         if e <= w or n <= s:
@@ -235,6 +263,8 @@ def region_label(region_id: str) -> str:
         return f"{row.iloc[0]['district']}, {row.iloc[0]['state']}" if len(row) else val
     if kind == "bbox":
         return f"Custom area ({val})"
+    if kind == "custom":
+        return custom_regions().get(val, {}).get("name", f"Custom polygon {val}")
     if kind == "cell":
         lat, lon = grid.cell_center(int(val))
         return f"Grid cell {val} ({float(lat):.3f}N, {float(lon):.3f}E)"

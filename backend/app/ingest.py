@@ -48,7 +48,14 @@ STD_COLUMNS = [
 def discover_sources() -> list[dict]:
     """Repository archives (DL_FIRE_*.zip or loose CSVs) plus user uploads."""
     out = []
+    from .acquire import lfs_pointer
     for z in sorted(list(ROOT.glob("*.zip")) + list((ROOT / "data" / "raw").glob("*.zip"))):
+        ptr = lfs_pointer(z)
+        if ptr:
+            out.append({"key": z.stem, "origin": "repository", "container": str(z), "member": None, "bytes": 0, "lfs_pointer": ptr,
+                        "error": f"Git LFS pointer (archive of {ptr.get('size', 0) / 1e6:.1f} MB not downloaded): run `git lfs pull` "
+                                 "or `python -m app.acquire lfs`"})
+            continue
         try:
             with zipfile.ZipFile(z) as zf:
                 for info in zf.infolist():
@@ -60,7 +67,9 @@ def discover_sources() -> list[dict]:
             out.append({"key": z.stem, "origin": "repository", "container": str(z), "member": None, "bytes": 0,
                         "error": "Not a valid zip (Git LFS pointer? run `git lfs pull`)"})
     for c in sorted(list(ROOT.glob("fire_*.csv")) + list((ROOT / "data" / "raw").glob("*.csv"))):
-        out.append({"key": c.stem, "origin": "repository", "container": str(c), "member": None, "bytes": c.stat().st_size})
+        side = c.with_suffix(".json")
+        out.append({"key": c.stem, "origin": "repository", "container": str(c), "member": None, "bytes": c.stat().st_size,
+                    "hint": json.loads(side.read_text()) if side.exists() else {}})
     for c in sorted(UPLOADS.glob("*.csv")):
         meta = {}
         side = c.with_suffix(".json")
@@ -117,7 +126,13 @@ def standardise(raw: pd.DataFrame, source_file: str, hint: dict | None = None):
     if "instrument" in df:
         q["instrument_relabelled"] = int((df["instrument"].astype("string").str.strip().str.upper() != instrument).sum())
     is_modis = (instrument == "MODIS").to_numpy()
-    product = np.where(is_modis, "1km", hint.get("product_type") or "375m")
+    vprod = hint.get("product_type") or "375m"
+    if "source_product" in df:  # e.g. rows converted from VNP14 750 m granules
+        sp = df["source_product"].astype("string").str.strip().str.lower()
+        vprod = np.where(sp.isin(["375m", "750m"]), sp.fillna("375m"), vprod)
+    product = np.where(is_modis, "1km", vprod)
+    if hint.get("product_type") == "1km" and (~is_modis).any():
+        raise ValueError("1km product hint given for VIIRS rows")
 
     conf_raw = df["confidence"].astype("string").str.strip() if "confidence" in df else pd.Series(pd.NA, index=df.index, dtype="string")
     conf_num = pd.to_numeric(conf_raw, errors="coerce").astype("float64")
@@ -185,7 +200,7 @@ def aggregate_daily(std: pd.DataFrame) -> pd.DataFrame:
     t = std["anomaly_type"]
     d = pd.DataFrame({
         "acq_date": pd.to_datetime(std["acq_date"]), "cell_id": std["cell_id"].to_numpy(),
-        "satellite": std["satellite"].astype(str).to_numpy(), "daynight": std["daynight"].fillna("U").astype(str).to_numpy(),
+        "satellite": stream_of(std).to_numpy(), "daynight": std["daynight"].fillna("U").astype(str).to_numpy(),
         "n": 1,
         "n_veg": (t.isna() | (t == 0)).astype("int32").to_numpy(),
         "n_static": (t == 2).fillna(False).astype("int32").to_numpy(),
@@ -198,6 +213,14 @@ def aggregate_daily(std: pd.DataFrame) -> pd.DataFrame:
         "area_sum": std["pixel_area_km2"].fillna(0).astype("float64").to_numpy(),
     })
     return regroup_daily(d)
+
+
+def stream_of(std: pd.DataFrame) -> pd.Series:
+    """Aggregation stream: the satellite name for its default product (MODIS 1 km, VIIRS 375 m),
+    '<satellite> 750m' for the VIIRS 750 m product, so 375 m and 750 m counts never mix."""
+    sat = std["satellite"].astype(str)
+    is750 = (std["product_type"].astype(str) == "750m").to_numpy()
+    return pd.Series(np.where(is750, sat + " 750m", sat), index=std.index)
 
 
 def regroup_daily(d: pd.DataFrame) -> pd.DataFrame:
@@ -233,6 +256,7 @@ def process_source(src: dict, log=print) -> dict:
     totals: dict[str, int] = {}
     aggs, hists, versions = [], [], {}
     sats: dict[str, dict] = {}
+    products: set = set()
     name = src.get("member") or Path(src["container"]).name
     with _open_source(src) as fh:
         for i, raw in enumerate(pd.read_csv(fh, chunksize=CHUNK, dtype=STR_COLS, low_memory=False)):
@@ -243,6 +267,7 @@ def process_source(src: dict, log=print) -> dict:
                 pq.write_table(pa.Table.from_pandas(std, preserve_index=False), out_dir / f"part-{i:04d}.parquet",
                                compression="zstd", row_group_size=100_000)
                 aggs.append(aggregate_daily(std))
+                products.update(std["product_type"].astype(str).unique().tolist())
                 hists.append(_lst_hist(std))
                 for v, n in std["dataset_version"].fillna("unknown").value_counts().items():
                     versions[v] = versions.get(v, 0) + int(n)
@@ -258,7 +283,7 @@ def process_source(src: dict, log=print) -> dict:
     rec = {
         "key": key, "origin": src["origin"], "file": name, "container": Path(src["container"]).name,
         "bytes": src.get("bytes"), "quality": totals, "versions": versions, "satellites": sats,
-        "product_types": sorted({("1km" if SAT_INSTRUMENT[s] == "MODIS" else hint.get("product_type") or "375m") for s in sats}),
+        "product_types": sorted(products),
         "processed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "has_anomaly_type": totals.get("anomaly_type_missing", 0) < totals.get("rows_kept", 0),
     }
@@ -275,9 +300,18 @@ def process_all(only_new: bool = False, log=print) -> dict:
         if src.get("error"):
             results[src["key"]] = {"key": src["key"], "error": src["error"]}
             continue
-        if only_new and src["key"] in reg and (HOTSPOTS / src["key"]).exists():
+        if only_new and src["key"] in reg and not reg[src["key"]].get("error") and (HOTSPOTS / src["key"]).exists():
             continue
-        results[src["key"]] = process_source(src, log=log)
+        try:
+            results[src["key"]] = process_source(src, log=log)
+        except Exception as exc:  # record and continue: one bad file must not block the others
+            rec = {"key": src["key"], "origin": src["origin"], "file": src.get("member") or Path(src["container"]).name,
+                   "error": f"{type(exc).__name__}: {exc}", "processed_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+            reg = load_registry()
+            reg[src["key"]] = rec
+            _save_registry(reg)
+            results[src["key"]] = rec
+            log(f"[ingest] {src['key']} FAILED: {exc}")
     return results
 
 

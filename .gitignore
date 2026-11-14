@@ -38,3 +38,9 @@ data/uploads/*
 
 # graphify cache
 graphify-out/cache/
+
+# local secrets / backups / downloaded raw data
+.env
+data/backups/
+data/raw/*.parts/
+data/raw/*.csv

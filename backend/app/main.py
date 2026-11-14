@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 import threading
 import traceback
@@ -17,14 +19,15 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 
-from . import alerts, analytics, db_sync, forecast, geo, grid, harmonize, ingest, reports, risk, store
+from . import acquire, alerts, analytics, db_sync, gis_layers, notify, security, forecast, geo, grid, harmonize, ingest, reports, risk, store
 from . import models as M
 from .config import (ANOMALY_TYPES, PROCESSED, REPORTS, SAT_INSTRUMENT, SAT_LABEL, SATELLITES, UPLOADS, VIIRS_CONF_SCORE,
                      VIIRS_REFERENCE)
 
 app = FastAPI(title="PyroScope API", version="1.0.0",
               description="MODIS-VIIRS hot-spot harmonization, calibrated 7-day hotspot probability and authority alert routing.")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], allow_methods=["*"], allow_headers=["*"])
+_origins = [o.strip() for o in os.getenv("PYROSCOPE_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-User"])
 db_sync.init_db()
 
 rec = analytics._rec
@@ -61,6 +64,21 @@ def ok(data):
     return JSONResponse(content=json.loads(json.dumps(_clean(data), cls=NpEncoder)))
 
 
+PUBLIC_PATHS = {"/api/health", "/api/meta", "/api/auth/login", "/docs", "/openapi.json"}
+
+
+@app.middleware("http")
+async def _production_gate(request: Request, call_next):
+    """AUTH_MODE=production: every /api route except PUBLIC_PATHS needs a valid Bearer session."""
+    if security.auth_mode() == "production" and request.url.path.startswith("/api") and request.url.path not in PUBLIC_PATHS \
+            and request.method != "OPTIONS":
+        try:
+            actor(request.headers.get("authorization"), None)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    return await call_next(request)
+
+
 @app.exception_handler(ValueError)
 async def _bad(_: Request, exc: ValueError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})
@@ -71,27 +89,51 @@ async def _missing(_: Request, exc: KeyError):
     return JSONResponse(status_code=404, content={"detail": f"not found: {exc}"})
 
 
+@app.exception_handler(Exception)
+async def _unhandled(_: Request, exc: Exception):
+    logging.getLogger("pyroscope").exception("unhandled error")
+    return JSONResponse(status_code=500, content={"detail": "internal error (details are in the server log)"})
+
+
 @app.exception_handler(PermissionError)
 async def _conflict(_: Request, exc: PermissionError):
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
-# --------------------------------------------------------------------------- prototype role simulation
+# --------------------------------------------------------------------------- authentication
 class Actor(BaseModel):
     id: int
     username: str
     role: str
     display_name: str
     organisation_id: Optional[int] = None
+    auth: str = "token"            # token | dev-persona
 
 
-def actor(x_user: Optional[str] = Header(default=None)) -> Actor:
-    """Prototype persona switch (X-User header). This is NOT authentication; deploy behind real SSO."""
+def _actor_of(u: M.User, how: str) -> Actor:
+    return Actor(id=u.id, username=u.username, role=u.role.name, display_name=u.display_name, organisation_id=u.organisation_id, auth=how)
+
+
+def actor(authorization: Optional[str] = Header(default=None), x_user: Optional[str] = Header(default=None)) -> Actor:
+    """Bearer session token (always honoured). In AUTH_MODE=dev only, the X-User demo-persona header
+    is accepted when no token is sent. In production the header is ignored."""
+    if authorization and authorization.lower().startswith("bearer "):
+        dig = security.token_digest(authorization.split(" ", 1)[1].strip())
+        with M.Session() as s:
+            ses = s.scalar(select(M.UserSession).where(M.UserSession.token_sha256 == dig))
+            if ses is None or ses.revoked_at is not None or ses.expires_at < M.now():
+                raise HTTPException(401, "session invalid or expired; log in again")
+            u = s.get(M.User, ses.user_id)
+            if u is None or not u.is_active:
+                raise HTTPException(401, "account disabled")
+            return _actor_of(u, "token")
+    if security.auth_mode() == "production":
+        raise HTTPException(401, "authentication required (Bearer token)")
     with M.Session() as s:
         u = s.scalar(select(M.User).where(M.User.username == (x_user or "analyst")))
-        if u is None:
+        if u is None or not u.is_active:
             raise HTTPException(401, "unknown user")
-        return Actor(id=u.id, username=u.username, role=u.role.name, display_name=u.display_name, organisation_id=u.organisation_id)
+        return _actor_of(u, "dev-persona")
 
 
 def require(*roles):
@@ -102,9 +144,124 @@ def require(*roles):
     return dep
 
 
+class LoginBody(BaseModel):
+    username: str = Field(min_length=1, max_length=60)
+    password: str = Field(min_length=1, max_length=200)
+
+
+@app.post("/api/auth/login")
+def auth_login(body: LoginBody, request: Request):
+    with M.Session() as s:
+        u = s.scalar(select(M.User).where(M.User.username == body.username))
+        nowt = M.now()
+        if u is not None and u.locked_until and u.locked_until > nowt:
+            raise HTTPException(429, "account temporarily locked after repeated failures; try again later")
+        if u is None or not u.is_active or not security.verify_password(body.password, u.password_hash):
+            if u is not None:
+                u.failed_logins = (u.failed_logins or 0) + 1
+                if u.failed_logins >= security.MAX_FAILED:
+                    from datetime import timedelta
+                    u.locked_until, u.failed_logins = nowt + timedelta(minutes=security.LOCK_MINUTES), 0
+                s.add(M.AuditLog(actor=body.username, actor_role=None, action="LOGIN_FAILED", entity="user", entity_id=body.username))
+                s.commit()
+            raise HTTPException(401, "invalid username or password")
+        token, dig = security.new_token()
+        s.add(M.UserSession(user_id=u.id, token_sha256=dig, expires_at=nowt + security.session_ttl(), client=(request.headers.get("user-agent") or "")[:200]))
+        u.failed_logins, u.locked_until, u.last_login_at = 0, None, nowt
+        s.add(M.AuditLog(actor=u.username, actor_role=u.role.name, action="LOGIN", entity="user", entity_id=u.username))
+        s.commit()
+        return ok({"token": token, "token_type": "bearer", "expires_in_s": int(security.session_ttl().total_seconds()),
+                   "user": {"username": u.username, "display_name": u.display_name, "role": u.role.name, "organisation_id": u.organisation_id}})
+
+
+@app.post("/api/auth/logout")
+def auth_logout(authorization: Optional[str] = Header(default=None), a: Actor = Depends(actor)):
+    if a.auth == "token" and authorization:
+        dig = security.token_digest(authorization.split(" ", 1)[1].strip())
+        with M.Session() as s:
+            ses = s.scalar(select(M.UserSession).where(M.UserSession.token_sha256 == dig))
+            if ses:
+                ses.revoked_at = M.now()
+                s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="LOGOUT", entity="user", entity_id=a.username))
+                s.commit()
+    return ok({"logged_out": True})
+
+
+@app.get("/api/auth/me")
+def auth_me(a: Actor = Depends(actor)):
+    return ok({**a.model_dump(), "auth_mode": security.auth_mode(),
+               "warning": None if a.auth == "token" else "Development persona (X-User header). Not authentication; disabled when PYROSCOPE_AUTH_MODE=production."})
+
+
+class UserBody(BaseModel):
+    username: str = Field(min_length=3, max_length=60, pattern=r"^[A-Za-z0-9_.-]+$")
+    display_name: str = Field(min_length=1, max_length=120)
+    role: str = Field(pattern="^(admin|gov_officer|org_user|analyst)$")
+    password: str = Field(min_length=10, max_length=200)
+    organisation_id: Optional[int] = None
+    jurisdiction_state: Optional[str] = None
+    jurisdiction_land_use: Optional[str] = None
+
+
+@app.get("/api/users")
+def users_list(a: Actor = Depends(require())):
+    with M.Session() as s:
+        return ok({"items": [{"id": u.id, "username": u.username, "display_name": u.display_name, "role": u.role.name, "organisation_id": u.organisation_id,
+                              "is_active": u.is_active, "can_log_in": bool(u.password_hash), "is_demo": u.is_demo,
+                              "last_login_at": u.last_login_at.isoformat() + "Z" if u.last_login_at else None} for u in s.scalars(select(M.User).order_by(M.User.id))]})
+
+
+@app.post("/api/users")
+def users_create(body: UserBody, a: Actor = Depends(require())):
+    with M.Session() as s:
+        if s.scalar(select(M.User).where(M.User.username == body.username)):
+            raise HTTPException(409, "username already exists")
+        role = s.scalar(select(M.Role).where(M.Role.name == body.role))
+        if body.role == "org_user" and body.organisation_id is None:
+            raise ValueError("organisation users must belong to an organisation")
+        u = M.User(username=body.username, display_name=body.display_name, role_id=role.id, organisation_id=body.organisation_id,
+                   jurisdiction_state=body.jurisdiction_state, jurisdiction_land_use=body.jurisdiction_land_use, is_demo=False,
+                   password_hash=security.hash_password(body.password))
+        s.add(u)
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="USER_CREATED", entity="user", entity_id=body.username, detail={"role": body.role}))
+        s.commit()
+        return ok({"id": u.id, "username": u.username, "role": body.role})
+
+
+class PasswordBody(BaseModel):
+    current_password: Optional[str] = None
+    new_password: str = Field(min_length=10, max_length=200)
+
+
+@app.put("/api/auth/password")
+def auth_password(body: PasswordBody, a: Actor = Depends(actor)):
+    with M.Session() as s:
+        u = s.get(M.User, a.id)
+        if u.password_hash and not security.verify_password(body.current_password or "", u.password_hash):
+            raise HTTPException(401, "current password is wrong")
+        if not u.password_hash and a.auth != "token" and security.auth_mode() == "production":
+            raise HTTPException(403, "not allowed")
+        u.password_hash = security.hash_password(body.new_password)
+        for ses in s.scalars(select(M.UserSession).where(M.UserSession.user_id == u.id, M.UserSession.revoked_at.is_(None))):
+            ses.revoked_at = M.now()        # changing the password ends every existing session
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="PASSWORD_CHANGED", entity="user", entity_id=a.username))
+        s.commit()
+    return ok({"changed": True, "sessions_revoked": True})
+
+
 def need_data():
     if not store.has_data():
         raise HTTPException(409, "No processed data yet. Use Data Management -> Load Repository Dataset.")
+
+
+def _ref(product: Optional[str]) -> str:
+    """VIIRS calibration target stream: default S-NPP 375 m, or e.g. 'Suomi NPP 750m' when loaded."""
+    if not product or product in ("375m", VIIRS_REFERENCE):
+        return VIIRS_REFERENCE
+    cand = product if product.endswith("750m") else f"{VIIRS_REFERENCE} 750m" if product == "750m" else product
+    if cand not in {p["stream"] for p in harmonize.products()["streams"]}:
+        raise ValueError(f"VIIRS product '{product}' is not loaded. {harmonize.products()['viirs_750m_message'] or ''}")
+    return cand
 
 
 def _split(v: Optional[int]) -> Optional[int]:
@@ -125,8 +282,11 @@ def health():
 def meta():
     out = {"has_data": store.has_data(), "satellites": SATELLITES, "sat_labels": SAT_LABEL, "anomaly_types": ANOMALY_TYPES,
            "land_use_classes": geo.LAND_USE_CLASSES, "viirs_reference": VIIRS_REFERENCE, "confidence_mapping": VIIRS_CONF_SCORE}
-    with M.Session() as s:
-        out["users"] = [{"username": u.username, "display_name": u.display_name, "role": u.role.name} for u in s.scalars(select(M.User))]
+    out["auth_mode"] = security.auth_mode()
+    out["users"] = []
+    if security.auth_mode() == "dev":   # demo persona list only in development mode
+        with M.Session() as s:
+            out["users"] = [{"username": u.username, "display_name": u.display_name, "role": u.role.name} for u in s.scalars(select(M.User)) if u.is_active]
     if store.has_data():
         d = store.districts().dropna(subset=["state"]).sort_values(["state", "district"])
         have = set(store.cells()["district_id"].dropna())
@@ -329,6 +489,22 @@ async def upload(file: UploadFile = File(...), satellite: str = Form(...), produ
                "next": "POST /api/data/process to ingest it and rebuild the harmonization."})
 
 
+@app.get("/api/data/inventory")
+def data_inventory(refresh: bool = False):
+    """Ingestion / inventory report: archives (LFS status), loaded coverage per satellite, missing periods and blockers."""
+    if refresh or not acquire.REPORT_JSON.exists():
+        return ok(acquire.build_report())
+    return ok(json.loads(acquire.REPORT_JSON.read_text()))
+
+
+@app.post("/api/data/recover-lfs")
+def data_recover_lfs(a: Actor = Depends(require())):
+    """Replace Git LFS pointer stubs with the real archives (SHA-256 verified against the pointer)."""
+    res = acquire.recover_lfs()
+    acquire.build_report()
+    return ok({"results": res})
+
+
 @app.get("/api/data/quality")
 def data_quality():
     reg = ingest.load_registry()
@@ -350,14 +526,18 @@ def data_quality():
 
 # --------------------------------------------------------------------------- harmonization
 @app.get("/api/harmonization/summary", dependencies=[Depends(need_data)])
-def harm_summary(region: str = "country", split: Optional[int] = None):
-    df, _ = harmonize.series(region, _split(split))
-    ft = harmonize.fit(_split(split))
+def harm_summary(region: str = "country", split: Optional[int] = None, product: Optional[str] = None):
+    ref = _ref(product)
+    df, _ = harmonize.series(region, _split(split), ref=ref)
+    ft = harmonize.fit(_split(split), ref=ref)
     return ok({"region": store.region_label(region), "split": split, "series": rec(df), "notes": ft.notes,
                "provenance_counts": df["provenance"].value_counts().to_dict(), "train_years": {"morning_gap": ft.years_mg, "sensor": ft.years_sh},
-               "legend": {"actual_viirs": "Actual S-NPP VIIRS 375 m observation", "sensor_calibrated": "Sensor-calibrated estimate (from actual Aqua MODIS)",
+               "reference_product": harmonize.product_label(ref), "available_products": harmonize.products(),
+               "legend": {"actual_viirs": f"Actual {harmonize.product_label(ref)} observation", "sensor_calibrated": "Sensor-calibrated estimate (from actual Aqua MODIS)",
                           "morning_gap_sensor": "Morning-gap-corrected + sensor-calibrated estimate (from Terra MODIS only)", "no_data": "No sensor coverage"},
-               "products": {"viirs": "375 m (FIRMS VNP14IMG). No 750 m product is loaded; upload one to enable the continuity-oriented comparison.", "modis": "1 km (MCD14ML, C6.1)"},
+               "products": {"viirs": harmonize.product_label(ref) + ("" if ref.endswith("750m") else
+                                     (". " + (harmonize.products()["viirs_750m_message"] or "A 750 m stream is loaded: pass product=750m."))),
+                            "modis": "1 km (MCD14ML, C6.1)"},
                "terra_only_real_months": int(((df["cov_terra"] >= 0.5) & (df["cov_aqua"] < 0.5) & ~df["withheld_aqua"]).sum()),
                "pre_viirs_real_months": int(((df["cov_viirs"] == 0) & (df["modis_total"].notna())).sum())})
 
@@ -390,6 +570,7 @@ def harm_compare(region: str = "country"):
 def mg_analysis(region: str = "country", state: Optional[str] = None, split: Optional[int] = None):
     df, _ = harmonize.series(region, _split(split))
     ov = df[(df["cov_terra"] >= 0.999) & (df["cov_aqua"] >= 0.999)]
+    real_months = int(((df["cov_terra"] >= 0.5) & (df["cov_aqua"] < 0.5) & ~df["withheld_aqua"]).sum())
     return ok({"region": store.region_label(region), "calibration": harmonize.calibration_table("mg", _split(split), state),
                "series": rec(df[["date", "ym", "terra", "aqua", "terra_day", "terra_night", "aqua_day", "aqua_night", "aqua_est", "aqua_est_lo", "aqua_est_hi",
                                  "withheld_aqua", "cov_terra", "cov_aqua", "train_morning_gap"]]),
@@ -397,7 +578,13 @@ def mg_analysis(region: str = "country", state: Optional[str] = None, split: Opt
                "share_months_aqua_night_below_terra_night": float((ov["aqua_night"] < ov["terra_night"]).mean()) if len(ov) else None,
                "orbit": rec(store.orbit()[store.orbit()["satellite"].isin(["Terra", "Aqua"])]),
                "state_factors": harmonize.state_factors("mg", _split(split)), "scatter": harmonize.scatter("mg", _split(split)),
-               "terra_only_real_months": int(((df["cov_terra"] >= 0.5) & (df["cov_aqua"] < 0.5) & ~df["withheld_aqua"]).sum()),
+               "terra_only_real_months": real_months,
+               "mode": "real_correction" if real_months else "simulated_only",
+               "mode_message": None if real_months else ("No Terra-only months (FIRMS: Nov 2000 - Jun 2002) are loaded, so the real historical "
+                                                         "correction cannot be applied. Results labelled 'simulated' hide real Aqua months to test the method."),
+               "by_daynight_overlap": {dn: {"terra": float(ov[f"terra_{dn}"].sum()), "aqua": float(ov[f"aqua_{dn}"].sum()),
+                                            "aqua_per_terra": float(ov[f"aqua_{dn}"].sum() / ov[f"terra_{dn}"].sum()) if ov[f"terra_{dn}"].sum() else None}
+                                       for dn in ("day", "night")},
                "note": "The relationship is learned, not assumed: night-time Aqua (01:30) sees far fewer fires than night-time Terra (22:30), and in monsoon "
                        "months day-time Aqua can be below Terra. Estimated Aqua values are statistical estimates, not satellite detections."})
 
@@ -425,11 +612,13 @@ def mg_correct(body: RunBody):
 
 
 @app.get("/api/sensor-harmonizer/calibration", dependencies=[Depends(need_data)])
-def sh_calibration(state: Optional[str] = None, split: Optional[int] = None):
-    return ok({"calibration": harmonize.calibration_table("sh", _split(split), state), "state_factors": harmonize.state_factors("sh", _split(split)),
-               "scatter": harmonize.scatter("sh", _split(split)),
-               "product_note": "Calibration target is the S-NPP VIIRS 375 m product (the only VIIRS product loaded). The 750 m product is preferred for "
-                               "continuity with MODIS 1 km and is NOT interchangeable with 375 m; upload it to calibrate against it separately.",
+def sh_calibration(state: Optional[str] = None, split: Optional[int] = None, product: Optional[str] = None):
+    ref = _ref(product)
+    pr = harmonize.products()
+    return ok({"calibration": harmonize.calibration_table("sh", _split(split), state, ref), "state_factors": harmonize.state_factors("sh", _split(split), ref),
+               "scatter": harmonize.scatter("sh", _split(split), ref=ref), "products": pr,
+               "product_note": (f"Calibration target: {harmonize.product_label(ref)}. 375 m and 750 m are calibrated separately and never pooled. "
+                                + (pr["viirs_750m_message"] or "")),
                "other_viirs": "NOAA-20 / NOAA-21 detections are kept as separate actual observations and are never pooled into the S-NPP reference record."})
 
 
@@ -471,13 +660,18 @@ def uncertainty(region: str = "country", split: Optional[int] = None):
 
 
 @app.get("/api/validation", dependencies=[Depends(need_data)])
-def validation(region: str = "country", split: Optional[int] = None):
-    return ok(harmonize.validation(region, _split(split)))
+def validation(region: str = "country", split: Optional[int] = None, product: Optional[str] = None):
+    return ok(harmonize.validation(region, _split(split), _ref(product)))
 
 
 @app.get("/api/validation/seam-test", dependencies=[Depends(need_data)])
-def seam(region: str = "country", split: Optional[int] = None, window: int = Query(24, ge=12, le=60)):
-    return ok(harmonize.seam_test(region, _split(split), window))
+def seam(region: str = "country", split: Optional[int] = None, window: int = Query(24, ge=12, le=60), product: Optional[str] = None):
+    return ok(harmonize.seam_test(region, _split(split), window, _ref(product)))
+
+
+@app.get("/api/harmonization/products", dependencies=[Depends(need_data)])
+def harm_products():
+    return ok(harmonize.products())
 
 
 # --------------------------------------------------------------------------- analysis modules
@@ -652,9 +846,100 @@ class ContactBody(BaseModel):
     role_title: str = Field(min_length=3, max_length=160)
     level: int = Field(1, ge=1, le=3)
     contact_name: Optional[str] = Field(None, max_length=160)
-    contact_channel: str = Field("in-app", pattern="^(in-app|sms|email)$")
+    contact_channel: str = Field("in-app", pattern="^(in-app|sms|email|webhook)$")
     contact_value: Optional[str] = Field(None, max_length=200)
     confirm_verified: bool = Field(False, description="Administrator attests the contact was verified with the authority.")
+
+    @model_validator(mode="after")
+    def _check_address(self):
+        v = (self.contact_value or "").strip()
+        if self.contact_channel == "email" and not notify.EMAIL_RE.match(v):
+            raise ValueError("email channel needs a valid email address")
+        if self.contact_channel == "webhook" and not v.startswith("https://"):
+            raise ValueError("webhook channel needs an https:// URL")
+        if self.contact_channel == "sms" and not re.fullmatch(r"\+?[0-9 ()-]{7,20}", v):
+            raise ValueError("sms channel needs a phone number")
+        return self
+
+
+# --------------------------------------------------------------------------- GIS coverage & administrator layers
+@app.get("/api/geo/coverage")
+def geo_coverage():
+    return ok(gis_layers.coverage())
+
+
+class LayerBody(BaseModel):
+    name: str = Field(min_length=3, max_length=160)
+    land_use: str
+    source: str = Field(min_length=3, max_length=300, description="Dataset / issuing authority (provenance is mandatory)")
+    licence: Optional[str] = Field(None, max_length=120)
+    source_date: Optional[str] = Field(None, max_length=40)
+    geojson: dict
+
+
+@app.post("/api/jurisdictions/layers")
+def layers_add(body: LayerBody, a: Actor = Depends(require())):
+    if body.land_use not in geo.LAND_USE_CLASSES:
+        raise ValueError(f"land_use must be one of {geo.LAND_USE_CLASSES}")
+    ids = gis_layers.cells_in_geojson(body.geojson)
+    with M.Session() as s:
+        l = M.JurisdictionLayer(name=body.name, land_use=body.land_use, source=body.source, licence=body.licence, source_date=body.source_date,
+                                geojson=body.geojson, n_cells=len(ids), cell_ids=ids, uploaded_by=a.username)
+        s.add(l)
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="JURISDICTION_LAYER_ADDED", entity="jurisdiction_layer", entity_id=body.name,
+                         detail={"land_use": body.land_use, "n_cells": len(ids), "source": body.source}))
+        s.commit()
+        lid = l.id
+    store.clear_caches(); analytics.clear()
+    return ok({"id": lid, "n_cells": len(ids), "land_use": body.land_use})
+
+
+@app.delete("/api/jurisdictions/layers/{layer_id}")
+def layers_delete(layer_id: int, a: Actor = Depends(require())):
+    with M.Session() as s:
+        l = s.get(M.JurisdictionLayer, layer_id)
+        if l is None:
+            raise KeyError(layer_id)
+        s.delete(l)
+        s.add(M.AuditLog(actor=a.username, actor_role=a.role, action="JURISDICTION_LAYER_REMOVED", entity="jurisdiction_layer", entity_id=str(layer_id)))
+        s.commit()
+    store.clear_caches(); analytics.clear()
+    return ok({"deleted": layer_id})
+
+
+@app.post("/api/geo/exposure")
+async def exposure_upload(kind: str = Form(...), source: str = Form(..., min_length=3), licence: Optional[str] = Form(None),
+                          source_date: Optional[str] = Form(None), file: UploadFile = File(...), a: Actor = Depends(require())):
+    if not (file.filename or "").lower().endswith(".csv"):
+        raise ValueError("only .csv files are accepted")
+    raw = await file.read(200_000_001)
+    if len(raw) > 200_000_000:
+        raise ValueError("file larger than 200 MB")
+    import io
+    meta = gis_layers.save_exposure(kind, pd.read_csv(io.BytesIO(raw), dtype=str), source, licence, source_date, a.username)
+    analytics.clear()
+    return ok(meta)
+
+
+class CustomRegionBody(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    geojson: dict
+
+
+@app.post("/api/regions/custom", dependencies=[Depends(need_data)])
+def region_custom(body: CustomRegionBody):
+    return ok(store.add_custom_region(body.name, body.geojson))
+
+
+# --------------------------------------------------------------------------- notifications
+@app.get("/api/notifications/status")
+def notifications_status():
+    return ok(notify.status())
+
+
+@app.get("/api/notifications/log")
+def notifications_log(alert_id: Optional[str] = None, limit: int = Query(200, ge=1, le=1000), a: Actor = Depends(require("gov_officer"))):
+    return ok({"items": notify.log(alert_id, limit), "provider": notify.status()})
 
 
 @app.get("/api/authorities")

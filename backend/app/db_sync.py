@@ -39,6 +39,9 @@ AUTHORITY_TEMPLATES = {
 
 
 def init_db():
+    import os
+    from . import migrate, security
+    migrate.upgrade(log=lambda *a: None)           # additive; backs up SQLite first when anything changes
     M.Base.metadata.create_all(M.engine)
     with M.Session() as s:
         if not s.scalar(select(M.Role).limit(1)):
@@ -55,6 +58,12 @@ def init_db():
             for lu, rows in AUTHORITY_TEMPLATES.items():
                 for auth, title, lvl in rows:
                     s.add(M.AuthorityContact(land_use=lu, authority=auth, role_title=title, level=lvl, is_template=True, verified=False))
+        pw = os.getenv("PYROSCOPE_ADMIN_PASSWORD")  # bootstrap a real admin login; never hard-coded
+        if pw:
+            adm = s.scalar(select(M.User).where(M.User.username == "admin"))
+            if adm is not None and not adm.password_hash:
+                adm.password_hash = security.hash_password(pw)
+                adm.is_demo = False
         s.commit()
 
 

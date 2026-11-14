@@ -368,6 +368,12 @@ def act(alert_id: str, action: str, actor: str, actor_role: str, note: str | Non
         a.status = to
         s.add(M.AlertEscalation(alert=a, action=action.upper(), from_status=frm, to_status=to, actor=actor, actor_role=actor_role, note=note))
         _audit(s, actor, actor_role, f"ALERT_{action.upper()}", "alert", alert_id, {"from": frm, "to": to, "note": note})
+        if action in ("approve", "escalate"):
+            # Delivery happens only here, after an authorised human decision (see notify.py).
+            from . import notify
+            s.flush()
+            res = notify.deliver(s, a, approved_by=actor)
+            _audit(s, actor, actor_role, "NOTIFICATIONS_ATTEMPTED", "alert", alert_id, {"provider": notify.provider_name(), "results": res})
         s.commit()
         return serialize(a, full=True)
 

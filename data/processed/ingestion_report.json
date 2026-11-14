@@ -1,0 +1,413 @@
+{
+ "generated_at": "2026-11-14T14:11:03+00:00",
+ "aoi_bbox": [
+  68.0,
+  6.0,
+  98.0,
+  36.0
+ ],
+ "archives": [
+  {
+   "file": "DL_FIRE_J2V-C2_846939.zip",
+   "status": "valid",
+   "bytes": 39960895,
+   "members": [
+    {
+     "name": "fire_archive_J2V-C2_846939.csv",
+     "bytes": 171428296,
+     "kind": "archive"
+    },
+    {
+     "name": "fire_nrt_J2V-C2_846939.csv",
+     "bytes": 2538945,
+     "kind": "nrt"
+    },
+    {
+     "name": "Readme.txt",
+     "bytes": 89,
+     "kind": "other"
+    }
+   ]
+  },
+  {
+   "file": "DL_FIRE_M-C61_846937.zip",
+   "status": "valid",
+   "bytes": 21761475,
+   "members": [
+    {
+     "name": "fire_archive_M-C61_846937.csv",
+     "bytes": 96179318,
+     "kind": "archive"
+    },
+    {
+     "name": "fire_nrt_M-C61_846937.csv",
+     "bytes": 332917,
+     "kind": "nrt"
+    },
+    {
+     "name": "Readme.txt",
+     "bytes": 89,
+     "kind": "other"
+    }
+   ]
+  },
+  {
+   "file": "DL_FIRE_SV-C2_846940.zip",
+   "status": "valid",
+   "bytes": 159863811,
+   "members": [
+    {
+     "name": "fire_archive_SV-C2_846940.csv",
+     "bytes": 700313861,
+     "kind": "archive"
+    },
+    {
+     "name": "fire_nrt_SV-C2_846940.csv",
+     "bytes": 2503251,
+     "kind": "nrt"
+    },
+    {
+     "name": "Readme.txt",
+     "bytes": 89,
+     "kind": "other"
+    }
+   ]
+  }
+ ],
+ "sources": [
+  {
+   "key": "fire_archive_J2V-C2_846939",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J2V-C2_846939.zip",
+   "member": "fire_archive_J2V-C2_846939.csv",
+   "bytes": 171428296
+  },
+  {
+   "key": "fire_nrt_J2V-C2_846939",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_J2V-C2_846939.zip",
+   "member": "fire_nrt_J2V-C2_846939.csv",
+   "bytes": 2538945
+  },
+  {
+   "key": "fire_archive_M-C61_846937",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_M-C61_846937.zip",
+   "member": "fire_archive_M-C61_846937.csv",
+   "bytes": 96179318
+  },
+  {
+   "key": "fire_nrt_M-C61_846937",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_M-C61_846937.zip",
+   "member": "fire_nrt_M-C61_846937.csv",
+   "bytes": 332917
+  },
+  {
+   "key": "fire_archive_SV-C2_846940",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_SV-C2_846940.zip",
+   "member": "fire_archive_SV-C2_846940.csv",
+   "bytes": 700313861
+  },
+  {
+   "key": "fire_nrt_SV-C2_846940",
+   "origin": "repository",
+   "container": "/home/claude/hifiguy1234/pyra/DL_FIRE_SV-C2_846940.zip",
+   "member": "fire_nrt_SV-C2_846940.csv",
+   "bytes": 2503251
+  }
+ ],
+ "satellites": {
+  "Terra": {
+   "expected": {
+    "product": "MODIS C6.1 1 km (MCD14ML)",
+    "firms_start": "2000-11-01",
+    "firms_source": "MODIS_SP",
+    "note": "Terra MODIS launched Dec 1999; FIRMS C6.1 starts 1 Nov 2000 (earlier MOD14 data have known quality issues)."
+   },
+   "loaded": {
+    "archive": {
+     "first": "2012-01-01",
+     "last": "2026-08-31",
+     "rows": 381857
+    },
+    "nrt": {
+     "first": "2026-09-01",
+     "last": "2026-10-31",
+     "rows": 1561
+    },
+    "rows": 383418,
+    "versions": [
+     "6.03",
+     "6.1NRT",
+     "61.03"
+    ],
+    "products": [
+     "1km"
+    ]
+   },
+   "status": "partial"
+  },
+  "Aqua": {
+   "expected": {
+    "product": "MODIS C6.1 1 km (MCD14ML)",
+    "firms_start": "2002-07-04",
+    "firms_source": "MODIS_SP",
+    "note": "Aqua MODIS fire record begins July 2002."
+   },
+   "loaded": {
+    "archive": {
+     "first": "2012-01-01",
+     "last": "2026-08-30",
+     "rows": 852128
+    },
+    "nrt": {
+     "first": "2026-09-01",
+     "last": "2026-10-31",
+     "rows": 2342
+    },
+    "rows": 854470,
+    "versions": [
+     "6.03",
+     "6.1NRT",
+     "61.03"
+    ],
+    "products": [
+     "1km"
+    ]
+   },
+   "status": "partial"
+  },
+  "Suomi NPP": {
+   "expected": {
+    "product": "VIIRS C2 375 m (VNP14IMGT)",
+    "firms_start": "2012-01-20",
+    "firms_source": "VIIRS_SNPP_SP"
+   },
+   "loaded": {
+    "archive": {
+     "first": "2012-01-20",
+     "last": "2026-07-31",
+     "rows": 8726813
+    },
+    "nrt": {
+     "first": "2026-08-01",
+     "last": "2026-10-31",
+     "rows": 30073
+    },
+    "rows": 8756886,
+    "versions": [
+     "2",
+     "2.0NRT"
+    ],
+    "products": [
+     "375m"
+    ]
+   },
+   "status": "complete_from_firms_start"
+  },
+  "NOAA-20": {
+   "expected": {
+    "product": "VIIRS C2 375 m (VJ114IMGT)",
+    "firms_start": "2018-04-01",
+    "firms_source": "VIIRS_NOAA20_SP"
+   },
+   "loaded": null,
+   "status": "missing"
+  },
+  "NOAA-21": {
+   "expected": {
+    "product": "VIIRS C2 375 m (VJ214IMGT)",
+    "firms_start": "2024-01-17",
+    "firms_source": "VIIRS_NOAA21_NRT",
+    "note": "FIRMS distributes NOAA-21 as NRT; this repository's archive file contains NOAA-21 records from 2023-03 (pre-operational period)."
+   },
+   "loaded": {
+    "archive": {
+     "first": "2023-03-01",
+     "last": "2026-07-31",
+     "rows": 2135511
+    },
+    "nrt": {
+     "first": "2026-08-01",
+     "last": "2026-10-31",
+     "rows": 30498
+    },
+    "rows": 2166009,
+    "versions": [
+     "2",
+     "2.0NRT"
+    ],
+    "products": [
+     "375m"
+    ]
+   },
+   "status": "complete_from_firms_start"
+  }
+ },
+ "missing": [
+  {
+   "satellite": "Terra",
+   "period": "2000-11-01 to 2011-12-31",
+   "how": "FIRMS Archive Download (MODIS C6.1 / VIIRS C2, CSV, AOI (68.0, 6.0, 98.0, 36.0)) or `python -m app.acquire firms MODIS_SP 2000-11-01 2012-01-01`"
+  },
+  {
+   "satellite": "Aqua",
+   "period": "2002-07-04 to 2011-12-31",
+   "how": "FIRMS Archive Download (MODIS C6.1 / VIIRS C2, CSV, AOI (68.0, 6.0, 98.0, 36.0)) or `python -m app.acquire firms MODIS_SP 2002-07-04 2012-01-01`"
+  },
+  {
+   "satellite": "NOAA-20",
+   "period": "2018-04-01 onward",
+   "how": "FIRMS Archive Download or `python -m app.acquire firms VIIRS_NOAA20_SP <start> <end>` with FIRMS_MAP_KEY"
+  }
+ ],
+ "capabilities": {
+  "terra_only_era_loaded": false,
+  "pre_viirs_modis_loaded": false,
+  "real_morning_gap_correction": "blocked: no Terra-only (Nov 2000 - Jun 2002) records loaded",
+  "real_2012_seam_test": "blocked: fewer than 12 months of MODIS records precede the first VIIRS record",
+  "viirs_750m": "unavailable",
+  "noaa20": "missing"
+ },
+ "viirs_750m": {
+  "status": "not_in_firms",
+  "products": {
+   "Suomi NPP": "VNP14 (VIIRS/NPP Thermal Anomalies/Fire 6-Min L2 Swath 750 m)",
+   "NOAA-20": "VJ114 (VIIRS/JPSS1 Thermal Anomalies/Fire 6-Min L2 Swath 750 m)"
+  },
+  "facts": [
+   "The 750 m product applies the MODIS Collection 6 fire algorithm to VIIRS M-bands and is NASA's continuity product for the MODIS 1 km record.",
+   "FIRMS distributes only the 375 m VIIRS product as CSV; 750 m data are Level-2 NetCDF swath granules from LAADS DAAC / LP DAAC (Earthdata Login required)."
+  ],
+  "how_to_add": "Download VNP14 granules for the AOI from LAADS DAAC, run `python -m app.acquire vnp14 <granule dir> --satellite 'Suomi NPP'` to convert the fire-pixel tables to a FIRMS-like CSV in data/raw/, then rerun the pipeline. It is ingested as product_type=750m and calibrated separately from 375 m."
+ },
+ "registry": {
+  "fire_archive_J2V-C2_846939": {
+   "file": "fire_archive_J2V-C2_846939.csv",
+   "rows_kept": 2135511,
+   "versions": {
+    "2": 2135511
+   },
+   "satellites": {
+    "NOAA-21": {
+     "rows": 2135511,
+     "first": "2023-03-01",
+     "last": "2026-07-31"
+    }
+   },
+   "product_types": [
+    "375m"
+   ],
+   "processed_at": "2026-11-14T08:29:55+00:00",
+   "error": null
+  },
+  "fire_nrt_J2V-C2_846939": {
+   "file": "fire_nrt_J2V-C2_846939.csv",
+   "rows_kept": 30498,
+   "versions": {
+    "2.0NRT": 30498
+   },
+   "satellites": {
+    "NOAA-21": {
+     "rows": 30498,
+     "first": "2026-08-01",
+     "last": "2026-10-31"
+    }
+   },
+   "product_types": [
+    "375m"
+   ],
+   "processed_at": "2026-11-14T08:29:56+00:00",
+   "error": null
+  },
+  "fire_archive_M-C61_846937": {
+   "file": "fire_archive_M-C61_846937.csv",
+   "rows_kept": 1233985,
+   "versions": {
+    "6.03": 917482,
+    "61.03": 316503
+   },
+   "satellites": {
+    "Aqua": {
+     "rows": 852128,
+     "first": "2012-01-01",
+     "last": "2026-08-30"
+    },
+    "Terra": {
+     "rows": 381857,
+     "first": "2012-01-01",
+     "last": "2026-08-31"
+    }
+   },
+   "product_types": [
+    "1km"
+   ],
+   "processed_at": "2026-11-14T08:30:11+00:00",
+   "error": null
+  },
+  "fire_nrt_M-C61_846937": {
+   "file": "fire_nrt_M-C61_846937.csv",
+   "rows_kept": 3903,
+   "versions": {
+    "6.1NRT": 3903
+   },
+   "satellites": {
+    "Aqua": {
+     "rows": 2342,
+     "first": "2026-09-01",
+     "last": "2026-10-31"
+    },
+    "Terra": {
+     "rows": 1561,
+     "first": "2026-09-01",
+     "last": "2026-10-31"
+    }
+   },
+   "product_types": [
+    "1km"
+   ],
+   "processed_at": "2026-11-14T08:30:11+00:00",
+   "error": null
+  },
+  "fire_archive_SV-C2_846940": {
+   "file": "fire_archive_SV-C2_846940.csv",
+   "rows_kept": 8726813,
+   "versions": {
+    "2": 8726813
+   },
+   "satellites": {
+    "Suomi NPP": {
+     "rows": 8726813,
+     "first": "2012-01-20",
+     "last": "2026-07-31"
+    }
+   },
+   "product_types": [
+    "375m"
+   ],
+   "processed_at": "2026-11-14T08:31:52+00:00",
+   "error": null
+  },
+  "fire_nrt_SV-C2_846940": {
+   "file": "fire_nrt_SV-C2_846940.csv",
+   "rows_kept": 30073,
+   "versions": {
+    "2.0NRT": 30073
+   },
+   "satellites": {
+    "Suomi NPP": {
+     "rows": 30073,
+     "first": "2026-08-01",
+     "last": "2026-10-31"
+    }
+   },
+   "product_types": [
+    "375m"
+   ],
+   "processed_at": "2026-11-14T08:31:52+00:00",
+   "error": null
+  }
+ }
+}

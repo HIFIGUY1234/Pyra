@@ -323,23 +323,38 @@ def critical_regions(top: int = 60) -> dict:
     comp = pd.DataFrame({"forecast": r["max_cell_p"], "recent": pct(r["recent30"] / r["n_cells"]), "recurrence": r["recurrence"].fillna(r["recurrence"].median()),
                          "frp": pct(r["frp_per_det"].where(r["recent30"] >= 5)), "observation_gap": (r["gap30"] / 30).clip(0, 1),
                          "forest": r["forest"], "settlement": pct(r["urban"])})
-    r["score"] = sum(comp[k] * w for k, w in CRIT_WEIGHTS.items())
+    from . import gis_layers
+    weights = dict(CRIT_WEIGHTS)
+    unavailable = []
+    for kind, w, lab in (("population", 0.08, "Population exposure"), ("infrastructure", 0.07, "Critical infrastructure proximity")):
+        ex = gis_layers.exposure_by_cell(kind)
+        if ex is None:
+            unavailable.append(f"{lab} (no {kind} layer loaded - weight 0, not treated as zero exposure)")
+            continue
+        per = df.assign(v=df["cell_id"].map(ex).fillna(0)).groupby("district_id")["v"].sum()
+        r[kind] = r["district_id"].map(per).fillna(0).to_numpy()
+        comp[kind] = pct(r[kind])
+        weights[kind] = w
+    tot_w = sum(weights.values())
+    weights = {k: v / tot_w for k, v in weights.items()}
+    r["score"] = sum(comp[k] * w for k, w in weights.items())
     r["priority"] = pd.cut(r["score"].rank(pct=True), [0, 0.5, 0.8, 0.95, 1.0], labels=["Routine", "Elevated", "High", "Critical"]).astype(str)
     labels = {"forecast": "calibrated 7-day hotspot probability", "recent": "recent 30-day detections", "recurrence": "historical seasonal recurrence",
               "frp": "high fire radiative power", "observation_gap": "recent observation gaps (uncertain picture)", "forest": "forest / woodland cover",
-              "settlement": "urban land nearby (exposure proxy)"}
+              "settlement": "urban land nearby (exposure proxy)", "population": "population exposure (loaded layer)",
+              "infrastructure": "critical infrastructure nearby (loaded layer)"}
     out = []
     for i, row in r.sort_values("score", ascending=False).head(top).iterrows():
-        contrib = {k: float(comp.at[i, k] * w) for k, w in CRIT_WEIGHTS.items()}
+        contrib = {k: float(comp.at[i, k] * w) for k, w in weights.items()}
         reasons = [f"{labels[k]} ({comp.at[i, k]:.2f})" for k in sorted(contrib, key=contrib.get, reverse=True)[:3]]
         out.append({**{k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in row.items()},
-                    "id": f"district:{row['district_id']}", "components": {k: float(comp.at[i, k]) for k in CRIT_WEIGHTS}, "reasons": reasons,
+                    "id": f"district:{row['district_id']}", "components": {k: float(comp.at[i, k]) for k in weights}, "reasons": reasons,
                     "reliability": "reduced - observation gaps" if row["gap30"] >= 4 else "normal"})
-    return {"status": "ok", "issue_date": forecast.meta()["issue_date"], "items": out, "weights": CRIT_WEIGHTS, "n_districts": int(len(r)),
-            "not_available": ["Population exposure (no population grid loaded)", "Critical infrastructure proximity (no infrastructure layer loaded)"],
-            "note": "Decision-support ranking of districts. Urban land share from NASA MCD12Q1 is used as a coarse exposure proxy; population and "
-                    "infrastructure layers are not loaded and therefore carry zero weight rather than invented values. Priority bands are score "
-                    "percentiles (top 5% Critical, next 15% High, next 30% Elevated)."}
+    return {"status": "ok", "issue_date": forecast.meta()["issue_date"], "items": out, "weights": weights, "n_districts": int(len(r)),
+            "not_available": unavailable, "exposure_layers": gis_layers.exposure_status(),
+            "note": "Decision-support ranking of districts. Urban land share from NASA MCD12Q1 is a coarse exposure proxy. Population and "
+                    "infrastructure enter the score only when an administrator has loaded a layer with recorded provenance; otherwise they carry "
+                    "zero weight rather than invented values. Priority bands are score percentiles (top 5% Critical, next 15% High, next 30% Elevated)."}
 
 
 # --------------------------------------------------------------------------- observation intelligence

@@ -36,7 +36,7 @@ K_RATIO = 50.0        # pseudo-detections of prior weight for the state ratio
 K_SILENT = 200.0      # pseudo cell-months of prior weight for the silent-cell rate
 MIN_NATIONAL = 200.0  # predictor detections per calendar month below which calibration is flagged
 MIN_YEARS = 3
-SIM_TERRA_ONLY_MONTHS = 29   # length of the real Terra-only era (Feb 2000 - Jun 2002)
+SIM_TERRA_ONLY_MONTHS = 20   # length of the real FIRMS Terra-only era (Nov 2000 - Jun 2002)
 RES_BINS = np.array([1.0, 2.0, 3.0, 4.0])  # log10(yhat+1) edges
 SATS = ["Terra", "Aqua", VIIRS_REFERENCE]
 
@@ -53,6 +53,7 @@ class Panel:
     n_act_aqua: np.ndarray = None
     v_seen: np.ndarray = None              # VIIRS detections in Aqua-active cells
     frp: dict = field(default_factory=dict)
+    ref: str = VIIRS_REFERENCE             # VIIRS product stream defining the target scale
 
     @property
     def ym(self):
@@ -64,7 +65,8 @@ class Panel:
 
 
 @lru_cache(maxsize=64)
-def panel(region_id: str = "country") -> Panel:
+def panel(region_id: str = "country", ref: str = VIIRS_REFERENCE) -> Panel:
+    sats = ["Terra", "Aqua", ref]
     ax = store.month_axis()
     sts = store.states()
     sidx = {s: i for i, s in enumerate(sts)}
@@ -77,11 +79,11 @@ def panel(region_id: str = "country") -> Panel:
     ncell[sidx[store.OUTSIDE]] += len(rc) - len(known)
 
     m = store.region_monthly(region_id)
-    m = m[m["satellite"].isin(SATS)]
+    m = m[m["satellite"].isin(sats)]
     T, S = len(ax), len(sts)
-    p = Panel(ax=ax, states=sts, ncell=ncell)
+    p = Panel(ax=ax, states=sts, ncell=ncell, ref=ref)
     shape = (T, S, 2)
-    for s in SATS:
+    for s in sats:
         p.n[s] = np.zeros(shape)
         p.frp[s] = np.zeros(shape)
     p.aq_seen, p.v_seen = np.zeros(shape), np.zeros(shape)
@@ -91,7 +93,7 @@ def panel(region_id: str = "country") -> Panel:
     ympos = pd.Series(np.arange(T), index=store.ym_of(ax))
     w = m.pivot_table(index=["ym", "cell_id", "daynight"], columns="satellite", values="n_veg", aggfunc="sum",
                       fill_value=0, observed=True).reset_index()
-    for s in SATS:
+    for s in sats:
         if s not in w:
             w[s] = 0
     ti = ympos.reindex(w["ym"]).to_numpy()
@@ -99,10 +101,10 @@ def panel(region_id: str = "country") -> Panel:
     di = w["daynight"].astype(str).map(store.DN).fillna(0).astype(int).to_numpy()
     ok = ~np.isnan(ti)
     ti, si, di, w = ti[ok].astype(int), si[ok].astype(int), di[ok], w[ok]
-    te, aq, vi = (w[s].to_numpy(dtype=float) for s in SATS)
+    te, aq, vi = (w[s].to_numpy(dtype=float) for s in sats)
     np.add.at(p.n["Terra"], (ti, si, di), te)
     np.add.at(p.n["Aqua"], (ti, si, di), aq)
-    np.add.at(p.n[VIIRS_REFERENCE], (ti, si, di), vi)
+    np.add.at(p.n[ref], (ti, si, di), vi)
     np.add.at(p.aq_seen, (ti, si, di), aq * (te > 0))
     np.add.at(p.v_seen, (ti, si, di), vi * (aq > 0))
     np.add.at(p.n_act_terra, (ti, si, di), (te > 0).astype(float))
@@ -232,20 +234,22 @@ def _loyo(p: Panel, train, moy, years, args, target, name):
 
 
 @lru_cache(maxsize=16)
-def fit(split: int | None = None, B: int = BOOTSTRAP_N) -> Fit:
+def fit(split: int | None = None, B: int = BOOTSTRAP_N, ref: str = VIIRS_REFERENCE) -> Fit:
     """Fit both calibrations on the national panel.
     split=None  -> operational: every overlapping, fully covered, standard-processing month.
     split=YYYYMM -> held-out experiment: train ONLY on months >= split; everything earlier is
                     treated as unseen (VIIRS withheld; Aqua also withheld for the first
                     SIM_TERRA_ONLY_MONTHS months to imitate the Terra-only era)."""
-    p = panel("country")
+    p = panel("country", ref)
     cov = store.coverage()
+    if ref not in cov:
+        raise ValueError(f"VIIRS product stream '{ref}' is not loaded")
     ym, moy, years = p.ym, p.moy, p.ax.year.to_numpy()
     full = lambda s: (cov[s].to_numpy() >= 0.999) & cov[s + "|typed"].to_numpy()
     after = (ym >= split) if split else np.ones(len(ym), bool)
     stab = lambda s: np.isin(years, list(store.stable_years(s)))
     train_mg = full("Terra") & full("Aqua") & after & stab("Terra") & stab("Aqua")
-    train_sh = full("Aqua") & full(VIIRS_REFERENCE) & after & stab("Aqua")
+    train_sh = full("Aqua") & full(ref) & after & stab("Aqua")
     notes = []
     o = store.orbit()
     drift = {s: sorted(int(y) for y in o.loc[(o["satellite"] == s) & ~o["stable"], "year"]) for s in ("Terra", "Aqua")}
@@ -254,7 +258,7 @@ def fit(split: int | None = None, B: int = BOOTSTRAP_N) -> Fit:
                      f"{store.ORBIT_TOL_H} h from its early baseline): Terra {drift['Terra'] or 'none'}, Aqua {drift['Aqua'] or 'none'}. "
                      "Those years are excluded from calibration because their diurnal sampling differs from the historical MODIS era.")
     rng = np.random.default_rng(RNG_SEED)
-    T_, A_, V_ = p.n["Terra"], p.n["Aqua"], p.n[VIIRS_REFERENCE]
+    T_, A_, V_ = p.n["Terra"], p.n["Aqua"], p.n[ref]
     mg_args = (T_, p.aq_seen, A_, p.n_act_terra, p.n_act_aqua)
     sh_args = (A_, p.v_seen, V_, p.n_act_aqua, p.n_act_aqua)   # target-active cells unused downstream
     Wm, ymg = _boot_weights(years, train_mg, B, rng)
@@ -268,7 +272,7 @@ def fit(split: int | None = None, B: int = BOOTSTRAP_N) -> Fit:
             notes.append(f"{nm} calibration is UNRELIABLE: only {len(yrs)} training year(s) with full overlap.")
     terra_only_end = None
     if split:
-        test = np.where((ym < split) & (cov[VIIRS_REFERENCE].to_numpy() >= 0.999))[0]
+        test = np.where((ym < split) & (cov[ref].to_numpy() >= 0.999))[0]
         if len(test):
             k = min(SIM_TERRA_ONLY_MONTHS, max(len(test) // 2, 1))
             terra_only_end = int(ym[test[min(k, len(test) - 1)]])
@@ -277,13 +281,13 @@ def fit(split: int | None = None, B: int = BOOTSTRAP_N) -> Fit:
 
 
 # --------------------------------------------------------------------------- region series
-def series(region_id: str = "country", split: int | None = None, with_reps: bool = False):
+def series(region_id: str = "country", split: int | None = None, with_reps: bool = False, ref: str = VIIRS_REFERENCE):
     """Monthly harmonized record for a region. Returns (DataFrame, replicates[B,T] or None)."""
-    ft, p = fit(split), panel(region_id)
+    ft, p = fit(split, ref=ref), panel(region_id, ref)
     cov = store.coverage()
     ym, moy = p.ym, p.moy
-    cT, cA, cV = (cov[s].to_numpy() for s in SATS)
-    typedV = cov[VIIRS_REFERENCE + "|typed"].to_numpy()
+    cT, cA, cV = (cov[s].to_numpy() for s in ("Terra", "Aqua", ref))
+    typedV = cov[ref + "|typed"].to_numpy()
     held = (ym < split) if split else np.zeros(len(ym), bool)
     viirs_avail = (cV >= 0.999) & ~held
     aqua_withheld = held & (ym < (ft.terra_only_end or 0))
@@ -314,7 +318,9 @@ def series(region_id: str = "country", split: int | None = None, with_reps: bool
     F = np.moveaxis(ft.sh["F"][:, :, moy, :], 2, 1)
     a = np.moveaxis(ft.sh["a"][:, :, moy, :], 2, 1)
     nsil = np.clip(p.ncell[None, None, :, None] - nact_used, 0, None)
-    v_tot = (F * aq_used + a * nsil).sum((2, 3))                 # [B,T]
+    v_sd = F * aq_used + a * nsil                                # [B,T,S,2]
+    v_dn = v_sd[0].sum(1)                                        # central estimate by day/night [T,2]
+    v_tot = v_sd.sum((2, 3))                                     # [B,T]
     e_sh = _draw(ft.pools_sh, v_tot, rng, np.where(use_est, 1.0, infl_A)[None, :])
     e_sh[0] = 0.0
     reps = np.clip((v_tot + 1.0) * np.exp(e_sh) - 1.0, 0, None)
@@ -329,9 +335,11 @@ def series(region_id: str = "country", split: int | None = None, with_reps: bool
     prov = np.select([viirs_avail, aqua_avail, terra_avail], ["actual_viirs", "sensor_calibrated", "morning_gap_sensor"], "no_data")
     df = pd.DataFrame({
         "ym": ym, "date": p.ax.to_timestamp().strftime("%Y-%m-%d"), "year": p.ax.year, "month": p.ax.month,
-        "terra": nanif(tot("Terra"), cT == 0), "aqua": nanif(tot("Aqua"), cA == 0), "viirs": nanif(tot(VIIRS_REFERENCE), cV == 0),
+        "terra": nanif(tot("Terra"), cT == 0), "aqua": nanif(tot("Aqua"), cA == 0), "viirs": nanif(tot(ref), cV == 0),
         "terra_day": nanif(p.n["Terra"][:, :, 0].sum(1), cT == 0), "terra_night": nanif(p.n["Terra"][:, :, 1].sum(1), cT == 0),
         "aqua_day": nanif(p.n["Aqua"][:, :, 0].sum(1), cA == 0), "aqua_night": nanif(p.n["Aqua"][:, :, 1].sum(1), cA == 0),
+        "viirs_day": nanif(p.n[ref][:, :, 0].sum(1), cV == 0), "viirs_night": nanif(p.n[ref][:, :, 1].sum(1), cV == 0),
+        "veq_day": nanif(v_dn[:, 0], no_pred), "veq_night": nanif(v_dn[:, 1], no_pred),
         "cov_terra": cT, "cov_aqua": cA, "cov_viirs": cV,
         "viirs_complete": (cV >= 0.999), "nrt": ~typedV & (cV > 0),
         "aqua_est": nanif(aq_tot[0], ~terra_avail), "aqua_est_lo": nanif(aq_lo, ~terra_avail), "aqua_est_hi": nanif(aq_hi, ~terra_avail),
@@ -376,22 +384,51 @@ def status_of(m: dict) -> str:
     return "moderate" if m["wape_pct"] <= 40 else "poor"
 
 
-def default_split() -> int | None:
+def default_split(ref: str = VIIRS_REFERENCE) -> int | None:
     """Chronological split leaving ~35% of fully-overlapping years as the unseen early period."""
     cov = store.coverage()
-    okm = (cov["Aqua"] >= 0.999) & (cov[VIIRS_REFERENCE] >= 0.999) & cov["Aqua|typed"] & cov[VIIRS_REFERENCE + "|typed"]
+    if ref not in cov:
+        return None
+    okm = (cov["Aqua"] >= 0.999) & (cov[ref] >= 0.999) & cov["Aqua|typed"] & cov[ref + "|typed"]
     yrs = sorted(set(cov.index[okm.to_numpy()].year))
     if len(yrs) < 5:
         return None
     return int(yrs[max(2, int(round(len(yrs) * 0.35)))] * 100 + 1)
 
 
-def validation(region_id: str = "country", split: int | None = None) -> dict:
-    split = split or default_split()
+def _ymfmt(ym: int) -> str:
+    return f"{int(ym) // 100}-{int(ym) % 100:02d}"
+
+
+def product_label(ref: str) -> str:
+    return f"{ref.replace(' 750m', '')} VIIRS 750 m" if ref.endswith("750m") else f"{ref} VIIRS 375 m"
+
+
+def products() -> dict:
+    """VIIRS product streams available as calibration targets. 375 m and 750 m are never pooled."""
+    cov = store.coverage()
+    streams = [c for c in cov.columns if "|" not in c and c not in ("Terra", "Aqua")]
+    out = []
+    for st in streams:
+        if cov[st].sum() == 0:
+            continue
+        out.append({"stream": st, "label": product_label(st), "product_type": "750m" if st.endswith("750m") else "375m",
+                    "months_with_data": int((cov[st] > 0).sum()), "is_default_reference": st == VIIRS_REFERENCE,
+                    "calibration_target": st == VIIRS_REFERENCE or st.endswith("750m")})
+    has750 = any(o["product_type"] == "750m" for o in out)
+    return {"streams": out, "viirs_750m": "loaded" if has750 else "unavailable",
+            "viirs_750m_message": None if has750 else ("No VIIRS 750 m (VNP14/VJ114) records are loaded. FIRMS distributes only the 375 m product; "
+                                                       "750 m Level-2 swath granules come from LAADS DAAC. Convert them with `python -m app.acquire vnp14` "
+                                                       "or upload a CSV marked product 750m. Until then calibration targets S-NPP 375 m only.")}
+
+
+def validation(region_id: str = "country", split: int | None = None, ref: str = VIIRS_REFERENCE) -> dict:
+    split = split or default_split(ref)
     if not split:
-        return {"status": "insufficient_data", "message": "Fewer than 5 fully overlapping MODIS-VIIRS years are loaded; a chronological hold-out is not possible."}
-    df, _ = series(region_id, split)
-    ft = fit(split)
+        return {"status": "insufficient_data", "validation_kind": "unavailable",
+                "message": "Fewer than 5 fully overlapping MODIS-VIIRS years are loaded; a chronological hold-out is not possible."}
+    df, _ = series(region_id, split, ref=ref)
+    ft = fit(split, ref=ref)
     test = df[df["withheld_viirs"] & df["viirs_complete"] & ~df["nrt"]].copy()
     train = df[df["train_sensor"]]
     const = train["viirs"].sum() / train["aqua"].sum() if train["aqua"].sum() > 0 else np.nan
@@ -421,26 +458,42 @@ def validation(region_id: str = "country", split: int | None = None) -> dict:
                           "period": [int(mgt["ym"].min()), int(mgt["ym"].max())] if len(mgt) else None}
     out["morning_gap"]["status"] = status_of(out["morning_gap"]["metrics"])
     out["status"] = status_of(out["overall"])
+    out["reference_product"] = product_label(ref)
+    out["by_daynight"] = {
+        "day": metrics(test["viirs_day"], test["veq_day"]), "night": metrics(test["viirs_night"], test["veq_night"])}
+    out["band_nominal_pct"] = 90.0
+    insuff = len(ft.years_sh) < MIN_YEARS or out["overall"].get("n", 0) < 6
+    out["validation_kind"] = "insufficient_calibration" if insuff else "actual_holdout"
+    out["morning_gap"]["validation_kind"] = "simulated_withheld_experiment" if out["morning_gap"]["period"] else "unavailable"
+    out["methodology"] = {
+        "sensor_stage": (f"ACTUAL hold-out: the calibration is trained only on {min(ft.years_sh) if ft.years_sh else '-'}-{max(ft.years_sh) if ft.years_sh else '-'} "
+                         f"and scored against real {product_label(ref)} observations from {_ymfmt(out['test_period'][0]) if out['test_period'] else '-'} to "
+                         f"{_ymfmt(out['test_period'][1]) if out['test_period'] else '-'} that the model never saw (chronological, no random split)."),
+        "morning_gap_stage": ("SIMULATED experiment: real Aqua records in the first months of the held-out period are hidden so the Terra-only "
+                              "era can be imitated; the hidden Aqua values are the answer key. This tests the method, it is not the real 2000-2002 correction."),
+        "baselines": ["raw MODIS (Terra + Aqua counts, uncorrected)", "single constant VIIRS/Aqua ratio fitted on the training years", "PyroScope calibrated harmonization"],
+        "interval": "Band = 5th-95th percentile of the year-block bootstrap replicates (nominal 90%); empirical coverage on held-out months is reported.",
+    }
     out["status_rule"] = "good: WAPE <= 20% and |bias| <= 10%; moderate: WAPE <= 40%; otherwise poor (PyroScope convention, not an external standard)."
     out["series"] = _records(df[df["ym"] < split + 300][["date", "ym", "viirs", "veq", "veq_lo", "veq_hi", "modis_total", "aqua", "terra",
                                                          "provenance", "withheld_viirs", "withheld_aqua", "aqua_est"]])
     return out
 
 
-def seam_test(region_id: str = "country", split: int | None = None, window: int = 24) -> dict:
+def seam_test(region_id: str = "country", split: int | None = None, window: int = 24, ref: str = VIIRS_REFERENCE) -> dict:
     """Discontinuity at the MODIS->VIIRS hand-over, before vs after harmonization.
     Real seam (split=None): first month with actual VIIRS; needs MODIS before it.
     Simulated seam (split=YYYYMM): VIIRS withheld before `split`, so the truth is known."""
-    df_real, _ = series(region_id, None)
+    df_real, _ = series(region_id, None, ref=ref)
     first_v = df_real.index[df_real["provenance"] == "actual_viirs"]
     pre_modis = int((df_real.loc[: first_v[0] - 1, "modis_total"].notna()).sum()) if len(first_v) and first_v[0] > 0 else 0
     real_possible = pre_modis >= 12
     mode = "real" if (split is None and real_possible) else "simulated"
     if mode == "simulated":
-        split = split or default_split()
+        split = split or default_split(ref)
         if not split:
             return {"mode": "unavailable", "message": "Not enough overlapping data to run a seam test."}
-    df, reps = series(region_id, split if mode == "simulated" else None, with_reps=True)
+    df, reps = series(region_id, split if mode == "simulated" else None, with_reps=True, ref=ref)
     s_pos = int(np.where(df["provenance"].to_numpy() == "actual_viirs")[0][0])
     window = int(min(window, s_pos // 12 * 12, (len(df) - s_pos) // 12 * 12))
     if window < 12:
@@ -450,18 +503,18 @@ def seam_test(region_id: str = "country", split: int | None = None, window: int 
     step = lambda x, y: float(np.nanmean(y) / np.nanmean(x)) if np.nanmean(x) > 0 else None
     raw, harm = step(b["modis_total"], a_["viirs"]), step(b["veq"], a_["viirs"])
     aq_before = np.where(b["aqua"].notna() & ~b["withheld_aqua"], b["aqua"], np.nan)
-    ref = step(aq_before, a_["aqua"]) if np.isfinite(aq_before).sum() >= window // 2 else step(b["terra"], a_["terra"])
+    ref_step = step(aq_before, a_["aqua"]) if np.isfinite(aq_before).sum() >= window // 2 else step(b["terra"], a_["terra"])
     ref_sensor = "Aqua MODIS" if np.isfinite(aq_before).sum() >= window // 2 else "Terra MODIS"
     truth = step(b["viirs"], a_["viirs"]) if mode == "simulated" else None
     rep_before = reps[1:, s_pos - window: s_pos].mean(1)
     hl, hh = np.percentile(np.nanmean(a_["viirs"]) / np.clip(rep_before, 1e-9, None), [5, 95])
-    target = truth if truth else ref
+    target = truth if truth else ref_step
     ln = lambda v: float(abs(np.log(v / target))) if v and target else None
     res = {
         "mode": mode, "real_seam_possible": real_possible, "region": store.region_label(region_id),
         "seam_month": df.iloc[s_pos]["date"], "window_months": window,
         "step_raw": raw, "step_harmonized": harm, "step_harmonized_band": [float(hl), float(hh)],
-        "step_reference_sensor": ref, "reference_sensor": ref_sensor, "step_true": truth,
+        "step_reference_sensor": ref_step, "reference_sensor": ref_sensor, "step_true": truth,
         "artificial_jump_before": ln(raw), "artificial_jump_after": ln(harm),
         "explanation": ("Each 'step' is mean activity in the %d months after the seam divided by the mean in the %d months before "
                         "(same calendar months on both sides). A genuine change in fire activity also moves the step, so the "
@@ -470,6 +523,19 @@ def seam_test(region_id: str = "country", split: int | None = None, window: int 
         "series": _records(df.iloc[max(0, s_pos - window - 12): s_pos + window + 12][
             ["date", "ym", "modis_total", "terra", "aqua", "viirs", "veq", "veq_lo", "veq_hi", "harmonized", "provenance", "withheld_viirs"]]),
     }
+    # Is a genuine change still visible? The harmonized step's resampling band is compared with
+    # 1.0 (no change); a change counts as detectable only if the unchanged reference sensor agrees.
+    band_excl = hl > 1.0 or hh < 1.0
+    ref_dir = None if not target else (1 if target > 1.05 else -1 if target < 0.95 else 0)
+    harm_dir = 1 if hl > 1.0 else -1 if hh < 1.0 else 0
+    res["genuine_change"] = {
+        "reference_step": target, "harmonized_band_excludes_no_change": bool(band_excl),
+        "detectable": bool(band_excl and ref_dir == harm_dir and ref_dir != 0),
+        "direction": {1: "increase", -1: "decrease", 0: "no clear change"}[harm_dir],
+        "note": "A real change in fire activity across the seam should survive harmonization. 'detectable' means the harmonized step band "
+                "excludes 1.0 and agrees in direction with the step seen by the unchanged reference sensor."}
+    res["validation_kind"] = "actual_seam" if mode == "real" else "simulated_seam"
+    res["reference_product"] = product_label(ref)
     if res["artificial_jump_before"] is not None and res["artificial_jump_after"] is not None:
         red = 1 - res["artificial_jump_after"] / res["artificial_jump_before"] if res["artificial_jump_before"] > 0 else 0
         res["reduction_pct"] = float(100 * red)
@@ -488,9 +554,9 @@ def _records(df: pd.DataFrame) -> list:
     return df.astype(object).where(pd.notna(df), None).to_dict("records")
 
 
-def calibration_table(which: str = "sh", split: int | None = None, state: str | None = None) -> dict:
+def calibration_table(which: str = "sh", split: int | None = None, state: str | None = None, ref: str = VIIRS_REFERENCE) -> dict:
     """Learned relationship by calendar month (national, and one state if asked) with bootstrap bands."""
-    ft = fit(split)
+    ft = fit(split, ref=ref)
     par = ft.sh if which == "sh" else ft.mg
     sts = store.states()
     rows = []
@@ -505,16 +571,16 @@ def calibration_table(which: str = "sh", split: int | None = None, state: str | 
                 Fs = par["F"][:, sts.index(state), mth, d]
                 row.update(state_ratio=float(Fs[0]), state_lo=float(np.percentile(Fs[1:], 5)), state_hi=float(np.percentile(Fs[1:], 95)))
             rows.append(row)
-    return {"pair": "Aqua MODIS -> S-NPP VIIRS 375 m" if which == "sh" else "Terra MODIS -> Aqua MODIS",
+    return {"pair": f"Aqua MODIS -> {product_label(ref)}" if which == "sh" else "Terra MODIS -> Aqua MODIS", "reference_product": ref,
             "train_years": ft.years_sh if which == "sh" else ft.years_mg, "split": split, "by_month": rows,
             "loyo": ft.loyo[which], "notes": ft.notes,
             "model": "y = F[state,month,day/night] * x + a[state,month,day/night] * (cells where x saw nothing); F and a shrunk to national values",
             "band": "5th-95th percentile of a year-block bootstrap (%d resamples) - a resampling spread, not a formal confidence interval" % (par["R"].shape[0] - 1)}
 
 
-def state_factors(which: str = "sh", split: int | None = None) -> list:
+def state_factors(which: str = "sh", split: int | None = None, ref: str = VIIRS_REFERENCE) -> list:
     """Annual-mean day-time ratio per state (weighted by predictor detections) for mapping."""
-    ft, p = fit(split), panel("country")
+    ft, p = fit(split, ref=ref), panel("country", ref)
     par = ft.sh if which == "sh" else ft.mg
     X = p.n["Aqua" if which == "sh" else "Terra"]
     train = ft.train_sh if which == "sh" else ft.train_mg
@@ -529,11 +595,11 @@ def state_factors(which: str = "sh", split: int | None = None) -> list:
     return sorted(out, key=lambda r: -r["predictor_detections"])
 
 
-def scatter(which: str = "sh", split: int | None = None, max_points: int = 1500) -> list:
+def scatter(which: str = "sh", split: int | None = None, max_points: int = 1500, ref: str = VIIRS_REFERENCE) -> list:
     """State-month pairs used for calibration (for a log-log scatter in the UI)."""
-    ft, p = fit(split), panel("country")
+    ft, p = fit(split, ref=ref), panel("country", ref)
     x = p.n["Aqua" if which == "sh" else "Terra"].sum(-1)
-    y = p.n[VIIRS_REFERENCE if which == "sh" else "Aqua"].sum(-1)
+    y = p.n[ref if which == "sh" else "Aqua"].sum(-1)
     train = ft.train_sh if which == "sh" else ft.train_mg
     ti, si = np.where((x + y > 0) & train[:, None])
     if len(ti) > max_points:

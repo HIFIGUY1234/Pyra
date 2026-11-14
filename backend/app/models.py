@@ -55,7 +55,24 @@ class User(Base):
     jurisdiction_land_use = Column(String(40))
     is_demo = Column(Boolean, default=True)
     created_at = Column(DateTime, default=now)
+    password_hash = Column(String(200))                  # PBKDF2-SHA256; NULL = cannot log in (demo persona only)
+    is_active = Column(Boolean, default=True)
+    failed_logins = Column(Integer, default=0)
+    locked_until = Column(DateTime)
+    last_login_at = Column(DateTime)
     role = relationship("Role")
+
+
+class UserSession(Base):
+    """Bearer sessions. Only the SHA-256 of the token is stored."""
+    __tablename__ = "user_sessions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token_sha256 = Column(String(64), unique=True, nullable=False)
+    created_at = Column(DateTime, default=now)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    revoked_at = Column(DateTime)
+    client = Column(String(200))
 
 
 class MonitoringLocation(Base):
@@ -303,6 +320,39 @@ class AlertRecipient(Base):
     alert = relationship("Alert", back_populates="recipients")
 
 
+class NotificationDelivery(Base):
+    """Delivery log for every notification attempt (simulated or through a configured provider)."""
+    __tablename__ = "notification_deliveries"
+    id = Column(Integer, primary_key=True)
+    alert_pk = Column(Integer, ForeignKey("alerts.id"), index=True, nullable=False)
+    recipient_pk = Column(Integer, ForeignKey("alert_recipients.id"), index=True)
+    contact_id = Column(Integer, ForeignKey("authority_contacts.id"))
+    provider = Column(String(40))           # simulated | webhook | smtp
+    channel = Column(String(40))
+    simulated = Column(Boolean, default=True)
+    status = Column(String(40), index=True)  # SIMULATED_DELIVERED | SENT | FAILED | BLOCKED_* | SKIPPED_*
+    attempts = Column(Integer, default=1)
+    error = Column(Text)
+    approved_by = Column(String(60))
+    created_at = Column(DateTime, default=now, index=True)
+
+
+class JurisdictionLayer(Base):
+    """Administrator-supplied jurisdiction polygons (GeoJSON) that override the land-cover-derived class."""
+    __tablename__ = "jurisdiction_layers"
+    id = Column(Integer, primary_key=True)
+    name = Column(String(160), nullable=False)
+    land_use = Column(String(40), nullable=False)
+    source = Column(String(300), nullable=False)       # provenance: dataset name / authority
+    licence = Column(String(120))
+    source_date = Column(String(40))
+    geojson = Column(JSON, nullable=False)
+    n_cells = Column(Integer)
+    cell_ids = Column(JSON)
+    uploaded_by = Column(String(60))
+    created_at = Column(DateTime, default=now)
+
+
 class Report(Base):
     __tablename__ = "reports"
     id = Column(Integer, primary_key=True)
@@ -319,6 +369,7 @@ class AuditLog(Base):
     entity = Column(String(40)); entity_id = Column(String(60)); detail = Column(JSON)
 
 
+Index("ix_alert_generated", Alert.generated_at)
 Index("ix_hotspot_cell_date", HotspotObservation.cell_id, HotspotObservation.acq_date)
 Index("ix_forecast_issue_level", Forecast.issue_date, Forecast.level)
 Index("ix_alert_key_status", Alert.dedupe_key, Alert.status)

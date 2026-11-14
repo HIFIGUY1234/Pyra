@@ -9,6 +9,7 @@ import { Banner, Button, Card, CardBody, EmptyStateCard, FormGroup, RiskTierBadg
 import { Series, StatusBars } from './charts'
 import { BaseMap, BoxDraw, CellLayer, PointLayer, Swatch, seq } from './map'
 import { enc, Load, PageHead, Panel, Td } from './science'
+import { NotificationLogCard } from './completion'
 
 const esc = (s: any) => String(s ?? '–').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 const isoDay = (d: Date) => d.toISOString().slice(0, 10)
@@ -524,6 +525,7 @@ export function GovernmentPage() {
           </Table></div>
         </Load>
       </Panel>}
+      <NotificationLogCard />
     </div>
   )
 }
