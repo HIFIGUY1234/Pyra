@@ -207,10 +207,18 @@ All are from the Playwright runs (`frontend/e2e-screens/`, curated copies in `do
 | Harmonizer | ![](screenshots/auth-ui/page-harmonizer.png) |
 | Mobile overview / nav / sign-in | ![](screenshots/auth-ui/mobile-overview.png) ![](screenshots/auth-ui/mobile-nav-open.png) ![](screenshots/auth-ui/mobile-signin-dialog.png) |
 
-## 14. Git commit
+## 14. Git commits (branch `feature/pyroscope-auth-ui-final`, pushed to origin)
 
-See the branch history of `feature/pyroscope-auth-ui-final`. The commit hashes are listed in the pull request.
+| Commit | Scope |
+|---|---|
+| `8036d9e` | Backend: `organisation_name`, real-admin label, session lifecycle tests |
+| `11f133e` | Frontend: auth state machine, sign-in/identity UI, shell, overview, design system, basemap |
+| `c79630f` | E2E: dev + production stacks, auth journeys, page tour, mobile, credential-free DB copies, CI artifacts |
+| `658e1cd` | Docs: this report and screenshots |
+
+`data/pyroscope.db` and `data/reports/*` were intentionally not committed.
 
 ## 15. Pull request
 
-See the PR opened from `feature/pyroscope-auth-ui-final` into `main`.
+The GitHub CLI is not installed in the build environment, so the PR could not be opened automatically. Open it from:
+https://github.com/HIFIGUY1234/Pyra/compare/main...feature/pyroscope-auth-ui-final
