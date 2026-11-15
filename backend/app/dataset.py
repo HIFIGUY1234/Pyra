@@ -242,7 +242,7 @@ def write_manifest(processed: Path | None = None, provenance: str = "pipeline") 
     processed = Path(processed or PROCESSED)
     m = build_manifest(processed, provenance)
     tmp = processed / f".{MANIFEST}.tmp"
-    tmp.write_text(json.dumps(m, indent=1))
+    tmp.write_text(json.dumps(m, indent=1), newline="\n")
     os.replace(tmp, processed / MANIFEST)
     return m
 
@@ -318,7 +318,7 @@ def install_seed(target: Path | None = None, seed: Path | None = None, log=_log)
             shutil.rmtree(tmp, ignore_errors=True)
             return done("failed", f"seed copy failed verification ({len(bad)} files), nothing installed: {bad[:5]}")
         sm = sm | {"installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "installed_from": "image seed"}
-        (tmp / MANIFEST).write_text(json.dumps(sm, indent=1))
+        (tmp / MANIFEST).write_text(json.dumps(sm, indent=1), newline="\n")
         if target.exists():
             if _has_files(target):
                 prev = target.parent / "processed.previous"

@@ -1,3 +1,4 @@
 *.zip filter=lfs diff=lfs merge=lfs -text
 data/auxiliary/emissions/*.txt -text
 supabase/migrations/*.sql text eol=lf
+data/processed/** -text

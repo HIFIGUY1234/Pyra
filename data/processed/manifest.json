@@ -1,7 +1,7 @@
 {
  "schema_version": 1,
  "processing_version": "2026.11",
- "created_at": "2026-11-15T16:32:53+00:00",
+ "created_at": "2026-11-15T17:22:36+00:00",
  "provenance": "repository-seed",
  "coverage": {
   "Aqua": {
@@ -158,12 +158,12 @@
    "sha256": "fd85c726f1bf18cc9c293d16957a12bc45bdb26c7b239cc499e5b48a0a83c59b"
   },
   "archive_checksums.json": {
-   "bytes": 596,
-   "sha256": "09ec3face8ea94c5021c218502d99c2ba8ad47c42609faa05b8ca4825498c424"
+   "bytes": 590,
+   "sha256": "4a9d602f995f83694bc7072eec7075a4f4467447c26793eb53b9217205e74618"
   },
   "bridge_calibrations.json": {
-   "bytes": 17306,
-   "sha256": "b5341871edfbfe369adb63d5e5343846e20292331da21ee6592e29558a77b641"
+   "bytes": 16645,
+   "sha256": "3198e4db51364030fe5080fa47396b4494a37429a1f380d7ac5e558ba10c38d0"
   },
   "cells.parquet": {
    "bytes": 99779,
@@ -174,8 +174,8 @@
    "sha256": "114d14e6cb77a835aea77683e01c4475628f67764560ec1e82866abe8aa60f86"
   },
   "datasets.json": {
-   "bytes": 9050,
-   "sha256": "6d0e7b2441fa4085bb9b86c866064f845f70e7401ee32e3ec563a4d138d0d62d"
+   "bytes": 8682,
+   "sha256": "6408b3d0747aef70e2108e74e8af186f1195ec37373f00b00b27ff9c9b7204a7"
   },
   "districts.parquet": {
    "bytes": 51837,
@@ -186,16 +186,16 @@
    "sha256": "93accd64f2eea17d18241787f452022422bf112d4d996d46bf0cb8699b06286a"
   },
   "emissions/summary.json": {
-   "bytes": 2580,
-   "sha256": "2aad807b1fac86bb8846f3806f0f68ce39b47c74e659c7dde4a2022ddb33a5b7"
+   "bytes": 2465,
+   "sha256": "f7cb0ecec30799f9f3cca9fcb10ab02a88a3d43e25570feda7c7b6a1537ee2b0"
   },
   "events/associations.parquet": {
    "bytes": 1032432,
    "sha256": "49cf373c63631fcf6337ed53e973f129d857d64de684b334956a9926c878dbee"
   },
   "events/runs.json": {
-   "bytes": 857,
-   "sha256": "9ae9c56e786b1987937e2019343a5c3acae9f896f54c97b973c015a98ebda0de"
+   "bytes": 823,
+   "sha256": "a31779b803f31a4bf42b7729defd3b923385b782bc47f6e0f2091d741a19de5c"
   },
   "forecast_cells.parquet": {
    "bytes": 1697789,
@@ -358,12 +358,12 @@
    "sha256": "3fcf118af312471beb343ac0c200b6dbb136faa39a501437518911c41b2ecf11"
   },
   "models/forecast_comparison.json": {
-   "bytes": 84759,
-   "sha256": "0ff4551459f4e5482794a59025c1a36c8030f4e97a17b1afb382d4ff33e58e66"
+   "bytes": 81127,
+   "sha256": "f051087771808db5aeb7e424f8fc2c958dc78278f230f3c6a9b81948d76dd521"
   },
   "models/forecast_meta.json": {
-   "bytes": 15895,
-   "sha256": "53c82f3af4c30559867b3c60f22feeedc2d853bf18aeb577fe13d7e43f533e25"
+   "bytes": 15261,
+   "sha256": "16c62f5b0ba9c62bcf62a78564aad410460d64a4a1043e853f1a5bbd16836253"
   },
   "models/forecast_models.pkl": {
    "bytes": 1964211,
@@ -378,8 +378,8 @@
    "sha256": "4334267b108afdfa923de383077a030b10a80c1a500b19deeacf494932d14a4a"
   },
   "models/sensors/noaa-20/forecast_meta.json": {
-   "bytes": 46584,
-   "sha256": "54977b617b56389ed02601334723eb49b836ecc3d1f6cf239bac173180f98645"
+   "bytes": 44547,
+   "sha256": "ad4887835ee6a1b075b45b3703b08a72a5f3303fa8d08d4e273bffd664dc9366"
   },
   "models/sensors/noaa-20/forecast_models.pkl": {
    "bytes": 1853136,
@@ -394,8 +394,8 @@
    "sha256": "c3592532e2e421147ee58f07537b649868d56845ee6743ab20c4a3144cbc13d6"
   },
   "models/sensors/noaa-21/forecast_meta.json": {
-   "bytes": 45813,
-   "sha256": "96f1b0e1dafda531755ef984666f19d20ca2d51366bf688f4142919a54e87d4a"
+   "bytes": 43799,
+   "sha256": "67510095fad449d3c9eee7b48367cde45b61c330b433f32f2b933829c00750dd"
   },
   "models/sensors/noaa-21/forecast_models.pkl": {
    "bytes": 1636865,
@@ -406,8 +406,8 @@
    "sha256": "fee455943c6b91e894edd58d2edc00e53b80a0431e207224360072c5bd041e15"
   },
   "noaa21_calibration.json": {
-   "bytes": 5590,
-   "sha256": "598d157b11dfde3263a96a116bb5b62748efb6e990276697d9d2d9bef1c75111"
+   "bytes": 5337,
+   "sha256": "ba120583dbd07b0ea9724ca602d781607b853f61a6688d8bef179ba78c5ad922"
   },
   "orbit_lst.parquet": {
    "bytes": 6494,
@@ -418,8 +418,8 @@
    "sha256": "cf67d2bf7c14c13ffd40d51b955f2732b7019aa514e59b7e36ab7bd280da382b"
   },
   "spans.json": {
-   "bytes": 19675,
-   "sha256": "f2e32468cc15847806b8dc45f13cb8981f9e1e34fe5b4561cbf1f83211b34aa2"
+   "bytes": 18592,
+   "sha256": "097864bd9ed74b4fae120dd52b0ba8ff0d75ec4982d3a9ee6c9f03be46629bc5"
   },
   "states.geojson": {
    "bytes": 421329,
