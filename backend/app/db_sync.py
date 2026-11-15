@@ -61,9 +61,11 @@ def init_db():
         pw = os.getenv("PYROSCOPE_ADMIN_PASSWORD")  # bootstrap a real admin login; never hard-coded
         if pw:
             adm = s.scalar(select(M.User).where(M.User.username == "admin"))
-            if adm is not None and not adm.password_hash:
+            if adm is not None:
                 adm.password_hash = security.hash_password(pw)
                 adm.is_demo = False
+                adm.failed_logins = 0
+                adm.locked_until = None
                 if adm.display_name == DEMO_USERS[0][1]:   # now a real account: drop the "(demo persona)" seed label
                     adm.display_name = "Administrator"
         s.commit()
