@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Database, RefreshCw, Wrench } from 'lucide-react'
-import { api, useApi, useApp } from './lib'
+import { api, useApi, useApp, DATASET_NOT_READY_MSG } from './lib'
 import { Banner, Button, Card, CardBody, CardHeader } from './ui'
 
 export type ReadinessFile = { file: string; status: string; bytes?: number | null; rows?: number | null; detail?: string | null }
@@ -112,11 +112,14 @@ function JobBox({ rd }: { rd: Readiness }) {
 }
 
 /** Shown by data pages (e.g. the Calendar) when the API answers 409 / is unreachable. */
-export function DatasetWaiting({ what, onRetry }: { what: string; onRetry: () => void }) {
+export function DatasetWaiting({ what, onRetry }: { what: string; onRetry?: () => void }) {
   const navigate = useNavigate()
+  const { reloadMeta } = useApp()
+  const retry = onRetry || reloadMeta
   const r = useReadiness(onRetry)
+  const health = useApi<{ database: { ok: boolean }; data: { status: string; seed?: string }; build?: { commit: string | null; image: string } }>('/api/health')
   const rd = r.data
-  const offline = r.errorStatus === 0
+  const offline = r.errorStatus === 0 || health.errorStatus === 0
   return (
     <Card>
       <CardHeader title={`${what} is waiting for a processed satellite dataset.`}
@@ -124,6 +127,15 @@ export function DatasetWaiting({ what, onRetry }: { what: string; onRetry: () =>
       <CardBody className="text-xs text-slate-300"><div className="space-y-3" data-testid="dataset-waiting">
         {offline && <Banner tone="danger" title="Backend unreachable">The PyroScope API did not respond. Check that the backend service is running, then retry.</Banner>}
         {r.error && !offline && <Banner tone="danger" title="Readiness unavailable">{r.error}</Banner>}
+        {!offline && <div><div className="font-semibold text-slate-100">{DATASET_NOT_READY_MSG}</div>
+          <div className="text-slate-400">The frontend is connected, but the backend has not made its processed scientific dataset available.</div></div>}
+        {health.data && <div className="flex flex-wrap gap-x-4 gap-y-1 rounded border border-[#22324b] bg-[#0f1726] px-3 py-2" data-testid="backend-status">
+          <span>Backend: <strong className="text-emerald-300">connected</strong></span>
+          <span>Database: <strong className={health.data.database.ok ? 'text-emerald-300' : 'text-red-300'}>{health.data.database.ok ? 'connected' : 'unavailable'}</strong></span>
+          <span>Processed dataset: <strong className="text-amber-300">{READINESS_LABEL[health.data.data.status] || health.data.data.status}</strong></span>
+          {rd && <span>Dataset installation: <strong>{rd.seed.state.replace(/_/g, ' ')}</strong>{rd.manifest?.installed_at ? ` (last ${when(rd.manifest.installed_at)})` : ''}</span>}
+          {health.data.build && <span>Backend build: <code>{health.data.build.image}{health.data.build.commit ? ` @ ${health.data.build.commit.slice(0, 7)}` : ''}</code></span>}
+        </div>}
         {rd && <>
           <Banner tone={TONE[rd.status] || 'info'} title={READINESS_LABEL[rd.status] || rd.status}>{rd.next_action.message}
             {rd.next_action.command && rd.can_administer && <> Server command: <code>{rd.next_action.command}</code>.</>}</Banner>
@@ -131,6 +143,7 @@ export function DatasetWaiting({ what, onRetry }: { what: string; onRetry: () =>
             <li>Processed summaries: {rd.missing.length ? `missing ${rd.missing.join(', ')}` : rd.required.every((f) => f.status === 'ok') ? 'present and valid' : `problems: ${rd.required.filter((f) => f.status !== 'ok').map((f) => `${f.file} (${f.status.replace(/_/g, ' ')})`).join(', ')}`}</li>
             <li>Repository archives: {rd.archives.total === 0 ? 'none available to this backend' : `${rd.archives.valid} valid, ${rd.archives.lfs_pointers} Git LFS pointer(s), ${rd.archives.corrupt} corrupt`}{rd.lfs.message ? ` - ${rd.lfs.message}` : ''}</li>
             <li>Processing job: {rd.status === 'PROCESSING' ? 'running (this panel refreshes every 3 s)' : rd.job.state && rd.job.state !== 'idle' ? rd.job.state : 'none running'}</li>
+            {rd.seed.detail && <li>Dataset installation detail: {rd.seed.detail}</li>}
             <li>Your access: {rd.can_administer ? 'administrator - you can run the dataset actions below.' : 'Dataset administration requires an authorised administrator.'}</li>
           </ul>
           <JobBox rd={rd} />
@@ -139,7 +152,7 @@ export function DatasetWaiting({ what, onRetry }: { what: string; onRetry: () =>
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" variant="secondary" onClick={r.reload}><RefreshCw className="h-3.5 w-3.5" />Check Data Readiness</Button>
           <Button size="sm" variant="outline" onClick={() => navigate('/data')}>Open Data Management</Button>
-          <Button size="sm" variant="outline" onClick={onRetry}>Retry {what}</Button>
+          <Button size="sm" variant="outline" onClick={() => { retry(); r.reload(); health.reload() }}>Retry {what}</Button>
         </div>
       </div></CardBody>
     </Card>

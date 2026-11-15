@@ -76,6 +76,9 @@ export class ApiError extends Error {
   detail: Record<string, unknown> | null
   constructor(status: number, message: string, retryAfter: number | null = null, detail: Record<string, unknown> | null = null) { super(message); this.status = status; this.retryAfter = retryAfter; this.detail = detail }
 }
+/** Shown wherever a data route answers 409 DATASET_NOT_READY (the backend has no validated processed dataset). */
+export const DATASET_NOT_READY_MSG = 'Satellite dataset is not installed on the connected backend.'
+export const isDatasetNotReady = (e: unknown) => e instanceof ApiError && e.status === 409 && e.detail?.code === 'DATASET_NOT_READY'
 /** Fired when the server rejects the current Bearer token (expired, revoked, account disabled). */
 export const SESSION_EXPIRED_EVENT = 'pyro:session-expired'
 
@@ -122,13 +125,15 @@ export function useApi<T = unknown>(path: string | null, deps: unknown[] = []) {
   // HTTP status of the last failure (0 = network / backend unreachable); null when the last request succeeded.
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const seq = useRef(0)
+  // Refetch automatically when the backend's dataset becomes available (meta.has_data flips), without a page reload.
+  const hasData = useContext(AppCtx)?.meta?.has_data
   const load = useCallback(() => {
     if (!path) { setData(null); return }
     const id = ++seq.current
     setLoading(true); setError(null); setErrorStatus(null)
-    api<T>(path).then((d) => { if (id === seq.current) setData(d) }).catch((e) => { if (id === seq.current) { setError(e.message); setErrorStatus(e instanceof ApiError ? e.status : 0); setData(null) } }).finally(() => { if (id === seq.current) setLoading(false) })
+    api<T>(path).then((d) => { if (id === seq.current) setData(d) }).catch((e) => { if (id === seq.current) { setError(isDatasetNotReady(e) ? DATASET_NOT_READY_MSG : e.message); setErrorStatus(e instanceof ApiError ? e.status : 0); setData(null) } }).finally(() => { if (id === seq.current) setLoading(false) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, ...deps])
+  }, [path, hasData, ...deps])
   useEffect(load, [load])
   return { data, error, errorStatus, loading, reload: load }
 }
@@ -182,6 +187,7 @@ export const Note = ({ children, tone = 'info' }: { children: ReactNode; tone?: 
 )
 
 export function State({ loading, error, empty, children }: { loading?: boolean; error?: string | null; empty?: boolean; children?: ReactNode }) {
+  if (error === DATASET_NOT_READY_MSG) return <Note tone="warn">{error} The frontend is connected, but the backend has not made its processed scientific dataset available yet. See <a className="underline" href="/data">Data Management</a> for its readiness.</Note>
   if (error) return <Note tone="bad">Could not load: {error}</Note>
   if (loading && empty !== false) return <div className="animate-pulse py-10 text-center text-sm text-slate-500">Loading…</div>
   if (empty) return <div className="py-8 text-center text-sm text-slate-500">No data.</div>

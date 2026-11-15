@@ -3,7 +3,7 @@
  * Every number comes from the API. Estimates are always labelled as estimates. */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
-import { api, useApi, useApp, num, pct, compact, titleCase, Prov, Tabs, SplitPicker, C, SAT_COLOR, SAT_LABEL, MONTHS, TIER_COLOR } from './lib'
+import { api, useApi, useApp, DATASET_NOT_READY_MSG, num, pct, compact, titleCase, Prov, Tabs, SplitPicker, C, SAT_COLOR, SAT_LABEL, MONTHS, TIER_COLOR } from './lib'
 import { Banner, Button, Card, CardBody, CardHeader, EmptyStateCard, Table, UncertaintyNote, StatCard } from './ui'
 import { Series, StatusBars, LogScatter, withBand } from './charts'
 import { seq } from './map'
@@ -34,6 +34,7 @@ export function PageHead({ title, intro, badges, actions }: { idx?: string; titl
 
 /** Loading / error / empty wrapper using empty-state cards (never dummy numbers). */
 export function Load({ loading, error, data, children, what }: { loading: boolean; error: string | null; data: unknown; children: ReactNode; what: string }) {
+  if (error === DATASET_NOT_READY_MSG) return <DatasetWaiting what={what.charAt(0).toUpperCase() + what.slice(1)} />
   if (error) return <EmptyStateCard title={`Could not load ${what}`} description={<span className="text-red-300">{error}</span>} />
   if (loading && !data) return <Card><CardBody className="animate-pulse py-12 text-center text-sm text-slate-400">Loading {what}…</CardBody></Card>
   if (!data) return null
