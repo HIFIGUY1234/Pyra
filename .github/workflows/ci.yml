@@ -173,7 +173,7 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - name: Run journeys (real API on a throw-away DB copy)
+      - name: Run journeys (dev + production stacks, real API on throw-away DB copies)
         working-directory: frontend
         env:
           PYROSCOPE_E2E_PYTHON: python
@@ -184,6 +184,7 @@ jobs:
           name: playwright-evidence
           path: |
             frontend/test-results/
+            frontend/e2e-screens/
             frontend/playwright-report/
           retention-days: 14
 

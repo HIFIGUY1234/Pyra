@@ -1,16 +1,22 @@
 import { test, expect, type Page } from '@playwright/test'
+import { E2E_ADMIN_PASSWORD } from './env'
 
 /* Four user journeys from the completion brief, run in a real browser against the real API and loaded data.
-   Screenshots go to test-results/screens (evidence of actual rendering, not committed). */
+   Screenshots go to e2e-screens (evidence of actual rendering, not committed). */
 
 const SLOW = { timeout: 240_000 }   // first calibration fit / bootstrap on a cold server
 const field = (page: Page, label: string) =>
   page.locator('div[class~="space-y-1.5"]', { has: page.locator('label', { hasText: new RegExp(`^${label}$`) }) }).locator('input').first()
 
-const shot = (page: Page, name: string) => page.screenshot({ path: `test-results/screens/${name}.png`, fullPage: false })
+const shot = (page: Page, name: string) => page.screenshot({ path: `e2e-screens/${name}.png`, fullPage: false })
 
 async function persona(page: Page, username: string) {
-  await page.getByLabel('Active operator profile').selectOption(username)
+  const sel = page.getByLabel('Demo persona')
+  if ((await sel.inputValue()) === username) return
+  const me = page.waitForResponse((r) => r.url().endsWith('/api/auth/me') && r.request().headers()['x-user'] === username)
+  await sel.selectOption(username)
+  await me
+  await expect(sel).toHaveValue(username)
 }
 
 async function heading(page: Page, text: string | RegExp) {
@@ -19,7 +25,7 @@ async function heading(page: Page, text: string | RegExp) {
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByLabel('Active operator profile')).toBeVisible()
+  await expect(page.getByLabel('Demo persona')).toBeVisible()
 })
 
 test('A - historical fire researcher', async ({ page }) => {
@@ -130,16 +136,21 @@ test('C - organisation: register, add location, isolation', async ({ page }) => 
 })
 
 test('D - administrator: password login, invalid login, observation intelligence, logout', async ({ page }) => {
-  await page.getByRole('button', { name: 'Log in' }).click()
-  await page.getByLabel('Username').fill('admin')
-  await page.getByLabel('Password').fill('wrong-password-1A')
-  await page.locator('div.absolute').getByRole('button', { name: 'Log in' }).click()
-  await expect(page.getByText('invalid username or password')).toBeVisible()
-  await page.getByLabel('Password').fill('E2e-Admin-Passw0rd')
-  await page.locator('div.absolute').getByRole('button', { name: 'Log in' }).click()
-  await expect(page.getByTitle('Signed in with a session token. Click to log out.')).toContainText('admin')
+  await page.getByRole('button', { name: 'Sign in with an account' }).click()
+  const dlg = page.getByRole('dialog', { name: 'Sign in with an account' })
+  await dlg.getByLabel('Username', { exact: true }).fill('admin')
+  await dlg.getByLabel('Password', { exact: true }).fill('wrong-password-1A')
+  await dlg.getByRole('button', { name: 'Sign in' }).click()
+  await expect(dlg.getByRole('alert')).toContainText('Username or password is incorrect')
+  await dlg.getByLabel('Password', { exact: true }).fill(E2E_ADMIN_PASSWORD)
+  await dlg.getByRole('button', { name: 'Sign in' }).click()
+  const account = page.getByTestId('identity-account')
+  await expect(account).toContainText('Administrator')
+  await expect(page.getByLabel('Demo persona')).toHaveCount(0)               // one identity indicator at a time
+  await expect(page.getByText(/Demonstration access/)).toHaveCount(0)
 
-  await page.goto('/data')
+  await page.goto('/data')                                                      // token survives navigation
+  await expect(page.getByTestId('identity-account')).toContainText('Administrator')
   await expect(page.getByRole('button', { name: 'Recover Git LFS archives' })).toBeVisible()
   await page.goto('/thresholds')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
@@ -155,8 +166,13 @@ test('D - administrator: password login, invalid login, observation intelligence
   const health = await (await page.request.get('/api/health')).json()
   expect(health.database.ok).toBeTruthy()
 
-  await page.getByTitle('Signed in with a session token. Click to log out.').click()
-  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible()
+  await page.getByTestId('identity-account').getByRole('button').click()
+  await expect(page.getByRole('navigation', { name: 'Administration' })).toBeVisible()
+  await shot(page, 'dev-account-menu')
+  await page.getByRole('button', { name: 'Sign out and return to demo mode' }).click()
+  await expect(page.getByText('Demo mode')).toBeVisible()
+  await expect(page.getByLabel('Demo persona')).toBeVisible()
+  expect(await page.evaluate(() => sessionStorage.getItem('pyro_token'))).toBeNull()
 })
 
 test('mobile dashboard renders without horizontal overflow', async ({ page }) => {

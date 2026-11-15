@@ -53,6 +53,8 @@ data/processed/pipeline_state.json
 # e2e run artefacts
 data/e2e.db
 data/e2e_reports/
+data/e2e_prod.db
+data/e2e_prod_reports/
 frontend/test-results/
 frontend/playwright-report/
 # large downloaded rasters (manifest + derived grids are kept)
@@ -65,3 +67,4 @@ data/auxiliary/linear/*.pbf
 data/auxiliary/linear/*.part
 data/auxiliary/linear/nodes.idx
 data/object_store/
+frontend/e2e-screens/
