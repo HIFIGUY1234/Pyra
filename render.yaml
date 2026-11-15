@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: pyroscope-backend
+    env: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    plan: standard
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYROSCOPE_EMBEDDED_WORKER
+        value: "1"
+      - key: PYROSCOPE_NOTIFY_PROVIDER
+        value: simulated
+      - key: PYROSCOPE_CORS_ORIGIN_REGEX
+        value: "^https://.*\\.vercel\\.app$"
