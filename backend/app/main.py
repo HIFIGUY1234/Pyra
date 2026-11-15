@@ -37,10 +37,10 @@ async def _lifespan(_app):
 
 app = FastAPI(title="PyroScope API", version="1.0.0", lifespan=_lifespan,
               description="MODIS-VIIRS hot-spot harmonization, calibrated 7-day hotspot probability and authority alert routing.")
-_origins = [o.strip() for o in os.getenv("PYROSCOPE_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()]
+_origins = [o.strip() for o in os.getenv("PYROSCOPE_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://pyra-zeta.vercel.app").split(",") if o.strip()]
 # Vercel preview deployments get per-branch hostnames: allow them with an explicit regex, e.g.
 # PYROSCOPE_CORS_ORIGIN_REGEX=^https://pyroscope-[a-z0-9-]+-myteam\.vercel\.app$  (never a bare wildcard)
-_origin_regex = os.getenv("PYROSCOPE_CORS_ORIGIN_REGEX") or None
+_origin_regex = os.getenv("PYROSCOPE_CORS_ORIGIN_REGEX") or r"^https://[a-zA-Z0-9_\.-]+\.vercel\.app$"
 app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_origin_regex=_origin_regex, allow_methods=["GET", "POST", "PUT", "DELETE"],
                    allow_headers=["Authorization", "Content-Type", "X-User"])
 db_sync.init_db()
