@@ -10,6 +10,7 @@ import { seq } from './map'
 import { KindBadge, ValidationMethod } from './completion'
 import { ModelSelectionPanel, SeamRobustnessPanel, SeamVerdict, type Seam } from './validation_extra'
 import { Noaa21Panel, Viirs750Panel } from './completion_final'
+import { DatasetWaiting } from './readiness'
 import type { Anomalies, Calendar, CalendarDay, CalibMonth, HarmCompare, HarmSummary, HarmYear, Metric, MorningGapAnalysis, MorningGapRun, RegionTrend, SensorCalib, StateFactor, Trends, Uncertainty, Validation } from './types'
 
 /* ------------------------------------------------------------------ shared helpers */
@@ -492,7 +493,9 @@ export function CalendarPage() {
   const [year, setYear] = useState<number | null>(null)
   const [src, setSrc] = useState('Suomi NPP')
   const [metric, setMetric] = useState<'count' | 'frp'>('count')
-  const { data, loading, error } = useApi<Calendar>(`/api/calendar?region=${enc(region)}${year ? `&year=${year}` : ''}`)
+  const { data, loading, error, errorStatus, reload } = useApi<Calendar>(`/api/calendar?region=${enc(region)}${year ? `&year=${year}` : ''}`)
+  // 409 = processed dataset not ready; 0 = backend unreachable: explain and offer the next valid action instead of a bare error.
+  const waiting = errorStatus === 409 || errorStatus === 0
   const days: CalendarDay[] = useMemo(() => data?.days || [], [data])
   const frp = metric === 'frp' && src !== 'veq'
   const val = (d: CalendarDay) => (src === 'veq' ? d.veq : frp ? d[`${src}|frp`] : d[src])
@@ -515,7 +518,7 @@ export function CalendarPage() {
           <Tabs value={src} onChange={setSrc} options={CAL_SOURCES} />
           {src !== 'veq' && <Tabs value={metric} onChange={setMetric} options={[{ value: 'count', label: 'Detections' }, { value: 'frp', label: 'FRP (MW)' }]} />}
         </>} />
-      <Load loading={loading} error={error} data={data} what="calendar">
+      {waiting ? <DatasetWaiting what="Burning Activity Calendar" onRetry={reload} /> : <Load loading={loading} error={error} data={data} what="calendar">
         {data && <>
           <Panel title={`${data.region} · ${data.year} · ${src === 'veq' ? 'VIIRS-equivalent (actual VIIRS where observed)' : SAT_LABEL[src]} ${frp ? 'FRP' : 'detections'}`} sub={data.note}>
             <div className="overflow-x-auto">
@@ -560,7 +563,7 @@ export function CalendarPage() {
             </Table>
           </Panel>
         </>}
-      </Load>
+      </Load>}
     </div>
   )
 }
