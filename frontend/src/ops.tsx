@@ -5,7 +5,7 @@ import { Circle } from 'react-leaflet'
 import { Link } from 'react-router-dom'
 import { Bell, Building2, Download, Play, Plus, RefreshCw, Square, Trash2 } from 'lucide-react'
 import { api, download, useApi, useApp, num, pct, compact, titleCase, Prov, Tabs, C, SAT_COLOR, SAT_LABEL, TIER_COLOR, TIERS, LAND_COLOR } from './lib'
-import { Banner, Button, Card, CardBody, EmptyStateCard, FormGroup, RiskTierBadge, SimulatedBadge, Table, UncertaintyNote, ArgonStatCard } from './argon'
+import { Banner, Button, Card, CardBody, EmptyStateCard, FormGroup, RiskTierBadge, SimulatedBadge, Table, UncertaintyNote, StatCard } from './ui'
 import { Series, StatusBars } from './charts'
 import { BaseMap, BoxDraw, CellLayer, PointLayer, Swatch, seq } from './map'
 import { enc, Load, PageHead, Panel, Td } from './science'
@@ -63,7 +63,7 @@ export function LiveMapPage() {
 
   return (
     <div className="space-y-5">
-      <PageHead idx="02" title="Live Fire Map" badges={<Prov kind="actual" />}
+      <PageHead idx="02" title="Fire Map" badges={<Prov kind="actual" />}
         intro="Original FIRMS detections (squares = MODIS 1 km, circles = VIIRS 375 m) with optional density, harmonized, forecast and land-use layers. Click a detection for full metadata. Draw a box to analyse a custom area everywhere in PyroScope." />
       <Card>
         <CardBody className="space-y-3 p-4">
@@ -74,7 +74,7 @@ export function LiveMapPage() {
             <FormGroup label={`Min. std. confidence ${minConf.toFixed(2)}`}><input type="range" min={0} max={0.9} step={0.05} value={minConf} onChange={(e) => setMinConf(Number(e.target.value))} /></FormGroup>
             <div className="flex flex-wrap gap-2">
               {['Terra', 'Aqua', 'Suomi NPP', 'NOAA-20', 'NOAA-21'].map((s) => (
-                <label key={s} className="flex items-center gap-1.5 rounded border border-[#26324a] px-2 py-1">
+                <label key={s} className="flex items-center gap-1.5 rounded border border-[#22324b] px-2 py-1">
                   <input type="checkbox" checked={sats.includes(s)} onChange={() => setSats((x) => (x.includes(s) ? x.filter((y) => y !== s) : [...x, s]))} />
                   <Swatch color={SAT_COLOR[s]} label={SAT_LABEL[s]} square={s === 'Terra' || s === 'Aqua'} />
                 </label>
@@ -84,9 +84,9 @@ export function LiveMapPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Layers</span>
             {LAYERS.map((l) => (
-              <button key={l.key} onClick={() => toggle(l.key)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${on(l.key) ? 'border-orange-500 bg-orange-500/15 text-orange-200' : 'border-[#26324a] text-slate-400 hover:text-slate-200'}`}>{l.label}</button>
+              <button key={l.key} onClick={() => toggle(l.key)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${on(l.key) ? 'border-orange-500 bg-orange-500/15 text-orange-200' : 'border-[#22324b] text-slate-400 hover:text-slate-200'}`}>{l.label}</button>
             ))}
-            <span className="mx-1 h-4 w-px bg-[#26324a]" />
+            <span className="mx-1 h-4 w-px bg-[#22324b]" />
             <Button size="xs" variant={draw ? 'warning' : 'secondary'} onClick={() => setDraw((d) => !d)}><Square className="h-3 w-3" />{draw ? 'Click two corners…' : 'Draw custom area'}</Button>
             {region !== 'country' && <Button size="xs" variant="outline" onClick={() => setRegion('country')}>Reset to India</Button>}
           </div>
@@ -94,7 +94,7 @@ export function LiveMapPage() {
       </Card>
       <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
         <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26324a] px-4 py-2 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#22324b] px-4 py-2 text-xs text-slate-400">
             <span>{geo.data?.label || 'India'}{hs.loading && ' · loading detections…'}{hs.error && <span className="text-red-300"> · {hs.error}</span>}</span>
             {hs.data && <span>{num(hs.data.returned)} of {num(hs.data.total_matching)} detections shown{hs.data.thinned && ' (evenly thinned - narrow the filters to see all)'}</span>}
           </div>
@@ -112,7 +112,7 @@ export function LiveMapPage() {
             {on('hotspots') && hs.data && <PointLayer points={hs.data.hotspots} colorOf={(p) => SAT_COLOR[p.satellite] || '#fff'} isSquare={(p) => p.instrument === 'MODIS'} popup={hotspotPopup} onClick={setSel} />}
             <BoxDraw active={draw} onDone={(b) => { setDraw(false); setRegion(`bbox:${b.join(',')}`) }} />
           </BaseMap>
-          <div className="flex flex-wrap gap-3 border-t border-[#26324a] px-4 py-2">
+          <div className="flex flex-wrap gap-3 border-t border-[#22324b] px-4 py-2">
             {on('forecast') && TIERS.map((t) => <Swatch key={t} color={TIER_COLOR[t]} label={titleCase(t)} square />)}
             {on('landuse') && Object.entries(LAND_COLOR).map(([k, v]) => <Swatch key={k} color={v} label={k} square />)}
             {densityLayers.length > 0 && <span className="text-[11px] text-slate-400">Density ramp: light = few, dark = many (log scale). Months {cl.data?.months?.join(' – ')}.</span>}
@@ -188,17 +188,17 @@ export function ForecastPage() {
             </Card>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <ArgonStatCard title="Model confidence" value={`±${num((d.confidence?.model_band_mean_width || 0) * 50, 1)} pts`} subValue="mean bootstrap-model band half-width" provenance="Calibrated Forecast" />
-                <ArgonStatCard title="Observation quality" value={pct(d.confidence?.observation_coverage_score)} subValue="reference-sensor coverage (separate from probability)" provenance="Actual Observation" />
-                <ArgonStatCard title="Expected cells with a detection" value={num(d.regional?.expected_cells_with_detection, 1)} subValue={`of ${num(d.n_cells)} forecast cells`} provenance="Calibrated Forecast" />
-                <ArgonStatCard title="Test skill" value={`AUC ${num(d.confidence?.test_roc_auc, 3)}`} subValue={`Brier ${num(d.confidence?.test_brier, 3)} (chronological hold-out)`} provenance="Calibrated Forecast" />
+                <StatCard title="Model confidence" value={`±${num((d.confidence?.model_band_mean_width || 0) * 50, 1)} pts`} subValue="mean bootstrap-model band half-width" provenance="Calibrated Forecast" />
+                <StatCard title="Observation quality" value={pct(d.confidence?.observation_coverage_score)} subValue="reference-sensor coverage (separate from probability)" provenance="Actual Observation" />
+                <StatCard title="Expected cells with a detection" value={num(d.regional?.expected_cells_with_detection, 1)} subValue={`of ${num(d.n_cells)} forecast cells`} provenance="Calibrated Forecast" />
+                <StatCard title="Test skill" value={`AUC ${num(d.confidence?.test_roc_auc, 3)}`} subValue={`Brier ${num(d.confidence?.test_brier, 3)} (chronological hold-out)`} provenance="Calibrated Forecast" />
               </div>
               <UncertaintyNote>{d.confidence?.note} Target: {d.target}</UncertaintyNote>
             </div>
           </div>
           <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
             <Card className="overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26324a] px-4 py-2 text-xs text-slate-400">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#22324b] px-4 py-2 text-xs text-slate-400">
                 <span>Grid-cell probabilities · click a cell for its drivers and jurisdiction</span>
                 <span className="flex flex-wrap gap-2">{TIERS.map((t) => <Swatch key={t} color={TIER_COLOR[t]} label={`${titleCase(t)} (${num(d.tier_counts?.[t] || 0)})`} square />)}</span>
               </div>
@@ -261,12 +261,12 @@ function CellPanel({ cell, cellId }: { cell: { data: CellDetail | null; loading:
             {(c.factors || []).map((g) => (
               <div key={g.group} className="flex items-center gap-2 py-0.5">
                 <span className="w-40 shrink-0 truncate text-slate-300" title={g.group}>{g.group}</span>
-                <div className="relative h-2 flex-1 rounded bg-[#172033]"><i className="absolute top-0 h-2 rounded" style={{ left: g.contribution >= 0 ? '50%' : `${50 - Math.min(50, Math.abs(g.contribution) * 25)}%`, width: `${Math.min(50, Math.abs(g.contribution) * 25)}%`, background: g.contribution >= 0 ? TIER_COLOR.HIGH : '#3987e5' }} /></div>
+                <div className="relative h-2 flex-1 rounded bg-[#141f33]"><i className="absolute top-0 h-2 rounded" style={{ left: g.contribution >= 0 ? '50%' : `${50 - Math.min(50, Math.abs(g.contribution) * 25)}%`, width: `${Math.min(50, Math.abs(g.contribution) * 25)}%`, background: g.contribution >= 0 ? TIER_COLOR.HIGH : '#3987e5' }} /></div>
                 <span className="w-12 text-right font-mono text-slate-400">{num(g.contribution, 2)}</span>
               </div>
             ))}
           </div>
-          <div className="rounded border border-[#26324a] p-2">
+          <div className="rounded border border-[#22324b] p-2">
             <div className="font-semibold text-slate-200">Jurisdiction · {c.jurisdiction?.land_use}</div>
             <div className="text-slate-400">{c.jurisdiction?.district || '–'}, {c.jurisdiction?.state || '–'}</div>
             <ul className="mt-1 list-disc pl-4 text-slate-300">{(c.jurisdiction?.authorities || []).map((a, i: number) => <li key={i}>L{a.level} {a.role_title} - {a.authority} {a.verified_contact ? <span className="text-emerald-300">(verified contact)</span> : <span className="text-amber-300">(no verified contact)</span>}</li>)}</ul>
@@ -285,11 +285,11 @@ function ModelCard({ m }: { m: ForecastModel }) {
     <Panel title="Model, calibration & threshold validation" badge={<Prov kind="forecast" />} sub={`${m.target_kind}. ${m.trained_on}`}>
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <ArgonStatCard title="Brier (test)" value={num(m.test?.brier, 4)} subValue={`climatology ${num(m.baseline_climatology?.brier, 4)}`} provenance="Calibrated Forecast" />
-          <ArgonStatCard title="Brier skill vs climatology" value={pct(m.brier_skill_vs_climatology, 1)} provenance="Calibrated Forecast" />
-          <ArgonStatCard title="ROC-AUC" value={num(m.test?.roc_auc, 3)} subValue={`PR-AUC ${num(m.test?.pr_auc, 3)}`} provenance="Calibrated Forecast" />
-          <ArgonStatCard title="Base rate" value={pct(m.test?.base_rate, 1)} subValue={`${compact(m.test?.n)} test cell-weeks`} provenance="Actual Observation" />
-          <ArgonStatCard title="Chronological split" value={<span className="text-sm">train ≤ {m.split?.train_until?.slice(0, 4)}</span>} subValue={`calibrate ≤ ${m.split?.calibrate_until?.slice(0, 4)} · test ${m.split?.test_from?.slice(0, 4)}–${m.split?.test_until?.slice(0, 4)}`} provenance="Calibrated Forecast" />
+          <StatCard title="Brier (test)" value={num(m.test?.brier, 4)} subValue={`climatology ${num(m.baseline_climatology?.brier, 4)}`} provenance="Calibrated Forecast" />
+          <StatCard title="Brier skill vs climatology" value={pct(m.brier_skill_vs_climatology, 1)} provenance="Calibrated Forecast" />
+          <StatCard title="ROC-AUC" value={num(m.test?.roc_auc, 3)} subValue={`PR-AUC ${num(m.test?.pr_auc, 3)}`} provenance="Calibrated Forecast" />
+          <StatCard title="Base rate" value={pct(m.test?.base_rate, 1)} subValue={`${compact(m.test?.n)} test cell-weeks`} provenance="Actual Observation" />
+          <StatCard title="Chronological split" value={<span className="text-sm">train ≤ {m.split?.train_until?.slice(0, 4)}</span>} subValue={`calibrate ≤ ${m.split?.calibrate_until?.slice(0, 4)} · test ${m.split?.test_from?.slice(0, 4)}–${m.split?.test_until?.slice(0, 4)}`} provenance="Calibrated Forecast" />
         </div>
         <div className="grid gap-4 xl:grid-cols-3">
           <div>
@@ -347,10 +347,10 @@ export function ObservationsPage() {
         {d && <>
           <Banner tone="info" title="Limits">{d.limits}</Banner>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <ArgonStatCard title="Coverage score" value={pct(d.coverage_score)} subValue={d.coverage_score_definition} provenance="Actual Observation" />
-            <ArgonStatCard title="Rain days (recent)" value={num(d.obscuration?.rain_days_recent)} subValue={`${num(d.obscuration?.rain_mm_recent, 0)} mm - rain implies cloud`} provenance="Actual Observation" />
-            <ArgonStatCard title="Cloud (recent)" value={d.obscuration?.cloud_pct_recent == null ? 'not yet available' : `${num(d.obscuration.cloud_pct_recent, 0)}%`} subValue={`climatology same months ${num(d.obscuration?.cloud_pct_climatology_same_months, 0)}%`} provenance="Actual Observation" />
-            <ArgonStatCard title="Window" value={<span className="text-base">{d.window?.[0]} → {d.window?.[1]}</span>} subValue={d.region} provenance="Actual Observation" />
+            <StatCard title="Coverage score" value={pct(d.coverage_score)} subValue={d.coverage_score_definition} provenance="Actual Observation" />
+            <StatCard title="Rain days (recent)" value={num(d.obscuration?.rain_days_recent)} subValue={`${num(d.obscuration?.rain_mm_recent, 0)} mm - rain implies cloud`} provenance="Actual Observation" />
+            <StatCard title="Cloud (recent)" value={d.obscuration?.cloud_pct_recent == null ? 'not yet available' : `${num(d.obscuration.cloud_pct_recent, 0)}%`} subValue={`climatology same months ${num(d.obscuration?.cloud_pct_climatology_same_months, 0)}%`} provenance="Actual Observation" />
+            <StatCard title="Window" value={<span className="text-base">{d.window?.[0]} → {d.window?.[1]}</span>} subValue={d.region} provenance="Actual Observation" />
           </div>
           <p className="text-[11px] text-slate-500">{d.obscuration?.cloud_note}</p>
           <Panel title={`Sensor-by-sensor observation record - ${d.region}`} pad={false}>
@@ -376,7 +376,7 @@ export function ObservationsPage() {
       <Load loading={alt.loading} error={alt.error} data={alt.data} what="monitoring gaps">
         {alt.data && <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
           <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-center gap-3 border-b border-[#26324a] px-4 py-2 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-3 border-b border-[#22324b] px-4 py-2 text-xs text-slate-400">
               <span>Cells where additional monitoring may be needed (last {alt.data.window_days} days)</span>
               {reasons.map((r) => <Swatch key={r} color={rc(r)} label={`${r} (${alt.data?.counts[r]})`} square />)}
             </div>
@@ -457,7 +457,7 @@ export function GovernmentPage() {
       <Load loading={data.loading} error={data.error} data={data.data} what="alerts">
         {data.data?.items?.length ? <div className="max-h-[420px] overflow-y-auto"><Table headers={['Alert', kind === 'adv' ? 'Probability' : 'Detection', 'Region / land use', 'Status / routing', can ? 'Actions' : '']}>
           {data.data.items.map((a) => (
-            <tr key={a.alert_id} className="align-top hover:bg-[#172033]/60">
+            <tr key={a.alert_id} className="align-top hover:bg-[#141f33]/60">
               <Td><div className="font-mono text-[11px] text-slate-200">{a.alert_id}</div><div className="mt-0.5">{kind === 'adv' ? <RiskTierBadge tier={a.risk_category} /> : <span className="text-[11px] text-sky-300">{SAT_LABEL[a.satellite ?? ''] || a.satellite}</span>}</div><div className="text-[10px] text-slate-500">{titleCase(a.alert_type)}</div></Td>
               <Td>{kind === 'adv' ? <><strong>{pct(a.probability)}</strong><div className="text-[10px] text-slate-400">{pct(a.p_lower)}–{pct(a.p_upper)} · {a.n_cells ?? '–'} cells</div></> : <>{a.frp_mw == null ? 'FRP n/a' : `${num(a.frp_mw, 1)} MW`}<div className="text-[10px] text-slate-400">{a.issue_date}</div></>}</Td>
               <Td>{a.region_name}<div className="text-[10px] text-slate-400">{a.land_use} · {a.state}</div></Td>
@@ -484,7 +484,7 @@ export function GovernmentPage() {
       <div className="grid gap-3 md:grid-cols-4">
         {[['Predicted Pre-Fire Risk Advisory', 'Model forecast ≥ HIGH threshold. Needs human review.', 'border-orange-500/50'], ['Unverified Satellite Hotspot Detection', 'A real MODIS/VIIRS detection - not yet confirmed on the ground.', 'border-sky-500/50'],
           ['Verified Fire Incident', 'Only after an authorised officer verifies on the ground.', 'border-emerald-500/50'], ['Official Public Emergency Warning', 'Issued only through the authority\'s own channels. PyroScope never issues one.', 'border-red-500/50']].map(([t, s, b]) => (
-          <div key={t} className={`rounded-xl border ${b} bg-[#111827] px-4 py-3`}><div className="text-xs font-bold text-white">{t}</div><div className="mt-1 text-[11px] text-slate-400">{s}</div></div>
+          <div key={t} className={`rounded-md border ${b} bg-[#0f1726] px-4 py-3`}><div className="text-xs font-bold text-white">{t}</div><div className="mt-1 text-[11px] text-slate-400">{s}</div></div>
         ))}
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -493,7 +493,7 @@ export function GovernmentPage() {
       </div>
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
         <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26324a] px-4 py-2 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#22324b] px-4 py-2 text-xs text-slate-400">
             <span>7-day calibrated risk by grid cell · {landUse || 'all jurisdictions'} · {fcells.length} cells</span>
             <span className="flex flex-wrap gap-2">{TIERS.map((t) => <Swatch key={t} color={TIER_COLOR[t]} label={titleCase(t)} square />)}</span>
           </div>
@@ -569,8 +569,8 @@ export function OrganisationPage() {
       <div className="grid gap-4 xl:grid-cols-3">
         <Panel title="Your organisations" pad={false}>
           <Load loading={orgs.loading} error={orgs.error} data={orgs.data} what="organisations">
-            {orgs.data?.items?.length ? <ul className="divide-y divide-[#26324a]">{orgs.data.items.map((o) => (
-              <li key={o.id}><button onClick={() => setOrgId(o.id)} className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-xs ${o.id === orgId ? 'bg-orange-500/10 text-white' : 'text-slate-300 hover:bg-[#172033]'}`}>
+            {orgs.data?.items?.length ? <ul className="divide-y divide-[#22324b]">{orgs.data.items.map((o) => (
+              <li key={o.id}><button onClick={() => setOrgId(o.id)} className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-xs ${o.id === orgId ? 'bg-orange-500/10 text-white' : 'text-slate-300 hover:bg-[#141f33]'}`}>
                 <span><Building2 className="mr-1.5 inline h-3.5 w-3.5 text-orange-400" />{o.name}<span className="block pl-5 text-[10px] text-slate-500">{o.sector}</span></span><span className="text-slate-400">{o.locations} site(s)</span></button></li>))}</ul>
               : <p className="p-4 text-xs text-slate-400">No organisation registered yet.</p>}
           </Load>
@@ -612,8 +612,8 @@ function LocationCard({ l, onDelete, onReport }: { l: OrgLocation; onDelete: () 
   const hist = (l.history || []).filter((h) => h.complete)
   return (
     <Card>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#26324a] px-5 py-3">
-        <div><div className="flex items-center gap-2"><h3 className="text-sm font-semibold text-white">{l.name}</h3><span className="rounded border border-[#26324a] px-1.5 py-0.5 text-[10px] text-slate-300">{l.land_use_tag}</span>{l.threshold_breached && <RiskTierBadge tier="VERY_HIGH" customLabel="Threshold met" />}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#22324b] px-5 py-3">
+        <div><div className="flex items-center gap-2"><h3 className="text-sm font-semibold text-white">{l.name}</h3><span className="rounded border border-[#22324b] px-1.5 py-0.5 text-[10px] text-slate-300">{l.land_use_tag}</span>{l.threshold_breached && <RiskTierBadge tier="VERY_HIGH" customLabel="Threshold met" />}</div>
           <div className="text-[11px] text-slate-400">{num(l.latitude, 3)}, {num(l.longitude, 3)} · buffer {num(l.buffer_km)} km · your threshold {pct(l.alert_threshold)} · jurisdiction {l.jurisdiction?.land_use} ({l.jurisdiction?.district || '–'}, {l.jurisdiction?.state || '–'})</div></div>
         <div className="flex gap-2"><Button size="xs" variant="outline" onClick={() => onReport('pdf')}><Download className="h-3 w-3" />PDF</Button><Button size="xs" variant="outline" onClick={() => onReport('csv')}><Download className="h-3 w-3" />CSV</Button><Button size="xs" variant="danger" onClick={onDelete}><Trash2 className="h-3 w-3" /></Button></div>
       </div>
@@ -621,10 +621,10 @@ function LocationCard({ l, onDelete, onReport }: { l: OrgLocation; onDelete: () 
         <div className="space-y-3">
           {l.notification && <Banner tone="danger" title={<span className="flex items-center gap-2"><Bell className="h-3.5 w-3.5" />Notification to {l.notification.to} <SimulatedBadge /></span>}>{l.notification.text}</Banner>}
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded border border-[#26324a] p-2"><div className="text-[10px] uppercase text-slate-400">Highest cell p (7 d)</div><div className="text-xl font-bold text-white">{pct(fc.max_cell_probability)}</div><RiskTierBadge tier={fc.risk_category} /></div>
-            <div className="rounded border border-[#26324a] p-2"><div className="text-[10px] uppercase text-slate-400">Buffer joint p</div><div className="text-xl font-bold text-white">{pct(fc.headline_probability)}</div><div className="text-[10px] text-slate-500">issue {fc.issue_date || '–'}</div></div>
-            <div className="rounded border border-[#26324a] p-2"><div className="text-[10px] uppercase text-slate-400">Detections in buffer, 7 d</div><div className="text-xl font-bold text-white">{num(l.nearby_7d?.total)}</div><div className="text-[10px] text-slate-500">nearest {l.nearby_7d?.nearest_km == null ? '–' : `${num(l.nearby_7d.nearest_km, 1)} km`}</div></div>
-            <div className="rounded border border-[#26324a] p-2"><div className="text-[10px] uppercase text-slate-400">Max FRP</div><div className="text-xl font-bold text-white">{l.nearby_7d?.max_frp_mw == null ? '–' : `${num(l.nearby_7d.max_frp_mw, 0)}`}</div><div className="text-[10px] text-slate-500">MW</div></div>
+            <div className="rounded border border-[#22324b] p-2"><div className="text-[10px] uppercase text-slate-400">Highest cell p (7 d)</div><div className="text-xl font-bold text-white">{pct(fc.max_cell_probability)}</div><RiskTierBadge tier={fc.risk_category} /></div>
+            <div className="rounded border border-[#22324b] p-2"><div className="text-[10px] uppercase text-slate-400">Buffer joint p</div><div className="text-xl font-bold text-white">{pct(fc.headline_probability)}</div><div className="text-[10px] text-slate-500">issue {fc.issue_date || '–'}</div></div>
+            <div className="rounded border border-[#22324b] p-2"><div className="text-[10px] uppercase text-slate-400">Detections in buffer, 7 d</div><div className="text-xl font-bold text-white">{num(l.nearby_7d?.total)}</div><div className="text-[10px] text-slate-500">nearest {l.nearby_7d?.nearest_km == null ? '–' : `${num(l.nearby_7d.nearest_km, 1)} km`}</div></div>
+            <div className="rounded border border-[#22324b] p-2"><div className="text-[10px] uppercase text-slate-400">Max FRP</div><div className="text-xl font-bold text-white">{l.nearby_7d?.max_frp_mw == null ? '–' : `${num(l.nearby_7d.max_frp_mw, 0)}`}</div><div className="text-[10px] text-slate-500">MW</div></div>
           </div>
           <div className="flex flex-wrap gap-2 text-[11px]">{Object.entries(l.nearby_7d?.by_satellite || {}).map(([s, n]) => <Swatch key={s} color={SAT_COLOR[s]} label={`${SAT_LABEL[s] || s}: ${n}`} square={s === 'Terra' || s === 'Aqua'} />)}</div>
           {fc.status !== 'ok' && fc.message && <Banner tone="info">{fc.message}</Banner>}
@@ -635,7 +635,7 @@ function LocationCard({ l, onDelete, onReport }: { l: OrgLocation; onDelete: () 
           <Series data={hist} x="year" monthly={false} height={210} bars={[{ key: 'harmonized', name: 'Harmonized (VIIRS-eq.)', color: C.est }]} lines={[{ key: 'viirs', name: 'Actual VIIRS', color: C.viirs, dots: true }]} />
           <Prov kind="veq" />
         </div>
-        <div className="overflow-hidden rounded-lg border border-[#26324a]">
+        <div className="overflow-hidden rounded-lg border border-[#22324b]">
           <BaseMap height={260} bbox={l.bbox} showStates={false}>
             <Circle center={[l.latitude, l.longitude]} radius={l.buffer_km * 1000} pathOptions={{ color: '#f97316', weight: 1.5, fillOpacity: 0.05, dashArray: '4 3' }} />
             <PointLayer points={l.nearby_7d?.points || []} colorOf={(p) => SAT_COLOR[p.satellite] || '#fff'} isSquare={(p) => p.satellite === 'Terra' || p.satellite === 'Aqua'}

@@ -44,13 +44,20 @@ export function BoxDraw({ active, onDone }: { active: boolean; onDone: (bbox: [n
   return a && b ? <Rectangle bounds={[[a.lat, a.lng], [b.lat, b.lng]]} pathOptions={{ color: '#f97316', weight: 1.5, dashArray: '4 3', fillOpacity: 0.08 }} /> : null
 }
 
+/* Basemap. Keyless CARTO tiles now serve an "API key required" watermark, so by default PyroScope draws only the
+ * geoBoundaries state outlines on the dark canvas (no third-party tile dependency). A deployment with a tile
+ * subscription sets VITE_BASEMAP_URL (+ VITE_BASEMAP_ATTRIBUTION) to a {z}/{x}/{y} template. */
+const TILE_URL = import.meta.env.VITE_BASEMAP_URL || ''
+const TILE_ATTR = import.meta.env.VITE_BASEMAP_ATTRIBUTION || ''
+
 export function BaseMap({ children, height = 560, bbox, showStates = true, className = '' }: { children?: ReactNode; height?: number | string; bbox?: number[] | null; showStates?: boolean; className?: string }) {
   const states = useStates()
-  const style = useMemo(() => ({ color: '#64748b', weight: 0.8, fill: false, interactive: false }), [])
+  // Without tiles the state polygons double as the land mask: faint fill, visible outline.
+  const style = useMemo(() => (TILE_URL ? { color: '#64748b', weight: 0.8, fill: false, interactive: false } : { color: '#3d5070', weight: 0.8, fill: true, fillColor: '#111b2d', fillOpacity: 1, interactive: false }), [])
   return (
     <MapContainer center={[22.5, 80]} zoom={5} minZoom={3} preferCanvas style={{ height, width: '100%' }} className={`rounded-b-lg ${className}`} worldCopyJump>
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap contributors &copy; CARTO | Boundaries: geoBoundaries' subdomains="abcd" maxZoom={12} />
-      {showStates && states && <GeoJSON data={states} style={style} interactive={false} />}
+      {TILE_URL && <TileLayer url={TILE_URL} attribution={TILE_ATTR} maxZoom={12} />}
+      {(showStates || !TILE_URL) && states && <GeoJSON data={states} style={style} interactive={false} attribution="Boundaries: geoBoundaries" />}
       <FitBounds bbox={bbox} />
       {children}
     </MapContainer>
@@ -91,7 +98,7 @@ export function PointLayer<T extends PointLike = PointLike>({ points, colorOf, i
         const d = 0.012
         m = L.rectangle([[p.latitude - d, p.longitude - d], [p.latitude + d, p.longitude + d]], { renderer: canvas, color: col, weight: 1.5, fillColor: col, fillOpacity: 0.55 })
       } else {
-        m = L.circleMarker([p.latitude, p.longitude], { renderer: canvas, radius, color: '#0B0F19', weight: 0.6, fillColor: col, fillOpacity: 0.85 })
+        m = L.circleMarker([p.latitude, p.longitude], { renderer: canvas, radius, color: '#080d17', weight: 0.6, fillColor: col, fillOpacity: 0.85 })
       }
       if (popup) m.bindPopup(() => popup(p), { maxWidth: 320 })
       if (onClick) m.on('click', () => onClick(p))

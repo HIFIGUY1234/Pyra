@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Play, RefreshCw } from 'lucide-react'
 import { api, useApi, useApp, num, pct, compact, titleCase, Prov, Tabs, SplitPicker, C, SAT_COLOR, SAT_LABEL, MONTHS, TIER_COLOR } from './lib'
-import { Banner, Button, Card, CardBody, CardHeader, EmptyStateCard, Table, UncertaintyNote, ArgonStatCard } from './argon'
+import { Banner, Button, Card, CardBody, CardHeader, EmptyStateCard, Table, UncertaintyNote, StatCard } from './ui'
 import { Series, StatusBars, LogScatter, withBand } from './charts'
 import { seq } from './map'
 import { KindBadge, ValidationMethod } from './completion'
@@ -15,23 +15,23 @@ import type { Anomalies, Calendar, CalendarDay, CalibMonth, HarmCompare, HarmSum
 /* ------------------------------------------------------------------ shared helpers */
 export const enc = (r: string) => encodeURIComponent(r)
 
-export function PageHead({ idx, title, intro, badges, actions }: { idx: string; title: string; intro: ReactNode; badges?: ReactNode; actions?: ReactNode }) {
+/** Page title block. `idx` is accepted for call-site compatibility but no longer rendered (titles, not section numbers). */
+export function PageHead({ title, intro, badges, actions }: { idx?: string; title: string; intro: ReactNode; badges?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0 max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded border border-orange-500/30 bg-orange-500/15 px-2 py-0.5 font-mono text-xs font-bold text-orange-300">Section {idx}</span>
-          <h1 className="text-xl font-bold tracking-tight text-white">{title}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-white">{title}</h1>
           {badges}
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-slate-400">{intro}</p>
+        <p className="mt-1 text-sm leading-relaxed text-slate-400">{intro}</p>
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }
 
-/** Loading / error / empty wrapper using Argon empty-state cards (never dummy numbers). */
+/** Loading / error / empty wrapper using empty-state cards (never dummy numbers). */
 export function Load({ loading, error, data, children, what }: { loading: boolean; error: string | null; data: unknown; children: ReactNode; what: string }) {
   if (error) return <EmptyStateCard title={`Could not load ${what}`} description={<span className="text-red-300">{error}</span>} />
   if (loading && !data) return <Card><CardBody className="animate-pulse py-12 text-center text-sm text-slate-400">Loading {what}…</CardBody></Card>
@@ -76,7 +76,7 @@ function MetricsTable({ rows }: { rows: { name: ReactNode; m?: Metric }[] }) {
   return (
     <Table headers={['Model', 'n months', 'MAE', 'RMSE', 'WAPE', 'MAPE', 'Bias', 'R²']}>
       {rows.filter((r): r is { name: ReactNode; m: Metric } => !!r.m).map((r, i) => (
-        <tr key={i} className="hover:bg-[#172033]/60">
+        <tr key={i} className="hover:bg-[#141f33]/60">
           <Td>{r.name}</Td><Td right>{num(r.m.n)}</Td><Td right>{num(r.m.mae)}</Td><Td right>{num(r.m.rmse)}</Td>
           <Td right>{num(r.m.wape_pct, 1)}%</Td><Td right>{num(r.m.mape_pct, 1)}%</Td><Td right>{num(r.m.bias_pct, 1)}%</Td><Td right>{num(r.m.r2, 3)}</Td>
         </tr>
@@ -152,10 +152,10 @@ export function MorningGapPage() {
             {data.mode_message && <span>{data.mode_message}</span>}
             {data.by_daynight_overlap && <span className="text-slate-400">Overlap Aqua/Terra ratio — day {num(data.by_daynight_overlap.day?.aqua_per_terra, 2)}, night {num(data.by_daynight_overlap.night?.aqua_per_terra, 2)}</span>}</div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <ArgonStatCard title="Months Aqua < Terra (day+night)" value={pct(data.share_months_aqua_below_terra)} subValue="Afternoon is NOT always higher - learned, not assumed" provenance="Actual Observation" />
-            <ArgonStatCard title="Months Aqua night < Terra night" value={pct(data.share_months_aqua_night_below_terra_night)} subValue="01:30 pass sees fewer fires than 22:30" provenance="Actual Observation" />
-            <ArgonStatCard title="Calibration years" value={num(data.calibration?.train_years?.length)} subValue={`${data.calibration?.train_years?.[0] ?? '–'}–${data.calibration?.train_years?.slice(-1)[0] ?? '–'}`} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Real Terra-only months" value={num(data.terra_only_real_months)} subValue="months with Terra but no Aqua coverage in the loaded record" provenance="Actual Observation" />
+            <StatCard title="Months Aqua < Terra (day+night)" value={pct(data.share_months_aqua_below_terra)} subValue="Afternoon is NOT always higher - learned, not assumed" provenance="Actual Observation" />
+            <StatCard title="Months Aqua night < Terra night" value={pct(data.share_months_aqua_night_below_terra_night)} subValue="01:30 pass sees fewer fires than 22:30" provenance="Actual Observation" />
+            <StatCard title="Calibration years" value={num(data.calibration?.train_years?.length)} subValue={`${data.calibration?.train_years?.[0] ?? '–'}–${data.calibration?.train_years?.slice(-1)[0] ?? '–'}`} provenance="Harmonized Estimate" />
+            <StatCard title="Real Terra-only months" value={num(data.terra_only_real_months)} subValue="months with Terra but no Aqua coverage in the loaded record" provenance="Actual Observation" />
           </div>
           <Panel title="Terra morning vs Aqua afternoon - monthly detections" badge={<><Prov kind="actual" /><Prov kind="mg" text="Aqua estimate from Terra" /></>}
             sub={`${data.region}. Solid = actual detections. Dashed amber = Aqua activity estimated from Terra alone, with its 5–95% bootstrap band.`}>
@@ -256,10 +256,10 @@ function HarmTimeline({ region, split }: { region: string; split: number | null 
       {data && <>
         <FitNotes notes={data.notes} />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <ArgonStatCard title="Actual VIIRS months" value={num(data.provenance_counts?.actual_viirs || 0)} provenance="Actual Observation" />
-          <ArgonStatCard title="Sensor-calibrated months" value={num(data.provenance_counts?.sensor_calibrated || 0)} subValue="estimated from actual Aqua MODIS" provenance="Harmonized Estimate" />
-          <ArgonStatCard title="Morning-gap + sensor months" value={num(data.provenance_counts?.morning_gap_sensor || 0)} subValue="estimated from Terra only (two chained steps)" provenance="Harmonized Estimate" />
-          <ArgonStatCard title="Pre-VIIRS MODIS months" value={num(data.pre_viirs_real_months)} subValue="loaded MODIS months before VIIRS began" provenance="Actual Observation" />
+          <StatCard title="Actual VIIRS months" value={num(data.provenance_counts?.actual_viirs || 0)} provenance="Actual Observation" />
+          <StatCard title="Sensor-calibrated months" value={num(data.provenance_counts?.sensor_calibrated || 0)} subValue="estimated from actual Aqua MODIS" provenance="Harmonized Estimate" />
+          <StatCard title="Morning-gap + sensor months" value={num(data.provenance_counts?.morning_gap_sensor || 0)} subValue="estimated from Terra only (two chained steps)" provenance="Harmonized Estimate" />
+          <StatCard title="Pre-VIIRS MODIS months" value={num(data.pre_viirs_real_months)} subValue="loaded MODIS months before VIIRS began" provenance="Actual Observation" />
         </div>
         <Panel title={`Continuous VIIRS-equivalent record - ${data.region}`} badge={<><Prov kind="actual" text="Actual VIIRS" /><Prov kind="veq" /></>}
           sub="Orange = actual S-NPP VIIRS. Amber = VIIRS-equivalent estimate where VIIRS was not observing, with 5–95% band. Grey dotted = the VIIRS-equivalent estimate computed for every month, for comparison only. Raw MODIS shown for scale.">
@@ -371,10 +371,10 @@ export function UncertaintyPage() {
       <Load loading={loading} error={error} data={data} what="uncertainty">
         {data && <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <ArgonStatCard title="Band coverage (VIIRS withheld)" value={data.band_coverage_pct == null ? '–' : `${num(data.band_coverage_pct, 0)}%`} subValue="share of withheld months whose actual value fell inside the 90% band" provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Band coverage (Aqua withheld)" value={data.morning_gap_band_coverage_pct == null ? '–' : `${num(data.morning_gap_band_coverage_pct, 0)}%`} subValue="morning-gap step" provenance="Harmonized Estimate" />
+            <StatCard title="Band coverage (VIIRS withheld)" value={data.band_coverage_pct == null ? '–' : `${num(data.band_coverage_pct, 0)}%`} subValue="share of withheld months whose actual value fell inside the 90% band" provenance="Harmonized Estimate" />
+            <StatCard title="Band coverage (Aqua withheld)" value={data.morning_gap_band_coverage_pct == null ? '–' : `${num(data.morning_gap_band_coverage_pct, 0)}%`} subValue="morning-gap step" provenance="Harmonized Estimate" />
             {Object.entries(data.median_relative_width_by_stage || {}).map(([k, v]) => (
-              <ArgonStatCard key={k} title={`Median band width - ${k}`} value={pct(v as number, 0)} subValue="(hi − lo) / central estimate" provenance="Harmonized Estimate" />
+              <StatCard key={k} title={`Median band width - ${k}`} value={pct(v as number, 0)} subValue="(hi − lo) / central estimate" provenance="Harmonized Estimate" />
             ))}
           </div>
           <FitNotes notes={data.notes} />
@@ -427,10 +427,10 @@ export function ValidationPage() {
         {d && <>
           <StatusBanner status={d.status} rule={d.status_rule} what="Harmonization hold-out result" />
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <ArgonStatCard title="WAPE (held-out)" value={`${num(d.overall?.wape_pct, 1)}%`} subValue={`constant-ratio baseline ${num(d.baseline_constant_ratio?.wape_pct, 1)}% · raw MODIS ${num(d.baseline_raw_modis?.wape_pct, 1)}%`} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Bias" value={`${num(d.overall?.bias_pct, 1)}%`} subValue={`${d.overall?.n ?? '–'} withheld months`} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="MAE / RMSE" value={`${compact(d.overall?.mae)} / ${compact(d.overall?.rmse)}`} subValue={`detections per month (mean actual ${compact(d.overall?.mean_actual)})`} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Band coverage" value={d.band_coverage_pct == null ? '–' : `${num(d.band_coverage_pct, 0)}%`} subValue="target ≈ 90% for a 5–95% band" provenance="Harmonized Estimate" />
+            <StatCard title="WAPE (held-out)" value={`${num(d.overall?.wape_pct, 1)}%`} subValue={`constant-ratio baseline ${num(d.baseline_constant_ratio?.wape_pct, 1)}% · raw MODIS ${num(d.baseline_raw_modis?.wape_pct, 1)}%`} provenance="Harmonized Estimate" />
+            <StatCard title="Bias" value={`${num(d.overall?.bias_pct, 1)}%`} subValue={`${d.overall?.n ?? '–'} withheld months`} provenance="Harmonized Estimate" />
+            <StatCard title="MAE / RMSE" value={`${compact(d.overall?.mae)} / ${compact(d.overall?.rmse)}`} subValue={`detections per month (mean actual ${compact(d.overall?.mean_actual)})`} provenance="Harmonized Estimate" />
+            <StatCard title="Band coverage" value={d.band_coverage_pct == null ? '–' : `${num(d.band_coverage_pct, 0)}%`} subValue="target ≈ 90% for a 5–95% band" provenance="Harmonized Estimate" />
           </div>
           <FitNotes notes={d.notes} />
           <ValidationMethod v={d} seam={sm} />
@@ -466,10 +466,10 @@ export function ValidationPage() {
             <StatusBanner status={sm.status} rule={sm.status_rule} what="Seam result" />
             <SeamVerdict seam={sm} />
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <ArgonStatCard title="Step before harmonization" value={`×${r2(sm.step_raw)}`} subValue={`artificial jump ${r2(sm.artificial_jump_before)} ln-units`} provenance="Actual Observation" />
-              <ArgonStatCard title="Step after harmonization" value={`×${r2(sm.step_harmonized)}`} subValue={`band ×${r2(sm.step_harmonized_band?.[0])}–×${r2(sm.step_harmonized_band?.[1])}; residual ${r2(sm.artificial_jump_after)} ln`} provenance="Harmonized Estimate" />
-              <ArgonStatCard title="Genuine change (reference)" value={`×${r2(sm.step_true ?? sm.step_reference_sensor)}`} subValue={`${sm.reference_sensor} across the same seam - real changes must be kept`} provenance="Actual Observation" />
-              <ArgonStatCard title="Artificial jump removed" value={`${num(sm.reduction_pct, 0)}%`} provenance="Harmonized Estimate" />
+              <StatCard title="Step before harmonization" value={`×${r2(sm.step_raw)}`} subValue={`artificial jump ${r2(sm.artificial_jump_before)} ln-units`} provenance="Actual Observation" />
+              <StatCard title="Step after harmonization" value={`×${r2(sm.step_harmonized)}`} subValue={`band ×${r2(sm.step_harmonized_band?.[0])}–×${r2(sm.step_harmonized_band?.[1])}; residual ${r2(sm.artificial_jump_after)} ln`} provenance="Harmonized Estimate" />
+              <StatCard title="Genuine change (reference)" value={`×${r2(sm.step_true ?? sm.step_reference_sensor)}`} subValue={`${sm.reference_sensor} across the same seam - real changes must be kept`} provenance="Actual Observation" />
+              <StatCard title="Artificial jump removed" value={`${num(sm.reduction_pct, 0)}%`} provenance="Harmonized Estimate" />
             </div>
             <Series data={sm.series || []} height={280} refs={[{ x: sm.seam_month, label: 'seam' }]}
               lines={[{ key: 'modis_total', name: 'Original MODIS', color: C.terra }, { key: 'viirs', name: 'Actual VIIRS', color: C.viirs }, { key: 'harmonized', name: 'Harmonized record', color: C.est, dash: '5 3', width: 2.5 }]} />
@@ -486,7 +486,7 @@ export function ValidationPage() {
 
 /* ================================================================== 07 Burning Activity Calendar */
 const CAL_SOURCES = [{ value: 'Suomi NPP', label: 'S-NPP VIIRS' }, { value: 'NOAA-21', label: 'NOAA-21' }, { value: 'NOAA-20', label: 'NOAA-20' }, { value: 'Aqua', label: 'Aqua' }, { value: 'Terra', label: 'Terra' }, { value: 'veq', label: 'VIIRS-equivalent' }]
-const HATCH = 'repeating-linear-gradient(45deg,#1f2a40,#1f2a40 2px,#0B0F19 2px,#0B0F19 4px)'
+const HATCH = 'repeating-linear-gradient(45deg,#1a2740,#1a2740 2px,#080d17 2px,#080d17 4px)'
 export function CalendarPage() {
   const { region } = useApp()
   const [year, setYear] = useState<number | null>(null)
@@ -534,7 +534,7 @@ export function CalendarPage() {
                         const missing = v === null || v === undefined
                         const tip = `${d.date}: ${missing ? `no observation (${status || 'outside record'})` : `${num(v, frp ? 1 : 0)}${frp ? ' MW' : ' detections'}`}${src === 'veq' && !missing ? ` - ${d.provenance}` : ''}`
                         return <span key={di} title={tip} className="h-3 w-3 rounded-[2px]"
-                          style={missing ? { background: HATCH } : { background: Number(v) > 0 ? seq(Number(v), max) : '#172033', outline: src === 'veq' && d.provenance !== 'actual_viirs' ? '1px solid #c98500' : undefined }} />
+                          style={missing ? { background: HATCH } : { background: Number(v) > 0 ? seq(Number(v), max) : '#141f33', outline: src === 'veq' && d.provenance !== 'actual_viirs' ? '1px solid #c98500' : undefined }} />
                       })}
                     </div>
                   )
@@ -542,7 +542,7 @@ export function CalendarPage() {
               </div>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
-              <span className="flex items-center gap-1">0 <i className="inline-block h-3 w-3 rounded-[2px] bg-[#172033]" /></span>
+              <span className="flex items-center gap-1">0 <i className="inline-block h-3 w-3 rounded-[2px] bg-[#141f33]" /></span>
               <span className="flex items-center gap-1">low {[0.05, 0.2, 0.5, 1].map((f) => <i key={f} className="inline-block h-3 w-3 rounded-[2px]" style={{ background: seq(max * f, max) }} />)} high ({compact(max)})</span>
               <span className="flex items-center gap-1"><i className="inline-block h-3 w-3 rounded-[2px]" style={{ background: HATCH }} /> not observed (missing ≠ zero)</span>
               {src === 'veq' && <span className="flex items-center gap-1"><i className="inline-block h-3 w-3 rounded-[2px]" style={{ outline: '1px solid #c98500' }} /> estimate</span>}
@@ -582,10 +582,10 @@ export function TrendsPage() {
       <Load loading={loading} error={error} data={data} what="trends">
         {data && <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <ArgonStatCard title="Historical average / year" value={compact(data.historical_average_per_year)} subValue="harmonized, complete years" provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Linear trend" value={t ? `${t.pct_per_year >= 0 ? '+' : ''}${num(t.pct_per_year, 1)}% / yr` : '–'} subValue={t ? `${t.significant_95 ? 'significant' : 'NOT significant'} at 95% (t = ${num(t.t_stat, 2)}, ${t.n_years} yrs)` : ''} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Peak month" value={data.peak_month} subValue={`${pct(data.peak_month_share)} of annual activity`} provenance="Harmonized Estimate" />
-            <ArgonStatCard title="Years on record" value={num(data.yearly?.length)} subValue={`${(data.yearly || []).filter((y) => !y.complete).length} incomplete year(s) excluded from trend`} provenance="Actual Observation" />
+            <StatCard title="Historical average / year" value={compact(data.historical_average_per_year)} subValue="harmonized, complete years" provenance="Harmonized Estimate" />
+            <StatCard title="Linear trend" value={t ? `${t.pct_per_year >= 0 ? '+' : ''}${num(t.pct_per_year, 1)}% / yr` : '–'} subValue={t ? `${t.significant_95 ? 'significant' : 'NOT significant'} at 95% (t = ${num(t.t_stat, 2)}, ${t.n_years} yrs)` : ''} provenance="Harmonized Estimate" />
+            <StatCard title="Peak month" value={data.peak_month} subValue={`${pct(data.peak_month_share)} of annual activity`} provenance="Harmonized Estimate" />
+            <StatCard title="Years on record" value={num(data.yearly?.length)} subValue={`${(data.yearly || []).filter((y) => !y.complete).length} incomplete year(s) excluded from trend`} provenance="Actual Observation" />
           </div>
           <Panel title={`Yearly activity - ${data.region}`} sub={data.trend_note} badge={<Prov kind="veq" />}>
             <Series data={yearly} x="year" monthly={false} height={260} bands={[{ key: 'band', name: 'Harmonized band', color: C.est }]}
@@ -611,7 +611,7 @@ export function TrendsPage() {
           <div className="max-h-[480px] overflow-y-auto">
             <Table headers={['Region', 'Mean / yr', 'per 1000 km²', 'Latest yr', 'Peak', 'Trend / yr', 'Mean FRP', '']}>
               {(reg.data?.items || []).map((r) => (
-                <tr key={r.id} className={`hover:bg-[#172033]/60 ${r.id === region ? 'bg-orange-500/10' : ''}`}>
+                <tr key={r.id} className={`hover:bg-[#141f33]/60 ${r.id === region ? 'bg-orange-500/10' : ''}`}>
                   <Td>{r.name}</Td><Td right>{num(r.mean_per_year)}</Td><Td right>{num(r.per_1000km2)}</Td><Td right>{num(r.latest_year)}</Td><Td>{r.peak_month}</Td>
                   <Td right><span className={r.trend_significant ? 'font-semibold' : 'text-slate-500'}>{r.trend_pct_per_year >= 0 ? '+' : ''}{num(r.trend_pct_per_year, 1)}%{r.trend_significant ? '' : ' (n.s.)'}</span></Td>
                   <Td right>{num(r.frp_mean_mw, 1)} MW</Td>
@@ -674,7 +674,7 @@ export function AnomaliesPage() {
             {cur?.status !== 'ok' || !cur?.items?.length ? <p className="p-4 text-xs text-slate-400">{cur?.message || 'No region is outside its seasonal range in this window.'}</p> : (
               <Table headers={['Region', 'Current', 'Seasonal median', 'z', 'Direction', 'Contributing factors', '']}>
                 {cur.items.map((it) => (
-                  <tr key={it.id} className="hover:bg-[#172033]/60">
+                  <tr key={it.id} className="hover:bg-[#141f33]/60">
                     <Td>{it.name}</Td><Td right>{num(it.current)}</Td><Td right>{num(it.median)}</Td><Td right>{r2(it.z)}</Td>
                     <Td><span className="font-semibold uppercase" style={{ color: it.direction === 'above' ? TIER_COLOR.HIGH : '#3987e5' }}>{it.direction === 'above' ? '▲ above' : '▼ below'}</span></Td>
                     <Td><ul className="list-disc pl-4 text-[11px] text-slate-300">{(it.factors || []).map((f: string, i: number) => <li key={i}>{f}</li>)}</ul></Td>

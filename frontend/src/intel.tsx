@@ -143,7 +143,7 @@ export function FireEventDetailPage() {
         </div>
         <Card title="Event timeline" sub="Daily detections, FRP and detection-footprint growth (observation geometry, not a perimeter).">
           <div className="h-64"><ResponsiveContainer><ComposedChart data={e.timeline || []}><CartesianGrid stroke={C.grid} /><XAxis dataKey="date" tick={{ fontSize: 10 }} /><YAxis yAxisId="l" tick={{ fontSize: 10 }} /><YAxis yAxisId="r" orientation="right" tick={{ fontSize: 10 }} />
-            <Tooltip contentStyle={{ background: '#0b1220', border: '1px solid #26324a', fontSize: 12 }} /><Legend wrapperStyle={{ fontSize: 11 }} />
+            <Tooltip contentStyle={{ background: '#0b1220', border: '1px solid #22324b', fontSize: 12 }} /><Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar yAxisId="l" dataKey="detections" name="detections" fill={C.viirs} /><Line yAxisId="r" dataKey="cumulative_footprint_km2" name="cumulative footprint km²" stroke={C.est} dot={false} /><Line yAxisId="l" dataKey="frp_max_mw" name="max FRP (MW)" stroke={C.terra} dot={false} /></ComposedChart></ResponsiveContainer></div>
         </Card>
         <div className="grid gap-4 xl:grid-cols-2">
@@ -185,7 +185,7 @@ export function BurnedAreaPage() {
         </Card>
         <Card title="Burned area by state" sub={sum.data?.uncertainty || sum.data?.note}>
           <State loading={sum.loading} error={sum.error} empty={!sum.data?.items.length}>
-            <div className="h-72"><ResponsiveContainer><BarChart data={(sum.data?.items || []).slice(0, 15)}><CartesianGrid stroke={C.grid} /><XAxis dataKey="state" tick={{ fontSize: 9 }} interval={0} angle={-30} textAnchor="end" height={70} /><YAxis tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ background: '#0b1220', border: '1px solid #26324a', fontSize: 12 }} /><Bar dataKey="burned_km2" name="burned km²" fill={C.viirs} /></BarChart></ResponsiveContainer></div>
+            <div className="h-72"><ResponsiveContainer><BarChart data={(sum.data?.items || []).slice(0, 15)}><CartesianGrid stroke={C.grid} /><XAxis dataKey="state" tick={{ fontSize: 9 }} interval={0} angle={-30} textAnchor="end" height={70} /><YAxis tick={{ fontSize: 10 }} /><Tooltip contentStyle={{ background: '#0b1220', border: '1px solid #22324b', fontSize: 12 }} /><Bar dataKey="burned_km2" name="burned km²" fill={C.viirs} /></BarChart></ResponsiveContainer></div>
           </State>
         </Card>
       </>}</State>
@@ -305,7 +305,7 @@ export function GeostationaryPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card title="Diurnal sampling of fire detections (local solar time)" sub={di.data ? `${di.data.time_basis}. Counts are per sensor and not comparable across sensors.` : undefined}>
           <State loading={di.loading} error={di.error} empty={!di.data}>
-            <div className="h-64"><ResponsiveContainer><BarChart data={rows}><CartesianGrid stroke={C.grid} /><XAxis dataKey="hour" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => compact(v)} /><Tooltip contentStyle={{ background: '#0b1220', border: '1px solid #26324a', fontSize: 12 }} /><Legend wrapperStyle={{ fontSize: 11 }} />
+            <div className="h-64"><ResponsiveContainer><BarChart data={rows}><CartesianGrid stroke={C.grid} /><XAxis dataKey="hour" tick={{ fontSize: 10 }} /><YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => compact(v)} /><Tooltip contentStyle={{ background: '#0b1220', border: '1px solid #22324b', fontSize: 12 }} /><Legend wrapperStyle={{ fontSize: 11 }} />
               {sats.map((s, i) => <Bar key={s} dataKey={s} stackId="a" fill={[C.terra, C.aqua, C.viirs, C.n20, C.n21][i % 5]} />)}</BarChart></ResponsiveContainer></div>
             <p className="text-xs text-slate-400">Hours with no observation from any sensor: {di.data?.missing_hours.join(', ')}. Hourly activity estimate: <Tag s={di.data?.hourly_activity_estimate.status || 'NOT_AVAILABLE'} /> {di.data?.hourly_activity_estimate.reason}</p>
           </State>

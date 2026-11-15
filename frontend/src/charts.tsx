@@ -11,7 +11,7 @@ type Row = object
 const get = (r: Row, k: string) => (r as Record<string, unknown>)[k]
 
 const axis = { stroke: '#475569', tick: { fill: '#94a3b8', fontSize: 11 }, tickLine: false as const }
-const tip = { contentStyle: { background: '#0B0F19', border: '1px solid #26324a', borderRadius: 6, fontSize: 12, color: '#e2e8f0' }, labelStyle: { color: '#f8fafc', fontWeight: 600 }, itemStyle: { color: '#cbd5e1', padding: 0 } }
+const tip = { contentStyle: { background: '#080d17', border: '1px solid #22324b', borderRadius: 6, fontSize: 12, color: '#e2e8f0' }, labelStyle: { color: '#f8fafc', fontWeight: 600 }, itemStyle: { color: '#cbd5e1', padding: 0 } }
 
 const fmtVal = (v: Val | null | undefined, yFmt?: (v: number) => string) => {
   if (Array.isArray(v)) return v[0] == null ? '–' : `${(yFmt || ((x) => num(x)))(Number(v[0]))} – ${(yFmt || ((x) => num(x)))(Number(v[1]))}`
@@ -36,7 +36,7 @@ export function Series({ data, x = 'date', lines = [], bands = [], bars = [], he
         {legend && nSeries > 1 && <Legend iconType="plainline" wrapperStyle={{ fontSize: 12, color: '#cbd5e1', paddingTop: 4 }} />}
         {bands.map((b) => <Area key={b.key} dataKey={b.key} name={b.name} stroke="none" fill={b.color} fillOpacity={0.22} isAnimationActive={false} connectNulls={false} legendType="rect" />)}
         {bars.map((b) => <Bar key={b.key} dataKey={b.key} name={b.name} fill={b.color} stackId={b.stack} radius={b.stack ? 0 : [3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false} legendType="rect" />)}
-        {lines.map((l) => <Line key={l.key} dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={l.width ?? 2} strokeDasharray={l.dash} dot={l.dots ? { r: 3, fill: l.color, stroke: '#111827', strokeWidth: 1 } : false} activeDot={{ r: 4 }} isAnimationActive={false} connectNulls={false} />)}
+        {lines.map((l) => <Line key={l.key} dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={l.width ?? 2} strokeDasharray={l.dash} dot={l.dots ? { r: 3, fill: l.color, stroke: '#0f1726', strokeWidth: 1 } : false} activeDot={{ r: 4 }} isAnimationActive={false} connectNulls={false} />)}
         {refs.map((r, i) => <ReferenceLine key={i} x={r.x} y={r.y} stroke="#e2e8f0" strokeDasharray="4 3" label={{ value: r.label, fill: '#e2e8f0', fontSize: 11, position: r.x !== undefined ? 'insideTopRight' : 'insideTopLeft' }} />)}
       </ComposedChart>
     </ResponsiveContainer>

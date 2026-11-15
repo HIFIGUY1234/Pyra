@@ -4,8 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: { 950: '#0B0F19', 900: '#111827', 800: '#172033', 700: '#1f2a40', 600: '#2b3954' },
-        line: '#26324a',
+        // Navy/charcoal surfaces: base, panel, raised, hover, strong rule.
+        ink: { 950: '#080d17', 900: '#0f1726', 800: '#141f33', 700: '#1a2740', 600: '#2c3d5a' },
+        line: '#22324b',
+        fire: { DEFAULT: '#e8692a', soft: '#f0782d' },
       },
       fontFamily: { sans: ['Inter', 'system-ui', 'Segoe UI', 'sans-serif'], mono: ['JetBrains Mono', 'ui-monospace', 'Consolas', 'monospace'] },
     },

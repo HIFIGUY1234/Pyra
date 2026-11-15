@@ -99,10 +99,10 @@ export function ReferencePage() {
               <p className="mt-2 text-xs text-slate-400">Forecast served by default: <b>{d.forecast_served}</b>. Independent models: {d.forecast_models.join(', ') || 'none'}.</p>
               {role === 'admin' && passing.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  <select aria-label="Operational platform" value={choice} onChange={(e) => setChoice(e.target.value)} className="rounded border border-line bg-[#0B0F19] px-2 py-1">
+                  <select aria-label="Operational platform" value={choice} onChange={(e) => setChoice(e.target.value)} className="rounded border border-line bg-[#080d17] px-2 py-1">
                     <option value="">Evidence default</option>{passing.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  <input aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (required)" className="min-w-[14rem] rounded border border-line bg-[#0B0F19] px-2 py-1" />
+                  <input aria-label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (required)" className="min-w-[14rem] rounded border border-line bg-[#080d17] px-2 py-1" />
                   <Btn small kind="primary" disabled={reason.length < 5} onClick={() => save(choice || null)}>Save selection</Btn>
                   {msg && <span className="text-slate-300">{msg}</span>}
                 </div>
@@ -228,7 +228,7 @@ export function ForecastModelsPage() {
       <Card title="Region forecast by sensor" sub="Choose the target satellite explicitly. There is no silent fallback between sensors.">
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
           <label htmlFor="fsensor" className="text-slate-400">Target sensor</label>
-          <select id="fsensor" aria-label="Forecast target sensor" value={chosen} onChange={(e) => setSensor(e.target.value)} className="rounded border border-line bg-[#0B0F19] px-2 py-1">
+          <select id="fsensor" aria-label="Forecast target sensor" value={chosen} onChange={(e) => setSensor(e.target.value)} className="rounded border border-line bg-[#080d17] px-2 py-1">
             {(models.data?.items || []).map((m) => <option key={m.reference_sensor} value={m.reference_sensor}>{m.reference_sensor}{m.legacy ? ' (legacy, retired)' : ''}</option>)}
           </select>
           <span className="text-slate-500">default: {models.data?.served_by_default}</span>
@@ -289,9 +289,9 @@ export function Viirs750Page() {
       </Card>
       <Card title="Granule search (public CMR, no login)">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <select aria-label="750 m satellite" value={q.satellite} onChange={(e) => setQ({ ...q, satellite: e.target.value })} className="rounded border border-line bg-[#0B0F19] px-2 py-1">{['NOAA-21', 'NOAA-20', 'Suomi NPP'].map((s) => <option key={s}>{s}</option>)}</select>
-          <input aria-label="Start date" type="date" value={q.start} onChange={(e) => setQ({ ...q, start: e.target.value })} className="rounded border border-line bg-[#0B0F19] px-2 py-1" />
-          <input aria-label="End date" type="date" value={q.end} onChange={(e) => setQ({ ...q, end: e.target.value })} className="rounded border border-line bg-[#0B0F19] px-2 py-1" />
+          <select aria-label="750 m satellite" value={q.satellite} onChange={(e) => setQ({ ...q, satellite: e.target.value })} className="rounded border border-line bg-[#080d17] px-2 py-1">{['NOAA-21', 'NOAA-20', 'Suomi NPP'].map((s) => <option key={s}>{s}</option>)}</select>
+          <input aria-label="Start date" type="date" value={q.start} onChange={(e) => setQ({ ...q, start: e.target.value })} className="rounded border border-line bg-[#080d17] px-2 py-1" />
+          <input aria-label="End date" type="date" value={q.end} onChange={(e) => setQ({ ...q, end: e.target.value })} className="rounded border border-line bg-[#080d17] px-2 py-1" />
           <Btn small onClick={search} disabled={busy}>{busy ? 'Searching…' : 'Search'}</Btn>
           {role === 'admin' && <Btn small kind="primary" onClick={fetchJob} disabled={!cr.data?.configured} title={cr.data?.configured ? 'Queue download + conversion job' : 'Earthdata credentials not configured'}>Download & convert (job)</Btn>}
         </div>
@@ -325,9 +325,9 @@ export function ExposurePage({ kind }: { kind: 'population' | 'infrastructure' }
           </>)}
         </State>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <input aria-label="Latitude" value={pt.lat} onChange={(e) => setPt({ ...pt, lat: e.target.value })} className="w-20 rounded border border-line bg-[#0B0F19] px-2 py-1" />
-          <input aria-label="Longitude" value={pt.lon} onChange={(e) => setPt({ ...pt, lon: e.target.value })} className="w-20 rounded border border-line bg-[#0B0F19] px-2 py-1" />
-          <select aria-label="Category" value={pt.category} onChange={(e) => setPt({ ...pt, category: e.target.value })} className="rounded border border-line bg-[#0B0F19] px-2 py-1">{['road_major', 'road_minor', 'railway', 'power_line', 'power_minor', 'power_facility', 'settlement'].map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select>
+          <input aria-label="Latitude" value={pt.lat} onChange={(e) => setPt({ ...pt, lat: e.target.value })} className="w-20 rounded border border-line bg-[#080d17] px-2 py-1" />
+          <input aria-label="Longitude" value={pt.lon} onChange={(e) => setPt({ ...pt, lon: e.target.value })} className="w-20 rounded border border-line bg-[#080d17] px-2 py-1" />
+          <select aria-label="Category" value={pt.category} onChange={(e) => setPt({ ...pt, category: e.target.value })} className="rounded border border-line bg-[#080d17] px-2 py-1">{['road_major', 'road_minor', 'railway', 'power_line', 'power_minor', 'power_facility', 'settlement'].map((c) => <option key={c} value={c}>{titleCase(c)}</option>)}</select>
           <Btn small onClick={look}>Nearest</Btn>
           {near && <span>{near.status === 'found' ? `${num(near.distance_km, 2)} km — ${near.name || near.class || 'unnamed'}` : `${titleCase(near.status)}${near.reason ? `: ${near.reason}` : ''}`}</span>}
         </div>

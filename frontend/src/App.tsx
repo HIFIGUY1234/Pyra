@@ -1,66 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import {
-  BrowserRouter,
-  Routes,
-  Route,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom'
-import {
-  Activity,
-  AlertOctagon,
-  BarChart3,
-  Bell,
-  Calendar,
   CheckCircle2,
-  Clock,
   CloudUpload,
-  Compass,
   Database,
   Download,
   FileSpreadsheet,
   FileText,
-  Flame,
-  Gauge,
-  GitCompare,
-  Layers,
-  MapPin,
-  Menu,
   RefreshCw,
-  Satellite,
-  ShieldCheck,
-  Sliders,
-  Sparkles,
-  TrendingUp,
-  UserCheck,
   ArrowUpDown,
-  Landmark,
-  Building2,
-  Radar,
-  Orbit,
-  Settings,
-  Network,
-  Users,
-  Cpu,
+  Play,
 } from 'lucide-react'
 import {
   AppCtx,
   api,
   download,
-  getApiUser,
-  getAuthToken,
-  setApiUser,
   useApi,
   num,
   pct,
   titleCase,
-  RegionPicker,
-  regionName,
-  type Meta,
 } from './lib'
 import {
-  ArgonSidebar,
-  ArgonStatCard,
+  StatCard,
   Banner,
   Button,
   Card,
@@ -74,375 +35,19 @@ import {
   Table,
   UncertaintyNote,
   normalizeRiskKey,
-  type NavSectionItem,
   type ProvenanceType,
-} from './argon'
+} from './ui'
 import { AnomaliesPage, CalendarPage, HarmonizerPage, MorningGapPage, TrendsPage, UncertaintyPage, ValidationPage } from './science'
-import { AuthControl, CoverageCard, InventoryCard, LoginGate } from './completion'
+import { CoverageCard, InventoryCard } from './completion'
+import { AuthProvider, useAuth } from './auth'
+import { AuthSplash, LoginScreen } from './auth-ui'
+import { AppShell } from './shell'
+import { OverviewDashboardPage } from './overview'
 import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
 import { ExposurePanel } from './completion_final'
 import { BurnedAreaPage, DeploymentPage, EmissionsPage, ExternalValidationPage, FireEventDetailPage, FireEventsPage, GeostationaryPage, JobsPage, SmokePage } from './intel'
 import { ExposurePage, ForecastModelsPage, OrbitsPage, ReferencePage, ScoringPanel, SensorPage, SystemConfigPage, Viirs375Page, Viirs750Page } from './final_ops'
-import type { Alert, AlertList, AuthMe, CriticalItem, CriticalRegions, DashboardSummary, DataQuality, DataStatus, EvaluateResult, JobResponse, ReportCreated, ReportList, ReportRow, SatelliteSummary, ThresholdResponse, UploadResult } from './types'
-
-/* ==========================================================================
- * 1. All 17 PyroScope Sections for Argon Sidebar & Router
- * ========================================================================== */
-export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
-  { idx: '01', path: '/', label: 'Overview Dashboard', group: 'Core & Maps', icon: <Gauge className="h-4 w-4" /> },
-  { idx: '02', path: '/map', label: 'Live Fire Map', group: 'Core & Maps', icon: <MapPin className="h-4 w-4" /> },
-  { idx: '03', path: '/morning-gap', label: 'Morning-Gap Fixer', group: 'Harmonization & QA', icon: <Clock className="h-4 w-4" /> },
-  { idx: '04', path: '/harmonization', label: 'MODIS–VIIRS Harmonizer', group: 'Harmonization & QA', icon: <GitCompare className="h-4 w-4" /> },
-  { idx: '05', path: '/uncertainty', label: 'Uncertainty Estimation', group: 'Harmonization & QA', icon: <Activity className="h-4 w-4" /> },
-  { idx: '06', path: '/validation', label: 'Validation & Seam Test', group: 'Harmonization & QA', icon: <ShieldCheck className="h-4 w-4" /> },
-  { idx: '06a', path: '/reference', label: 'Historical & Operational Reference', group: 'Sensors & Products', icon: <Radar className="h-4 w-4" /> },
-  { idx: '06b', path: '/sensors/noaa-20', label: 'NOAA-20 VIIRS', group: 'Sensors & Products', icon: <Satellite className="h-4 w-4" /> },
-  { idx: '06c', path: '/sensors/noaa-21', label: 'NOAA-21 VIIRS', group: 'Sensors & Products', icon: <Satellite className="h-4 w-4" /> },
-  { idx: '06d', path: '/products/viirs375', label: 'VIIRS 375 m', group: 'Sensors & Products', icon: <Layers className="h-4 w-4" /> },
-  { idx: '06e', path: '/products/viirs750', label: 'VIIRS 750 m', group: 'Sensors & Products', icon: <Layers className="h-4 w-4" /> },
-  { idx: '07', path: '/calendar', label: 'Burning Activity Calendar', group: 'Analytics & Forecast', icon: <Calendar className="h-4 w-4" /> },
-  { idx: '08', path: '/historical-trends', label: 'Historical Trends', group: 'Analytics & Forecast', icon: <TrendingUp className="h-4 w-4" /> },
-  { idx: '09', path: '/anomalies', label: 'Anomaly Detection', group: 'Analytics & Forecast', icon: <AlertOctagon className="h-4 w-4" /> },
-  { idx: '10', path: '/forecast', label: 'Regional Fire Forecast', group: 'Analytics & Forecast', icon: <Sparkles className="h-4 w-4" /> },
-  { idx: '10a', path: '/forecast/models', label: 'Forecast Models by Sensor', group: 'Analytics & Forecast', icon: <Cpu className="h-4 w-4" /> },
-  { idx: '11', path: '/critical-regions', label: 'Critical Regions', group: 'Analytics & Forecast', icon: <Flame className="h-4 w-4" /> },
-  { idx: 'F1', path: '/events', label: 'Fire Events', group: 'Fire Intelligence', icon: <Flame className="h-4 w-4" /> },
-  { idx: 'F2', path: '/geostationary', label: 'Geostationary & Diurnal', group: 'Fire Intelligence', icon: <Satellite className="h-4 w-4" /> },
-  { idx: 'F3', path: '/burned-area', label: 'Burned-Area Mapping', group: 'Fire Intelligence', icon: <Layers className="h-4 w-4" /> },
-  { idx: 'F4', path: '/emissions', label: 'Emissions Estimation', group: 'Fire Intelligence', icon: <Activity className="h-4 w-4" /> },
-  { idx: 'F5', path: '/smoke', label: 'Smoke Transport', group: 'Fire Intelligence', icon: <Compass className="h-4 w-4" /> },
-  { idx: 'F6', path: '/external-validation', label: 'External Validation', group: 'Fire Intelligence', icon: <ShieldCheck className="h-4 w-4" /> },
-  { idx: '12', path: '/observations', label: 'Observation Intelligence', group: 'Analytics & Forecast', icon: <Compass className="h-4 w-4" /> },
-  { idx: '12a', path: '/orbits', label: 'Orbital Opportunities', group: 'Analytics & Forecast', icon: <Orbit className="h-4 w-4" /> },
-  { idx: '12b', path: '/exposure/population', label: 'Population Exposure', group: 'Analytics & Forecast', icon: <Users className="h-4 w-4" /> },
-  { idx: '12c', path: '/exposure/infrastructure', label: 'Infrastructure Exposure', group: 'Analytics & Forecast', icon: <Network className="h-4 w-4" /> },
-  { idx: '13', path: '/alerts', label: 'Alerts & Escalation', group: 'Decision Support', icon: <Bell className="h-4 w-4" /> },
-  { idx: '14', path: '/government', label: 'Government Dashboard', group: 'Decision Support', icon: <Landmark className="h-4 w-4" /> },
-  { idx: '15', path: '/organisation', label: 'Organisation Dashboard', group: 'Decision Support', icon: <Building2 className="h-4 w-4" /> },
-  { idx: '16', path: '/thresholds', label: 'Threshold Configuration', group: 'Governance & Data', icon: <Sliders className="h-4 w-4" /> },
-  { idx: '17', path: '/data', label: 'Data Management', group: 'Governance & Data', icon: <Database className="h-4 w-4" /> },
-  { idx: '18', path: '/data/quality', label: 'Data Quality Report', group: 'Governance & Data', icon: <BarChart3 className="h-4 w-4" /> },
-  { idx: '19', path: '/reports', label: 'Reports & Exports', group: 'Governance & Data', icon: <FileText className="h-4 w-4" /> },
-  { idx: '20a', path: '/jobs', label: 'Background Jobs', group: 'Governance & Data', icon: <RefreshCw className="h-4 w-4" /> },
-  { idx: '20b', path: '/deployment', label: 'Deployment Health', group: 'Governance & Data', icon: <Cpu className="h-4 w-4" /> },
-  { idx: '20', path: '/system', label: 'System Configuration', group: 'Governance & Data', icon: <Settings className="h-4 w-4" /> },
-]
-
-/* ==========================================================================
- * 2. Overview Dashboard (`/`)
- * ========================================================================== */
-function OverviewDashboardPage() {
-  const navigate = useNavigate()
-  const { data: summary, loading, error, reload } = useApi<DashboardSummary>('/api/dashboard/summary')
-  const { data: alertsResp } = useApi<AlertList>('/api/alerts?open_only=true')
-
-  const derived = useMemo(() => {
-    if (!summary) return null
-    const sats = summary.satellites || {}
-    const satEntries = Object.entries(sats) as [string, SatelliteSummary][]
-
-    const modisCount =
-      summary.modis_count ??
-      (Number(sats.Terra?.detections || 0) + Number(sats.Aqua?.detections || 0))
-
-    const viirsCount =
-      summary.viirs_count ??
-      (Number(sats['Suomi NPP']?.detections || 0) +
-        Number(sats['NOAA-20']?.detections || 0) +
-        Number(sats['NOAA-21']?.detections || 0))
-
-    const totalHotspots =
-      summary.total_hotspots ??
-      summary.total_detections ??
-      satEntries.reduce((acc, [, v]) => acc + Number(v?.detections || 0), 0)
-
-    const firstDates = satEntries
-      .map(([, v]) => v?.first)
-      .filter(Boolean)
-      .sort()
-    const lastDates = satEntries
-      .map(([, v]) => v?.last)
-      .filter(Boolean)
-      .sort()
-    const earliest = firstDates[0] || null
-    const latest = summary.data_end || lastDates[lastDates.length - 1] || null
-    const dateRange =
-      summary.date_range ||
-      (earliest && latest ? `${earliest} → ${latest}` : latest || 'Unspanned')
-
-    const seamStatus = summary.seam?.status || summary.validation?.status
-    const harmonizationStatus =
-      summary.harmonization_status ||
-      (seamStatus
-        ? `${titleCase(seamStatus)}`
-        : summary.provenance_counts
-          ? 'Harmonized Series Ready'
-          : 'Awaiting Calibration')
-
-    const activeAlerts =
-      alertsResp?.total ??
-      summary.active_alerts ??
-      (summary.forecast
-        ? Number(summary.forecast.cells_high || 0) +
-          Number(summary.forecast.cells_very_high || 0)
-        : null)
-
-    return {
-      totalHotspots,
-      modisCount,
-      viirsCount,
-      dateRange,
-      harmonizationStatus,
-      activeAlerts,
-      satEntries,
-    }
-  }, [summary, alertsResp])
-
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-white">
-            PyroScope Overview Dashboard
-          </h1>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Multi-sensor MODIS &amp; VIIRS observation inventory, sensor harmonization state, and calibrated risk alert summary.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SimulatedBadge />
-          <Button variant="secondary" size="sm" onClick={reload}>
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh Summary
-          </Button>
-        </div>
-      </div>
-
-      <UncertaintyNote provenance="Harmonized Estimate">
-        Harmonized estimates adjust pre-2012 Terra/Aqua MODIS counts to VIIRS-equivalent detection scales with 95% predictive intervals.
-        {summary?.validation?.band_coverage_pct !== undefined && (
-          <>
-            {' '}Hold-out empirical 95% interval coverage:{' '}
-            <strong className="text-amber-300">
-              {num(summary.validation.band_coverage_pct, 1)}%
-            </strong>
-            .
-          </>
-        )}
-        {summary?.seam?.reduction_pct !== undefined && (
-          <>
-            {' '}2012 sensor-transition seam step reduction:{' '}
-            <strong className="text-emerald-300">
-              {num(summary.seam.reduction_pct, 1)}%
-            </strong>
-            .
-          </>
-        )}
-        {summary?.forecast?.brier !== undefined && (
-          <>
-            {' '}7-day forecast Brier score:{' '}
-            <strong className="text-orange-300">
-              {num(summary.forecast.brier, 4)}
-            </strong>{' '}
-            (ROC-AUC: {num(summary.forecast.roc_auc, 3)}).
-          </>
-        )}
-      </UncertaintyNote>
-
-      {loading && !summary && (
-        <Card>
-          <CardBody className="py-12 text-center text-sm text-slate-400 animate-pulse">
-            Loading dashboard summary from <code>GET /api/dashboard/summary</code>...
-          </CardBody>
-        </Card>
-      )}
-
-      {!loading && (error || !summary || !derived) && (
-        <EmptyStateCard
-          title="No Dashboard Summary Data Available"
-          description={
-            <>
-              <code>GET /api/dashboard/summary</code> returned{' '}
-              {error ? <span className="text-red-300">{error}</span> : 'an empty dataset'}.
-              PyroScope does not fabricate placeholder numbers. Load the repository FIRMS datasets or upload a satellite CSV to populate live metrics.
-            </>
-          }
-          action={
-            <Button variant="primary" onClick={() => navigate('/data')}>
-              <Database className="h-4 w-4" />
-              Open Data Management
-            </Button>
-          }
-        />
-      )}
-
-      {summary && derived && (
-        <>
-          {/* Six Required Argon Stat Cards */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <ArgonStatCard
-              title="Total Hotspots Loaded"
-              value={num(derived.totalHotspots)}
-              subValue={
-                <span>
-                  Ingested across <strong>{num(summary.datasets ?? derived.satEntries.length)}</strong> registered dataset(s) and{' '}
-                  <strong>{derived.satEntries.length}</strong> active satellite stream(s)
-                </span>
-              }
-              provenance="Actual Observation"
-              accentColor="#38bdf8"
-              icon={<Flame className="h-5 w-5" />}
-            />
-
-            <ArgonStatCard
-              title="MODIS Count"
-              value={num(derived.modisCount)}
-              subValue={
-                <span>
-                  Terra MODIS: <strong>{num(summary.satellites?.Terra?.detections ?? 0)}</strong> | Aqua MODIS:{' '}
-                  <strong>{num(summary.satellites?.Aqua?.detections ?? 0)}</strong>
-                </span>
-              }
-              provenance="Actual Observation"
-              accentColor="#3987e5"
-              icon={<Satellite className="h-5 w-5" />}
-            />
-
-            <ArgonStatCard
-              title="VIIRS Count"
-              value={num(derived.viirsCount)}
-              subValue={
-                <span>
-                  S-NPP: <strong>{num(summary.satellites?.['Suomi NPP']?.detections ?? 0)}</strong> | NOAA-20:{' '}
-                  <strong>{num(summary.satellites?.['NOAA-20']?.detections ?? 0)}</strong> | NOAA-21:{' '}
-                  <strong>{num(summary.satellites?.['NOAA-21']?.detections ?? 0)}</strong>
-                </span>
-              }
-              provenance="Actual Observation"
-              accentColor="#d95926"
-              icon={<Layers className="h-5 w-5" />}
-            />
-
-            <ArgonStatCard
-              title="Date Range Covered"
-              value={<span className="text-lg">{derived.dateRange}</span>}
-              subValue={
-                <span>
-                  Archive end: <strong>{summary.data_end || 'N/A'}</strong>
-                  {summary.missing_sensors?.length ? (
-                    <span className="text-amber-300">
-                      {' '}• Missing: {summary.missing_sensors.join(', ')}
-                    </span>
-                  ) : (
-                    ' • All target sensors spanned'
-                  )}
-                </span>
-              }
-              provenance="Actual Observation"
-              accentColor="#10b981"
-              icon={<Calendar className="h-5 w-5" />}
-            />
-
-            <ArgonStatCard
-              title="Harmonization Status"
-              value={<span className="text-lg">{derived.harmonizationStatus}</span>}
-              subValue={
-                <span>
-                  {summary.seam?.reduction_pct !== undefined
-                    ? `Seam step reduced by ${num(summary.seam.reduction_pct, 1)}% (${summary.seam.seam_month || '2012-01'})`
-                    : 'Cross-sensor MODIS→VIIRS calibration pipeline'}
-                </span>
-              }
-              provenance="Harmonized Estimate"
-              accentColor="#f59e0b"
-              icon={<GitCompare className="h-5 w-5" />}
-            />
-
-            <ArgonStatCard
-              title="Active Alerts"
-              value={derived.activeAlerts !== null ? num(derived.activeAlerts) : '0'}
-              subValue={
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <span>
-                    {alertsResp?.total !== undefined
-                      ? `${num(alertsResp.total)} open alert(s) in queue`
-                      : summary.forecast
-                        ? `${num(summary.forecast.cells_high)} High + ${num(summary.forecast.cells_very_high)} Very High cells`
-                        : 'No active advisories'}
-                  </span>
-                </span>
-              }
-              provenance="Calibrated Forecast"
-              accentColor="#f97316"
-              icon={<Bell className="h-5 w-5" />}
-            />
-          </div>
-
-          {/* Sensor Inventory Breakdown Card */}
-          {derived.satEntries.length > 0 && (
-            <Card>
-              <CardHeader
-                title="Loaded Satellite Sensor Inventory"
-                subtitle="Per-instrument temporal coverage, observation counts, and multi-day gap diagnostics from GET /api/dashboard/summary"
-                badge={<ProvenanceBadge type="Actual Observation" />}
-              />
-              <CardBody noPadding>
-                <Table
-                  headers={[
-                    'Sensor',
-                    'Instrument Label',
-                    'First Observation',
-                    'Last Observation',
-                    'Days in Span',
-                    'Active Fire Days',
-                    'Gap Days (≥Run)',
-                    'Total Detections',
-                    'Provenance',
-                  ]}
-                >
-                  {derived.satEntries.map(([satKey, info]) => (
-                    <tr
-                      key={satKey}
-                      className="hover:bg-[#172033]/60 transition-colors"
-                    >
-                      <td className="px-4 py-3 font-semibold text-white">
-                        {satKey}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {info.label || satKey}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                        {info.first || '-'}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                        {info.last || '-'}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {num(info.days_in_span)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums">
-                        {num(info.days_with_detections)}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-amber-300">
-                        {num(info.gap_days)}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-white tabular-nums">
-                        {num(info.detections)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ProvenanceBadge type="Actual Observation" />
-                      </td>
-                    </tr>
-                  ))}
-                </Table>
-              </CardBody>
-            </Card>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
+import type { Alert, AlertList, CriticalItem, CriticalRegions, DataQuality, DataStatus, EvaluateResult, JobResponse, ReportCreated, ReportList, ReportRow, ThresholdResponse, UploadResult } from './types'
 
 /* ==========================================================================
  * 3. Alerts Table (`/alerts`)
@@ -489,7 +94,7 @@ function AlertsTablePage() {
       await api<unknown>(`/api/alerts/${alertId}/${action}`, {
         method: 'POST',
         body: {
-          note: `Action ${action.toUpperCase()} executed via PyroScope Argon UI (Simulated – Prototype Only)`,
+          note: `Action ${action.toUpperCase()} recorded via PyroScope web interface`,
         },
       })
       setActionMsg({
@@ -557,7 +162,7 @@ function AlertsTablePage() {
             disabled={evalBusy}
             onClick={handleEvaluateAlerts}
           >
-            <Sparkles className="h-3.5 w-3.5 text-orange-400" />
+            <Play className="h-3.5 w-3.5" aria-hidden="true" />
             {evalBusy ? 'Evaluating...' : 'Evaluate Alert Rules'}
           </Button>
           <Button variant="outline" size="sm" onClick={reload}>
@@ -595,7 +200,7 @@ function AlertsTablePage() {
                 <select
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value)}
-                  className="bg-[#0B0F19] border border-[#26324a] rounded-lg px-2.5 py-1.5 text-xs text-slate-100"
+                  className="bg-[#080d17] border border-[#22324b] rounded-lg px-2.5 py-1.5 text-xs text-slate-100"
                 >
                   <option value="">All Alert Types</option>
                   <option value="PRE_FIRE_RISK_ADVISORY">
@@ -617,7 +222,7 @@ function AlertsTablePage() {
                 <select
                   value={tierFilter}
                   onChange={(e) => setTierFilter(e.target.value)}
-                  className="bg-[#0B0F19] border border-[#26324a] rounded-lg px-2.5 py-1.5 text-xs text-slate-100"
+                  className="bg-[#080d17] border border-[#22324b] rounded-lg px-2.5 py-1.5 text-xs text-slate-100"
                 >
                   <option value="">All Tiers</option>
                   <option value="LOW">Low (Green)</option>
@@ -671,7 +276,7 @@ function AlertsTablePage() {
               disabled={evalBusy}
               onClick={handleEvaluateAlerts}
             >
-              <Sparkles className="h-4 w-4" />
+              <Play className="h-4 w-4" aria-hidden="true" />
               Run Alert Evaluation
             </Button>
           }
@@ -709,7 +314,7 @@ function AlertsTablePage() {
                 return (
                   <tr
                     key={id}
-                    className="hover:bg-[#172033]/60 transition-colors"
+                    className="hover:bg-[#141f33]/60 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs font-bold text-orange-300 whitespace-nowrap">
                       #{id}
@@ -773,7 +378,7 @@ function AlertsTablePage() {
 
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
-                        <span className="inline-flex w-fit items-center rounded border border-[#26324a] bg-[#0B0F19] px-2 py-0.5 text-[11px] font-semibold text-slate-200">
+                        <span className="inline-flex w-fit items-center rounded border border-[#22324b] bg-[#080d17] px-2 py-0.5 text-[11px] font-semibold text-slate-200">
                           {item.status || 'NEW'}
                         </span>
                         <span className="text-[10px] text-fuchsia-300">
@@ -982,7 +587,7 @@ function CriticalRegionsPage() {
                 return (
                   <tr
                     key={item.district_id || item.id || idx}
-                    className="hover:bg-[#172033]/60 transition-colors"
+                    className="hover:bg-[#141f33]/60 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-xs font-bold text-slate-300">
                       #{idx + 1}
@@ -1244,7 +849,7 @@ function ThresholdConfigurationPage() {
           <form onSubmit={handleSaveThresholds} className="space-y-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {/* Tier 1: LOW 0-19% */}
-              <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/80 p-3.5">
+              <div className="rounded-md border border-[#22324b] bg-[#080d17]/80 p-3.5">
                 <FormGroup
                   label="LOW Tier (0–19%)"
                   badge={<RiskTierBadge tier="LOW" />}
@@ -1260,7 +865,7 @@ function ThresholdConfigurationPage() {
                       setLowMaxPct(val)
                       setWatchPct(Math.min(96, val + 1))
                     }}
-                    className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm font-bold text-white"
+                    className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm font-bold text-white"
                   />
                 </FormGroup>
                 <div className="mt-2">
@@ -1269,7 +874,7 @@ function ThresholdConfigurationPage() {
               </div>
 
               {/* Tier 2: WATCH 20-39% */}
-              <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/80 p-3.5">
+              <div className="rounded-md border border-[#22324b] bg-[#080d17]/80 p-3.5">
                 <FormGroup
                   label="WATCH Tier (20–39%)"
                   badge={<RiskTierBadge tier="WATCH" />}
@@ -1285,7 +890,7 @@ function ThresholdConfigurationPage() {
                       setWatchPct(val)
                       setLowMaxPct(Math.max(0, val - 1))
                     }}
-                    className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm font-bold text-white"
+                    className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm font-bold text-white"
                   />
                 </FormGroup>
                 <div className="mt-2">
@@ -1294,7 +899,7 @@ function ThresholdConfigurationPage() {
               </div>
 
               {/* Tier 3: MODERATE 40-59% */}
-              <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/80 p-3.5">
+              <div className="rounded-md border border-[#22324b] bg-[#080d17]/80 p-3.5">
                 <FormGroup
                   label="MODERATE Tier (40–59%)"
                   badge={<RiskTierBadge tier="MODERATE" />}
@@ -1306,7 +911,7 @@ function ThresholdConfigurationPage() {
                     max={97}
                     value={moderatePct}
                     onChange={(e) => setModeratePct(Number(e.target.value))}
-                    className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm font-bold text-white"
+                    className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm font-bold text-white"
                   />
                 </FormGroup>
                 <div className="mt-2">
@@ -1315,7 +920,7 @@ function ThresholdConfigurationPage() {
               </div>
 
               {/* Tier 4: HIGH 60-79% */}
-              <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/80 p-3.5">
+              <div className="rounded-md border border-[#22324b] bg-[#080d17]/80 p-3.5">
                 <FormGroup
                   label="HIGH Tier (60–79%)"
                   badge={<RiskTierBadge tier="HIGH" />}
@@ -1327,7 +932,7 @@ function ThresholdConfigurationPage() {
                     max={98}
                     value={highPct}
                     onChange={(e) => setHighPct(Number(e.target.value))}
-                    className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm font-bold text-white"
+                    className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm font-bold text-white"
                   />
                 </FormGroup>
                 <div className="mt-2">
@@ -1336,7 +941,7 @@ function ThresholdConfigurationPage() {
               </div>
 
               {/* Tier 5: VERY HIGH 80-100% */}
-              <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/80 p-3.5">
+              <div className="rounded-md border border-[#22324b] bg-[#080d17]/80 p-3.5">
                 <FormGroup
                   label="VERY HIGH (80–100%)"
                   badge={<RiskTierBadge tier="VERY_HIGH" />}
@@ -1348,7 +953,7 @@ function ThresholdConfigurationPage() {
                     max={99}
                     value={veryHighPct}
                     onChange={(e) => setVeryHighPct(Number(e.target.value))}
-                    className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm font-bold text-white"
+                    className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm font-bold text-white"
                   />
                 </FormGroup>
                 <div className="mt-2">
@@ -1369,7 +974,7 @@ function ThresholdConfigurationPage() {
                   max={720}
                   value={cooldownHours}
                   onChange={(e) => setCooldownHours(Number(e.target.value))}
-                  className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white"
                 />
               </FormGroup>
 
@@ -1383,7 +988,7 @@ function ThresholdConfigurationPage() {
                   max={6}
                   value={evidenceMin}
                   onChange={(e) => setEvidenceMin(Number(e.target.value))}
-                  className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white"
                 />
               </FormGroup>
 
@@ -1394,7 +999,7 @@ function ThresholdConfigurationPage() {
                 <select
                   value={scopeType}
                   onChange={(e) => setScopeType(e.target.value as 'default' | 'land_use' | 'state')}
-                  className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white"
                 >
                   <option value="default">Default (National)</option>
                   <option value="land_use">Land-Use Override</option>
@@ -1412,7 +1017,7 @@ function ThresholdConfigurationPage() {
                   value={scopeValue}
                   onChange={(e) => setScopeValue(e.target.value)}
                   placeholder={scopeType === 'default' ? 'National Default' : 'e.g. Forest or Madhya Pradesh'}
-                  className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white disabled:opacity-40"
+                  className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white disabled:opacity-40"
                 />
               </FormGroup>
             </div>
@@ -1422,7 +1027,7 @@ function ThresholdConfigurationPage() {
                 type="text"
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
-                className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white"
               />
             </FormGroup>
 
@@ -1458,7 +1063,7 @@ function ThresholdConfigurationPage() {
               ]}
             >
               {data.configs.map((cfg) => (
-                <tr key={cfg.id} className="hover:bg-[#172033]/60">
+                <tr key={cfg.id} className="hover:bg-[#141f33]/60">
                   <td className="px-4 py-3 font-semibold text-white">
                     {cfg.scope_type}
                     {cfg.scope_value ? `: ${cfg.scope_value}` : ' (Default)'}
@@ -1619,7 +1224,7 @@ function DataManagementPage() {
         <ProvenanceBadge type="Actual Observation" />
       </div>
 
-      {/* Argon Card with Two Required Sections */}
+      {/* Data management */}
       <Card>
         <CardHeader
           title="Dataset Ingestion & Upload Pipeline"
@@ -1628,7 +1233,7 @@ function DataManagementPage() {
         />
         <CardBody className="space-y-6">
           {/* Section 1: Load Repository Datasets */}
-          <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/70 p-5 space-y-4">
+          <div className="rounded-md border border-[#22324b] bg-[#080d17]/70 p-5 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1668,7 +1273,7 @@ function DataManagementPage() {
             )}
 
             {activeJob && (
-              <div className="rounded-lg border border-[#26324a] bg-[#111827] p-4 space-y-2.5 text-xs">
+              <div className="rounded-lg border border-[#22324b] bg-[#0f1726] p-4 space-y-2.5 text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-300">
@@ -1699,7 +1304,7 @@ function DataManagementPage() {
                 )}
 
                 {Array.isArray(activeJob.log) && activeJob.log.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto rounded bg-[#0B0F19] p-2.5 font-mono text-[11px] text-slate-300 space-y-1 border border-[#26324a]">
+                  <div className="max-h-40 overflow-y-auto rounded bg-[#080d17] p-2.5 font-mono text-[11px] text-slate-300 space-y-1 border border-[#22324b]">
                     {activeJob.log.map((line: string, i: number) => (
                       <div key={i}>{line}</div>
                     ))}
@@ -1710,7 +1315,7 @@ function DataManagementPage() {
           </div>
 
           {/* Section 2: Upload CSV Form */}
-          <div className="rounded-xl border border-[#26324a] bg-[#0B0F19]/70 p-5 space-y-4">
+          <div className="rounded-md border border-[#22324b] bg-[#080d17]/70 p-5 space-y-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1735,7 +1340,7 @@ function DataManagementPage() {
                 <select
                   value={selectedSatellite}
                   onChange={(e) => setSelectedSatellite(e.target.value)}
-                  className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm text-white"
+                  className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm text-white"
                 >
                   {UPLOAD_SATELLITE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -1748,7 +1353,7 @@ function DataManagementPage() {
                     aria-label="VIIRS product"
                     value={selectedProduct}
                     onChange={(e) => setSelectedProduct(e.target.value as '375m' | '750m')}
-                    className="mt-2 w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-2 text-sm text-white"
+                    className="mt-2 w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-2 text-sm text-white"
                     title="375 m and 750 m are different products and are never pooled"
                   >
                     <option value="375m">VIIRS 375 m (FIRMS VNP14IMGT / VJ114IMGT)</option>
@@ -1767,7 +1372,7 @@ function DataManagementPage() {
                   onChange={(e) =>
                     setSelectedFile(e.target.files?.[0] || null)
                   }
-                  className="w-full rounded-lg border border-[#26324a] bg-[#111827] px-3 py-1.5 text-xs text-slate-200 file:mr-3 file:rounded file:border-0 file:bg-orange-600 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white"
+                  className="w-full rounded-lg border border-[#22324b] bg-[#0f1726] px-3 py-1.5 text-xs text-slate-200 file:mr-3 file:rounded file:border-0 file:bg-orange-600 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-white"
                 />
               </FormGroup>
 
@@ -1792,7 +1397,7 @@ function DataManagementPage() {
 
             {/* API Validation Results */}
             {uploadResult && (
-              <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/5 p-4 space-y-3">
+              <div className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -1810,7 +1415,7 @@ function DataManagementPage() {
                       ([k, v]) => (
                         <div
                           key={k}
-                          className="rounded border border-[#26324a] bg-[#111827] px-3 py-2"
+                          className="rounded border border-[#22324b] bg-[#0f1726] px-3 py-2"
                         >
                           <div className="text-[10px] uppercase text-slate-400">
                             {titleCase(k)}
@@ -1953,9 +1558,9 @@ function DataQualityReportPage() {
 
       {hasDatasets && metrics && data && (
         <>
-          {/* Argon Quality Metric Cards */}
+          {/* Quality metrics */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <ArgonStatCard
+            <StatCard
               title="Missing Values %"
               value={`${num(metrics.missingPct, 2)}%`}
               subValue={
@@ -1969,7 +1574,7 @@ function DataQualityReportPage() {
               accentColor="#eab308"
             />
 
-            <ArgonStatCard
+            <StatCard
               title="Invalid Coordinates %"
               value={`${num(metrics.invalidCoordPct, 3)}%`}
               subValue={
@@ -1983,7 +1588,7 @@ function DataQualityReportPage() {
               accentColor="#f97316"
             />
 
-            <ArgonStatCard
+            <StatCard
               title="Duplicate Records"
               value={num(metrics.duplicateRecords)}
               subValue={
@@ -1999,7 +1604,7 @@ function DataQualityReportPage() {
               accentColor="#38bdf8"
             />
 
-            <ArgonStatCard
+            <StatCard
               title="Timestamp Errors"
               value={num(metrics.timestampErrors)}
               subValue={
@@ -2011,7 +1616,7 @@ function DataQualityReportPage() {
               accentColor="#dc2626"
             />
 
-            <ArgonStatCard
+            <StatCard
               title="FRP Issues"
               value={num(metrics.frpIssues)}
               subValue={
@@ -2025,7 +1630,7 @@ function DataQualityReportPage() {
               accentColor="#f59e0b"
             />
 
-            <ArgonStatCard
+            <StatCard
               title="Per-Dataset Retention"
               value={`${num(metrics.rowsKept)} / ${num(metrics.rowsRead)}`}
               subValue={
@@ -2072,7 +1677,7 @@ function DataQualityReportPage() {
                     Number(q.frp_invalid_negative || 0) +
                     Number(q.frp_extreme_gt_10000MW || 0)
                   return (
-                    <tr key={ds.key || i} className="hover:bg-[#172033]/60">
+                    <tr key={ds.key || i} className="hover:bg-[#141f33]/60">
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-white">
                         {ds.key || ds.file || `Dataset #${i + 1}`}
                       </td>
@@ -2130,7 +1735,7 @@ function DataQualityReportPage() {
                   ]}
                 >
                   {data.sensors.map((s) => (
-                    <tr key={s.satellite} className="hover:bg-[#172033]/60">
+                    <tr key={s.satellite} className="hover:bg-[#141f33]/60">
                       <td className="px-4 py-3 font-semibold text-white">
                         {s.label || s.satellite}
                       </td>
@@ -2282,7 +1887,7 @@ function ReportsPage() {
         Generated Full and Harmonized Summary reports embed sensor provenance tags, 95% harmonization confidence intervals, and calibrated 7-day forecast probability tables.
       </UncertaintyNote>
 
-      {/* Argon Report Generator Form */}
+      {/* Report generator */}
       <Card>
         <CardHeader
           title="Generate Regional Fire & Harmonization Report"
@@ -2303,7 +1908,7 @@ function ReportsPage() {
                 value={regionInput}
                 onChange={(e) => setRegionInput(e.target.value)}
                 placeholder="country or state:Madhya Pradesh"
-                className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white"
               />
             </FormGroup>
 
@@ -2316,7 +1921,7 @@ function ReportsPage() {
                 onChange={(e) =>
                   setReportType(e.target.value as 'full' | 'harmonized')
                 }
-                className="w-full rounded-lg border border-[#26324a] bg-[#0B0F19] px-3 py-2 text-sm text-white"
+                className="w-full rounded-lg border border-[#22324b] bg-[#080d17] px-3 py-2 text-sm text-white"
               >
                 <option value="full">Full</option>
                 <option value="harmonized">Harmonized Summary</option>
@@ -2343,7 +1948,7 @@ function ReportsPage() {
           )}
 
           {generatedPair && (
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3">
+            <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-bold text-white">
                   Report Generated for{' '}
@@ -2393,7 +1998,7 @@ function ReportsPage() {
         </CardBody>
       </Card>
 
-      {/* Existing Reports Argon Table */}
+      {/* Existing reports */}
       {loading && !data && (
         <Card>
           <CardBody className="py-10 text-center text-sm text-slate-400 animate-pulse">
@@ -2437,7 +2042,7 @@ function ReportsPage() {
               ]}
             >
               {reportsList.map((r) => (
-                <tr key={r.id} className="hover:bg-[#172033]/60">
+                <tr key={r.id} className="hover:bg-[#141f33]/60">
                   <td className="px-4 py-3 font-mono text-xs font-bold text-orange-300">
                     #{r.id}
                   </td>
@@ -2496,170 +2101,83 @@ function ReportsPage() {
 }
 
 /* ==========================================================================
- * Top Navbar & Main Argon Shell Layout
+ * Application root: authentication gate -> shell -> routes
  * ========================================================================== */
-function ArgonShell() {
-  const location = useLocation()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [user, setUserState] = useState<string>(getApiUser())
-  const [region, setRegion] = useState<string>('country')
-  const { data: meta, reload: reloadMeta } = useApi<Meta>('/api/meta')
-  const [authVersion, setAuthVersion] = useState(0)
-  const me = useApi<AuthMe>('/api/auth/me', [authVersion, user])
-
-  const setUser = (u: string) => {
-    setApiUser(u)
-    setUserState(u)
-  }
-
-  const role = useMemo(() => {
-    if (me.data?.role) return me.data.role as string            // authoritative: the server's view of who we are
-    const found = meta?.users?.find((x) => x.username === user)
-    return found?.role || 'analyst'
-  }, [meta, user, me.data])
-
-  const activeSection = useMemo(() => {
-    return (
-      PYROSCOPE_SECTIONS.find((s) => s.path === location.pathname) ||
-      PYROSCOPE_SECTIONS[0]
-    )
-  }, [location.pathname])
-
+function AppRoutes() {
   return (
-    <AppCtx.Provider
-      value={{
-        user,
-        setUser,
-        role,
-        region,
-        setRegion,
-        meta: meta || null,
-        reloadMeta,
-      }}
-    >
-      <div className="flex h-screen w-full overflow-hidden bg-[#0B0F19] text-slate-100">
-        {/* Persistent Left Argon Sidebar */}
-        <ArgonSidebar
-          sections={PYROSCOPE_SECTIONS}
-          hasData={Boolean(meta?.has_data)}
-          mobileOpen={mobileOpen}
-          onCloseMobile={() => setMobileOpen(false)}
-        />
+    <Routes>
+      <Route path="/" element={<OverviewDashboardPage />} />
+      <Route path="/alerts" element={<AlertsTablePage />} />
+      <Route path="/critical-regions" element={<CriticalRegionsPage />} />
+      <Route path="/thresholds" element={<ThresholdConfigurationPage />} />
+      <Route path="/data" element={<DataManagementPage />} />
+      <Route path="/data/quality" element={<DataQualityReportPage />} />
+      <Route path="/reports" element={<ReportsPage />} />
 
-        {/* Right Content Column: Top Argon Navbar + Main Router Outlet */}
-        <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
-          <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-[#26324a] bg-[#111827]/95 px-4 py-3 backdrop-blur lg:px-6">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(true)}
-                className="inline-flex items-center justify-center rounded-lg border border-[#26324a] bg-[#0B0F19] p-2 text-slate-300 hover:text-white lg:hidden"
-                aria-label="Open navigation menu"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] font-bold text-orange-400">
-                    [{activeSection.idx}/{PYROSCOPE_SECTIONS.length}]
-                  </span>
-                  <span className="text-sm font-bold text-white">
-                    {activeSection.label}
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400">
-                  Active Region: <strong className="text-slate-200">{regionName(region, meta || null)}</strong>
-                </div>
-              </div>
-            </div>
+      <Route path="/map" element={<LiveMapPage />} />
+      <Route path="/morning-gap" element={<MorningGapPage />} />
+      <Route path="/harmonization" element={<HarmonizerPage />} />
+      <Route path="/sensor-harmonizer" element={<HarmonizerPage />} />
+      <Route path="/uncertainty" element={<UncertaintyPage />} />
+      <Route path="/validation" element={<ValidationPage />} />
+      <Route path="/calendar" element={<CalendarPage />} />
+      <Route path="/historical-trends" element={<TrendsPage />} />
+      <Route path="/anomalies" element={<AnomaliesPage />} />
+      <Route path="/forecast" element={<ForecastPage />} />
+      <Route path="/forecast/models" element={<ForecastModelsPage />} />
+      <Route path="/reference" element={<ReferencePage />} />
+      <Route path="/sensors/noaa-20" element={<SensorPage sensor="NOAA-20" />} />
+      <Route path="/sensors/noaa-21" element={<SensorPage sensor="NOAA-21" />} />
+      <Route path="/products/viirs375" element={<Viirs375Page />} />
+      <Route path="/products/viirs750" element={<Viirs750Page />} />
+      <Route path="/exposure/population" element={<ExposurePage kind="population" />} />
+      <Route path="/exposure/infrastructure" element={<ExposurePage kind="infrastructure" />} />
+      <Route path="/orbits" element={<OrbitsPage />} />
+      <Route path="/system" element={<SystemConfigPage />} />
+      <Route path="/observations" element={<ObservationsPage />} />
+      <Route path="/government" element={<GovernmentPage />} />
+      <Route path="/organisation" element={<OrganisationPage />} />
+      <Route path="/events" element={<FireEventsPage />} />
+      <Route path="/events/:id" element={<FireEventDetailPage />} />
+      <Route path="/geostationary" element={<GeostationaryPage />} />
+      <Route path="/burned-area" element={<BurnedAreaPage />} />
+      <Route path="/emissions" element={<EmissionsPage />} />
+      <Route path="/smoke" element={<SmokePage />} />
+      <Route path="/external-validation" element={<ExternalValidationPage />} />
+      <Route path="/jobs" element={<JobsPage />} />
+      <Route path="/deployment" element={<DeploymentPage />} />
+      <Route path="*" element={<OverviewDashboardPage />} />
+  </Routes>
+  )
+}
 
-            <div className="flex flex-wrap items-center gap-3">
-              <RegionPicker allowCustom />
-              <AuthControl onChange={() => { setAuthVersion((n) => n + 1); reloadMeta() }} />
-              {!getAuthToken() && meta?.auth_mode !== 'production' && <div className="flex items-center gap-1.5 rounded-lg border border-[#26324a] bg-[#0B0F19] px-2.5 py-1 text-xs">
-                <UserCheck className="h-3.5 w-3.5 text-orange-400" />
-                <select
-                  aria-label="Active operator profile"
-                  value={user}
-                  onChange={(e) => setUser(e.target.value)}
-                  className="bg-transparent border-0 p-0 text-xs font-semibold text-slate-200 focus:ring-0"
-                >
-                  {(
-                    meta?.users || [
-                      { username: 'analyst', display_name: 'Fire Analyst', role: 'analyst' },
-                      { username: 'officer', display_name: 'Nodal Officer', role: 'officer' },
-                      { username: 'admin', display_name: 'System Admin', role: 'admin' },
-                    ]
-                  ).map((u) => (
-                    <option key={u.username} value={u.username} className="bg-[#111827]">
-                      {u.display_name} ({u.role})
-                    </option>
-                  ))}
-                </select>
-              </div>}
-            </div>
-          </header>
-
-          {/* Main Content Area with React Router v6 Routes */}
-          <main className="flex-1 overflow-y-auto bg-[#0B0F19] p-4 lg:p-6">
-            <div className="mx-auto max-w-[1500px]">
-              <LoginGate>
-              <Routes>
-                <Route path="/" element={<OverviewDashboardPage />} />
-                <Route path="/alerts" element={<AlertsTablePage />} />
-                <Route path="/critical-regions" element={<CriticalRegionsPage />} />
-                <Route path="/thresholds" element={<ThresholdConfigurationPage />} />
-                <Route path="/data" element={<DataManagementPage />} />
-                <Route path="/data/quality" element={<DataQualityReportPage />} />
-                <Route path="/reports" element={<ReportsPage />} />
-
-                <Route path="/map" element={<LiveMapPage />} />
-                <Route path="/morning-gap" element={<MorningGapPage />} />
-                <Route path="/harmonization" element={<HarmonizerPage />} />
-                <Route path="/sensor-harmonizer" element={<HarmonizerPage />} />
-                <Route path="/uncertainty" element={<UncertaintyPage />} />
-                <Route path="/validation" element={<ValidationPage />} />
-                <Route path="/calendar" element={<CalendarPage />} />
-                <Route path="/historical-trends" element={<TrendsPage />} />
-                <Route path="/anomalies" element={<AnomaliesPage />} />
-                <Route path="/forecast" element={<ForecastPage />} />
-                <Route path="/forecast/models" element={<ForecastModelsPage />} />
-                <Route path="/reference" element={<ReferencePage />} />
-                <Route path="/sensors/noaa-20" element={<SensorPage sensor="NOAA-20" />} />
-                <Route path="/sensors/noaa-21" element={<SensorPage sensor="NOAA-21" />} />
-                <Route path="/products/viirs375" element={<Viirs375Page />} />
-                <Route path="/products/viirs750" element={<Viirs750Page />} />
-                <Route path="/exposure/population" element={<ExposurePage kind="population" />} />
-                <Route path="/exposure/infrastructure" element={<ExposurePage kind="infrastructure" />} />
-                <Route path="/orbits" element={<OrbitsPage />} />
-                <Route path="/system" element={<SystemConfigPage />} />
-                <Route path="/observations" element={<ObservationsPage />} />
-                <Route path="/government" element={<GovernmentPage />} />
-                <Route path="/organisation" element={<OrganisationPage />} />
-                <Route path="/events" element={<FireEventsPage />} />
-                <Route path="/events/:id" element={<FireEventDetailPage />} />
-                <Route path="/geostationary" element={<GeostationaryPage />} />
-                <Route path="/burned-area" element={<BurnedAreaPage />} />
-                <Route path="/emissions" element={<EmissionsPage />} />
-                <Route path="/smoke" element={<SmokePage />} />
-                <Route path="/external-validation" element={<ExternalValidationPage />} />
-                <Route path="/jobs" element={<JobsPage />} />
-                <Route path="/deployment" element={<DeploymentPage />} />
-                <Route path="*" element={<OverviewDashboardPage />} />
-              </Routes>
-              </LoginGate>
-            </div>
-          </main>
-        </div>
-      </div>
+function Gate() {
+  const auth = useAuth()
+  const [region, setRegion] = useState<string>('country')
+  if (auth.status === 'initialising' || auth.status === 'error') return <AuthSplash />
+  // Production without a valid session: nothing but the sign-in screen. The URL is kept, so after sign-in the
+  // requested page renders.
+  if (auth.status === 'anonymous' || auth.status === 'session_expired' || !auth.identity) return <LoginScreen />
+  const { identity } = auth
+  return (
+    <AppCtx.Provider value={{
+      user: identity.username, setUser: (u) => { void auth.selectPersona(u) }, role: identity.role,
+      region, setRegion, meta: auth.meta, reloadMeta: auth.reloadMeta,
+    }}>
+      <AppShell>
+        {/* Remount every page when the identity changes so no user- or organisation-specific data survives a switch. */}
+        <React.Fragment key={auth.identityKey}><AppRoutes /></React.Fragment>
+      </AppShell>
     </AppCtx.Provider>
   )
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ArgonShell />
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Gate />
+      </BrowserRouter>
+    </AuthProvider>
   )
 }

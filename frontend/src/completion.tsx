@@ -1,8 +1,8 @@
-/* Completion-stage UI: authentication, dataset inventory, geographic coverage,
+/* Completion-stage UI: dataset inventory, geographic coverage,
  * notification delivery log and validation-kind labelling. All values come from the API. */
-import { useState, type ReactNode } from 'react'
-import { KeyRound, LogOut, RefreshCw, ShieldCheck } from 'lucide-react'
-import { api, Card, getAuthToken, Note, num, setAuthToken, State, titleCase, useApi, useApp } from './lib'
+import { useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { api, Card, Note, num, State, titleCase, useApi, useApp } from './lib'
 
 /* ------------------------------------------------------------------ API shapes */
 type DnScore = { wape_pct?: number | null; bias_pct?: number | null; n?: number }
@@ -13,8 +13,6 @@ type ValidationLike = {
 }
 type SeamLike = { validation_kind?: string; step_harmonized_band?: [number, number] | null
   genuine_change?: { detectable: boolean; direction?: string; reference_step?: number | null; note?: string | null } }
-type Me = { username: string; role: string }
-type LoginResp = { token: string }
 type Member = { kind: string; bytes: number }
 type Archive = { file: string; status: string; integrity?: string; instrument?: string; collection?: string; bytes?: number; sha256?: string; expected_sha256?: string; members?: Member[]; message?: string }
 type Span = { first: string; last: string }
@@ -73,63 +71,6 @@ export function ValidationMethod({ v, seam }: { v: ValidationLike | null | undef
       )}
     </Card>
   )
-}
-
-/* ------------------------------------------------------------------ authentication */
-export function AuthControl({ onChange }: { onChange: () => void }) {
-  const { meta } = useApp()
-  const [open, setOpen] = useState(false)
-  const [u, setU] = useState('')
-  const [p, setP] = useState('')
-  const [err, setErr] = useState<string | null>(null)
-  const me = useApi<Me>('/api/auth/me', [getAuthToken()])
-  const token = getAuthToken()
-  const login = async () => {
-    setErr(null)
-    try {
-      const r = await api<LoginResp>('/api/auth/login', { body: { username: u, password: p } })
-      setAuthToken(r.token); setP(''); setOpen(false); onChange(); me.reload()
-    } catch (e) { setErr(errMsg(e)) }
-  }
-  const logout = async () => {
-    try { await api<unknown>('/api/auth/logout', { method: 'POST' }) } catch { /* session may already be gone */ }
-    setAuthToken(null); onChange(); me.reload()
-  }
-  return (
-    <div className="relative">
-      {token ? (
-        <button onClick={logout} className="flex items-center gap-1.5 rounded-lg border border-emerald-600/50 bg-[#0B0F19] px-2.5 py-1 text-xs text-emerald-300" title="Signed in with a session token. Click to log out.">
-          <ShieldCheck className="h-3.5 w-3.5" />{me.data?.username || 'signed in'} ({me.data?.role || '…'})<LogOut className="h-3.5 w-3.5" />
-        </button>
-      ) : (
-        <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-lg border border-[#26324a] bg-[#0B0F19] px-2.5 py-1 text-xs text-slate-200">
-          <KeyRound className="h-3.5 w-3.5 text-orange-400" />Log in
-        </button>
-      )}
-      {!token && meta && meta.auth_mode === 'dev' && (
-        <span className="ml-2 rounded border border-amber-500/50 px-1.5 py-0.5 text-[10px] uppercase text-amber-300" title="Demo personas use the X-User header; disabled when PYROSCOPE_AUTH_MODE=production.">dev persona</span>
-      )}
-      {open && (
-        <div className="absolute right-0 z-30 mt-2 w-72 rounded-lg border border-line bg-ink-900 p-3 shadow-xl">
-          <div className="mb-2 text-xs font-semibold text-slate-200">Sign in</div>
-          <input aria-label="Username" className="mb-2 w-full rounded border border-line bg-[#0B0F19] px-2 py-1 text-xs" placeholder="username" value={u} onChange={(e) => setU(e.target.value)} />
-          <input aria-label="Password" type="password" className="mb-2 w-full rounded border border-line bg-[#0B0F19] px-2 py-1 text-xs" placeholder="password" value={p}
-            onChange={(e) => setP(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && login()} />
-          {err && <div className="mb-2 text-xs text-red-400">{err}</div>}
-          <button onClick={login} className="w-full rounded bg-orange-600 px-2 py-1 text-xs font-semibold text-white">Log in</button>
-          <p className="mt-2 text-[10px] text-slate-500">Accounts are created by an administrator (POST /api/users). Passwords are stored as PBKDF2 hashes; sessions expire.</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function LoginGate({ children }: { children: ReactNode }) {
-  const { meta } = useApp()
-  if (meta && meta.auth_mode === 'production' && !getAuthToken()) {
-    return <Card title="Authentication required"><p className="text-sm text-slate-300">This deployment runs in production mode. Log in with the button in the top bar.</p></Card>
-  }
-  return <>{children}</>
 }
 
 /* ------------------------------------------------------------------ dataset inventory */

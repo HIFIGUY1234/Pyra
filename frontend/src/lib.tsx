@@ -35,14 +35,47 @@ type Ctx = { user: string; setUser: (u: string) => void; role: string; region: s
 export const AppCtx = createContext<Ctx>(null as unknown as Ctx)
 export const useApp = () => useContext(AppCtx)
 
-let currentUser = localStorage.getItem('pyro_user') || 'analyst'
-export const setApiUser = (u: string) => { currentUser = u; localStorage.setItem('pyro_user', u) }
-export const getApiUser = () => currentUser
-// Bearer session token (real authentication). Kept in sessionStorage so it ends with the browser session.
-let authToken: string | null = sessionStorage.getItem('pyro_token')
-export const getAuthToken = () => authToken
-export const setAuthToken = (t: string | null) => { authToken = t; if (t) sessionStorage.setItem('pyro_token', t); else sessionStorage.removeItem('pyro_token') }
-const authHeaders = (): Record<string, string> => (authToken ? { Authorization: `Bearer ${authToken}` } : { 'X-User': currentUser })
+/* ------------------------------------------------------------------ request credential
+ * Exactly one credential is attached to every API request. It is owned by AuthProvider (src/auth.tsx); nothing
+ * else should switch it.
+ *   token   - real Bearer session (sessionStorage, ends with the browser tab session). Honoured in every mode.
+ *   persona - development demo identity sent as X-User. Only set by AuthProvider after /api/meta confirms
+ *             auth_mode=dev; the production backend rejects it anyway.
+ *   none    - no identity (production before sign-in). Never falls back to a persona. */
+export type Credential = { kind: 'token'; token: string } | { kind: 'persona'; username: string } | { kind: 'none' }
+const TOKEN_KEY = 'pyro_token'
+const TOKEN_EXP_KEY = 'pyro_token_exp'
+const PERSONA_KEY = 'pyro_user'
+const safe = <T,>(f: () => T, d: T): T => { try { return f() } catch { return d } }
+const storedToken = safe(() => sessionStorage.getItem(TOKEN_KEY), null)
+let credential: Credential = storedToken ? { kind: 'token', token: storedToken } : { kind: 'none' }
+export const getCredential = () => credential
+export const getAuthToken = () => (credential.kind === 'token' ? credential.token : null)
+export const getStoredPersona = () => safe(() => localStorage.getItem(PERSONA_KEY), null)
+export const getTokenExpiry = () => safe(() => Number(sessionStorage.getItem(TOKEN_EXP_KEY)) || null, null)
+export function setCredential(c: Credential, expiresInS?: number) {
+  credential = c
+  safe(() => {
+    if (c.kind === 'token') {
+      sessionStorage.setItem(TOKEN_KEY, c.token)
+      if (expiresInS) sessionStorage.setItem(TOKEN_EXP_KEY, String(Date.now() + expiresInS * 1000))
+    } else { sessionStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_EXP_KEY) }
+    if (c.kind === 'persona') localStorage.setItem(PERSONA_KEY, c.username)
+  }, undefined)
+}
+/** Back-compat helper used by tests: set or clear the Bearer token. */
+export const setAuthToken = (t: string | null) => setCredential(t ? { kind: 'token', token: t } : { kind: 'none' })
+const authHeaders = (): Record<string, string> =>
+  credential.kind === 'token' ? { Authorization: `Bearer ${credential.token}` } : credential.kind === 'persona' ? { 'X-User': credential.username } : {}
+
+/** Raised for any non-2xx API response; carries the HTTP status so callers can branch on 401/403/429. */
+export class ApiError extends Error {
+  status: number
+  retryAfter: number | null
+  constructor(status: number, message: string, retryAfter: number | null = null) { super(message); this.status = status; this.retryAfter = retryAfter }
+}
+/** Fired when the server rejects the current Bearer token (expired, revoked, account disabled). */
+export const SESSION_EXPIRED_EVENT = 'pyro:session-expired'
 
 // Backend origin. Empty = same origin (Vite dev proxy / nginx). On Vercel set VITE_API_BASE_URL to the persistent API
 // (e.g. https://api.example.org); it is a public build-time value and must never carry a secret.
@@ -52,12 +85,19 @@ export const apiUrl = (path: string) => (/^https?:\/\//.test(path) ? path : `${A
 export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
   const headers: Record<string, string> = authHeaders()
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
+  const sent = credential
   const r = await fetch(apiUrl(path), { method: opts.method || (opts.body !== undefined || opts.form ? 'POST' : 'GET'), headers, body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined) })
-  if (r.status === 401 && authToken && path !== '/api/auth/login') setAuthToken(null)   // expired / revoked session
+  // The token we sent was rejected: drop it and let AuthProvider move to SESSION_EXPIRED. Ignore late responses
+  // for a credential that has already been replaced (e.g. a request that started before a fresh login).
+  if (r.status === 401 && sent.kind === 'token' && credential === sent && path !== '/api/auth/login') {
+    setCredential({ kind: 'none' })
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
+  }
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`
     try { const j = await r.json(); msg = typeof j.detail === 'string' ? j.detail : Array.isArray(j.detail) ? j.detail.map((d: { loc?: (string | number)[]; msg: string }) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ') : JSON.stringify(j) } catch { /* keep status text */ }
-    throw new Error(msg)
+    const ra = Number(r.headers.get('Retry-After'))
+    throw new ApiError(r.status, msg, Number.isFinite(ra) && ra > 0 ? ra : null)
   }
   return r.json()
 }

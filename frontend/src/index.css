@@ -4,23 +4,27 @@
 
 :root {
   color-scheme: dark;
-  --argon-bg-base: #0B0F19;
-  --argon-bg-surface: #111827;
-  --argon-bg-elevated: #172033;
-  --argon-border: #26324a;
+  --ps-base: #080d17;
+  --ps-panel: #0f1726;
+  --ps-raised: #141f33;
+  --ps-rule: #22324b;
 }
-html, body, #root { height: 100%; background-color: #0B0F19; }
-body { @apply bg-ink-950 text-slate-200 antialiased; font-feature-settings: 'tnum'; }
-* { scrollbar-width: thin; scrollbar-color: #2b3954 transparent; }
-.leaflet-container { background: #0B0F19; font-family: inherit; }
-.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #111827; color: #e2e8f0; border: 1px solid #26324a; }
+html, body, #root { height: 100%; background-color: #080d17; }
+body { @apply bg-ink-950 text-slate-200 antialiased; font-feature-settings: 'tnum'; font-size: 14px; }
+* { scrollbar-width: thin; scrollbar-color: #2c3d5a transparent; }
+/* leaflet.css arrives in a later chunk with equal specificity, so qualify the selector */
+div.leaflet-container { background: #070b14; font-family: inherit; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #0f1726; color: #e2e8f0; border: 1px solid #22324b; }
 .leaflet-popup-content { margin: 10px 12px; font-size: 12px; line-height: 1.45; }
-.leaflet-control-layers, .leaflet-bar a { background: #111827 !important; color: #e2e8f0 !important; border-color: #26324a !important; }
+.leaflet-control-layers, .leaflet-bar a { background: #0f1726 !important; color: #e2e8f0 !important; border-color: #22324b !important; }
 .leaflet-control-attribution { background: rgba(11,15,25,.75) !important; color: #94a3b8 !important; }
 .leaflet-control-attribution a { color: #cbd5e1 !important; }
 .recharts-default-tooltip { border-radius: 6px; }
 input, select, textarea { @apply bg-ink-800 border border-line rounded px-2 py-1.5 text-sm text-slate-100 outline-none; }
-input:focus, select:focus, textarea:focus { @apply border-orange-500; }
+input:focus, select:focus, textarea:focus { @apply border-sky-400; }
+:focus-visible { outline: 2px solid #38bdf8; outline-offset: 1px; }
+button:focus:not(:focus-visible) { outline: none; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
 table { @apply w-full text-sm; }
-th { @apply text-left font-medium text-slate-400 text-xs uppercase tracking-wide py-2 px-2 border-b border-line; }
+th { @apply text-left font-medium text-slate-400 text-[11px] uppercase tracking-wide py-2 px-2 border-b border-line; }
 td { @apply py-1.5 px-2 border-b border-line/60 align-top; }

@@ -3,7 +3,7 @@
    are shown as unavailable, never as zero. */
 import { useState } from 'react'
 import { useApi, useApp, num, compact, titleCase, Prov, Tabs } from './lib'
-import { Banner, Table } from './argon'
+import { Banner, Table } from './ui'
 import { Panel, Load, Td } from './science'
 
 /* ------------------------------------------------------------------ types */

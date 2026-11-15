@@ -32,7 +32,9 @@ export type DashboardSummary = {
   provenance_counts?: Record<string, number>; active_alerts?: N
   seam?: { status?: string; reduction_pct?: N; seam_month?: string }
   validation?: { status?: string; band_coverage_pct?: N }
-  forecast?: { cells_high?: N; cells_very_high?: N; brier?: N; roc_auc?: N }
+  forecast?: { cells_high?: N; cells_very_high?: N; cells?: N; brier?: N; roc_auc?: N; issue_date?: string }
+  last7?: Record<string, { detections: number; frp_max?: N; cells: number }>
+  validation_error?: string
   timeline?: TimelineRow[]
 }
 export type TimelineRow = { date: string; harmonized?: N; veq_lo?: N; veq_hi?: N }

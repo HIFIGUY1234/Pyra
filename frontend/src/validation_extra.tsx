@@ -1,7 +1,7 @@
 /* Held-out calibration model selection, seam verdict and seam robustness (typed API shapes). */
 import { useState } from 'react'
 import { useApi, num, titleCase, Prov, Tabs } from './lib'
-import { Banner, Table } from './argon'
+import { Banner, Table } from './ui'
 import { Panel, Load, Td } from './science'
 
 export type Metrics = { n: number; mae?: number; rmse?: number; wape_pct?: number | null; bias_pct?: number | null; r2?: number | null; mean_actual?: number }

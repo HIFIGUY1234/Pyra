@@ -1,19 +1,17 @@
 import { type ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
 import {
-  Flame,
   ShieldAlert,
   Info,
   Inbox,
   CheckCircle2,
   AlertTriangle,
-  Sparkles,
   Radio,
 } from 'lucide-react'
 
 /* ==========================================================================
- * Argon Dashboard React (Creative Tim Free Tier Architecture)
- * Dark Theme Override: Base #0B0F19 / Surface #111827 / Border #26324a
+ * PyroScope UI primitives: cards, tables, buttons, banners, provenance and risk badges.
+ * Surfaces: base #080d17 / panel #0f1726 / raised #141f33 / rule #22324b. Colour carries meaning only:
+ * sensor identity, provenance, risk tier, and status (green verified, amber warning, red critical, grey unavailable).
  * ========================================================================== */
 
 export type ProvenanceType =
@@ -78,7 +76,7 @@ export function ProvenanceBadge({
 
 /**
  * Scientific / UI Rule:
- * Risk tier badges must use the five semantic colours (not Argon defaults):
+ * Risk tier badges must use the five semantic colours :
  * Low=green (#10b981), Watch=yellow (#eab308), Moderate=amber (#f59e0b),
  * High=orange (#f97316), Very High=red (#dc2626).
  */
@@ -202,7 +200,7 @@ export function UncertaintyNote({
   provenance?: ProvenanceType
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-[#26324a] bg-[#111827]/90 px-4 py-3 text-xs text-slate-300 shadow-sm">
+    <div className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-[#22324b] bg-[#0f1726]/90 px-4 py-3 text-xs text-slate-300 shadow-sm">
       <div className="flex items-start gap-2.5 max-w-4xl">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
         <div className="leading-relaxed">
@@ -218,7 +216,7 @@ export function UncertaintyNote({
 }
 
 /* --------------------------------------------------------------------------
- * Argon Card Primitives
+ * Card primitives
  * -------------------------------------------------------------------------- */
 export function Card({
   children,
@@ -229,7 +227,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-xl border border-[#26324a] bg-[#111827] shadow-[0_0_2rem_0_rgba(0,0,0,0.38)] ${className}`}
+      className={`rounded-md border border-[#22324b] bg-[#0f1726] ${className}`}
     >
       {children}
     </div>
@@ -251,7 +249,7 @@ export function CardHeader({
 }) {
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 border-b border-[#26324a] px-5 py-4 ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-3 border-b border-[#22324b] px-4 py-3 ${className}`}
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5">
@@ -280,7 +278,7 @@ export function CardBody({
   className?: string
   noPadding?: boolean
 }) {
-  return <div className={`${noPadding ? '' : 'p-5'} ${className}`}>{children}</div>
+  return <div className={`${noPadding ? '' : 'p-4'} ${className}`}>{children}</div>
 }
 
 export function CardFooter({
@@ -292,7 +290,7 @@ export function CardFooter({
 }) {
   return (
     <div
-      className={`border-t border-[#26324a] bg-[#0B0F19]/40 px-5 py-3 text-xs text-slate-400 rounded-b-xl ${className}`}
+      className={`border-t border-[#22324b] bg-[#080d17]/40 px-5 py-3 text-xs text-slate-400 rounded-b-xl ${className}`}
     >
       {children}
     </div>
@@ -300,9 +298,9 @@ export function CardFooter({
 }
 
 /* --------------------------------------------------------------------------
- * Argon KPI Stat Card (with mandatory Data Provenance Badge)
+ * KPI stat card (with mandatory Data Provenance Badge)
  * -------------------------------------------------------------------------- */
-export function ArgonStatCard({
+export function StatCard({
   title,
   value,
   subValue,
@@ -318,14 +316,14 @@ export function ArgonStatCard({
   accentColor?: string
 }) {
   return (
-    <Card className="flex flex-col justify-between transition-transform duration-150 hover:-translate-y-0.5">
+    <Card className="flex flex-col justify-between">
       <CardBody className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
               {title}
             </p>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-white tabular-nums">
+            <div className="mt-1.5 text-2xl font-semibold tracking-tight text-white tabular-nums">
               {value}
             </div>
           </div>
@@ -336,7 +334,7 @@ export function ArgonStatCard({
                 borderColor: `${accentColor}55`,
                 color: accentColor,
               }}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded border"
             >
               {icon}
             </div>
@@ -347,7 +345,7 @@ export function ArgonStatCard({
             {subValue}
           </div>
         )}
-        <div className="mt-3.5 flex items-center justify-between border-t border-[#26324a]/70 pt-2.5">
+        <div className="mt-3.5 flex items-center justify-between border-t border-[#22324b]/70 pt-2.5">
           <span className="text-[10px] uppercase tracking-wider text-slate-500">
             Provenance
           </span>
@@ -359,7 +357,7 @@ export function ArgonStatCard({
 }
 
 /* --------------------------------------------------------------------------
- * Argon Table Component
+ * Table
  * -------------------------------------------------------------------------- */
 export function Table({
   headers,
@@ -374,18 +372,19 @@ export function Table({
     <div className={`w-full overflow-x-auto ${className}`}>
       <table className="w-full border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-[#26324a] bg-[#0B0F19]/75">
+          <tr className="border-b border-[#22324b] bg-[#080d17]/75">
             {headers.map((h, i) => (
               <th
                 key={i}
-                className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap"
+                scope="col"
+                className="px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-slate-400 whitespace-nowrap"
               >
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#26324a]/60 text-slate-200">
+        <tbody className="divide-y divide-[#22324b]/60 text-slate-200">
           {children}
         </tbody>
       </table>
@@ -394,7 +393,7 @@ export function Table({
 }
 
 /* --------------------------------------------------------------------------
- * Argon Form, Button, Banner & Empty State Primitives
+ * Form, button, Banner & Empty State Primitives
  * -------------------------------------------------------------------------- */
 export function Button({
   children,
@@ -417,16 +416,16 @@ export function Button({
 }) {
   const variants: Record<string, string> = {
     primary:
-      'bg-orange-600 hover:bg-orange-500 text-white border-orange-500 shadow-sm',
+      'bg-[#e8692a] hover:bg-[#f07a3d] text-white border-[#e8692a]',
     secondary:
-      'bg-[#172033] hover:bg-[#1f2a40] text-slate-100 border-[#26324a]',
+      'bg-[#141f33] hover:bg-[#1a2740] text-slate-100 border-[#22324b]',
     success:
       'bg-emerald-600/90 hover:bg-emerald-500 text-white border-emerald-500',
     warning:
       'bg-amber-600/90 hover:bg-amber-500 text-white border-amber-500',
     danger: 'bg-red-600/90 hover:bg-red-500 text-white border-red-500',
     outline:
-      'bg-transparent hover:bg-[#172033] text-slate-200 border-[#26324a]',
+      'bg-transparent hover:bg-[#141f33] text-slate-200 border-[#22324b]',
   }
   const sizes: Record<string, string> = {
     xs: 'px-2 py-1 text-[11px]',
@@ -439,7 +438,7 @@ export function Button({
       title={title}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg border font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-45 ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-md border font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-sky-400 disabled:cursor-not-allowed disabled:opacity-45 ${variants[variant]} ${sizes[size]} ${className}`}
     >
       {children}
     </button>
@@ -494,7 +493,7 @@ export function Banner({
   }
   return (
     <div
-      className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-xs leading-relaxed ${styles[tone]}`}
+      className={`flex items-start gap-3 rounded-md border px-4 py-3 text-xs leading-relaxed ${styles[tone]}`}
     >
       <div className="mt-0.5">{icons[tone]}</div>
       <div className="min-w-0 flex-1">
@@ -521,7 +520,7 @@ export function EmptyStateCard({
   return (
     <Card>
       <CardBody className="py-12 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#26324a] bg-[#0B0F19] text-slate-400">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#22324b] bg-[#080d17] text-slate-400">
           <Inbox className="h-6 w-6" />
         </div>
         <h4 className="mt-3 text-sm font-semibold text-slate-100">{title}</h4>
@@ -531,147 +530,5 @@ export function EmptyStateCard({
         {action && <div className="mt-4 flex justify-center">{action}</div>}
       </CardBody>
     </Card>
-  )
-}
-
-/* --------------------------------------------------------------------------
- * Argon Sidebar Navigation Component (All 17 PyroScope Sections)
- * -------------------------------------------------------------------------- */
-export interface NavSectionItem {
-  idx: string
-  path: string
-  label: string
-  group: 'Core & Maps' | 'Harmonization & QA' | 'Sensors & Products' | 'Analytics & Forecast' | 'Fire Intelligence' | 'Decision Support' | 'Governance & Data'
-  icon: ReactNode
-  badge?: string
-}
-
-export function ArgonSidebar({
-  sections,
-  hasData,
-  mobileOpen,
-  onCloseMobile,
-}: {
-  sections: NavSectionItem[]
-  hasData?: boolean
-  mobileOpen: boolean
-  onCloseMobile: () => void
-}) {
-  const groups: NavSectionItem['group'][] = [
-    'Core & Maps',
-    'Harmonization & QA',
-    'Sensors & Products',
-    'Analytics & Forecast',
-    'Fire Intelligence',
-    'Decision Support',
-    'Governance & Data',
-  ]
-
-  return (
-    <>
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/60 lg:hidden"
-          onClick={onCloseMobile}
-        />
-      )}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[#26324a] bg-[#111827] text-slate-200 transition-transform duration-200 lg:static lg:translate-x-0 ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        {/* PyroScope Brand Logo & Header */}
-        <div className="flex items-center justify-between border-b border-[#26324a] bg-[#0B0F19]/60 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-orange-500/40 bg-gradient-to-br from-orange-500/25 to-red-600/25 text-orange-400 shadow-inner">
-              <Flame className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold tracking-tight text-white">
-                  PyroScope
-                </span>
-                <span className="rounded bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-orange-300 border border-orange-500/30">
-                  Argon UI
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400">
-                MODIS–VIIRS Harmonization Shell
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation Links for All 17 PyroScope Sections */}
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-          {groups.map((grp) => {
-            const items = sections.filter((s) => s.group === grp)
-            return (
-              <div key={grp}>
-                <div className="px-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                  {grp}
-                </div>
-                <ul className="space-y-0.5">
-                  {items.map((item) => (
-                    <li key={item.path}>
-                      <NavLink
-                        to={item.path}
-                        end={item.path === '/'}
-                        onClick={onCloseMobile}
-                        className={({ isActive }) =>
-                          `group flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition-colors ${
-                            isActive
-                              ? 'bg-orange-600/15 text-orange-300 border border-orange-500/40 font-semibold shadow-sm'
-                              : 'text-slate-300 hover:bg-[#172033] hover:text-white border border-transparent'
-                          }`
-                        }
-                      >
-                        <span className="flex items-center gap-2.5 min-w-0">
-                          <span className="text-[10px] font-mono text-slate-500 group-hover:text-slate-400">
-                            {item.idx}
-                          </span>
-                          <span className="shrink-0 text-slate-400 group-hover:text-orange-400">
-                            {item.icon}
-                          </span>
-                          <span className="truncate">{item.label}</span>
-                        </span>
-                        {item.badge && (
-                          <span className="ml-1.5 rounded bg-[#0B0F19] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 border border-[#26324a]">
-                            {item.badge}
-                          </span>
-                        )}
-                      </NavLink>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </nav>
-
-        {/* Sidebar Footer Status */}
-        <div className="border-t border-[#26324a] bg-[#0B0F19]/80 px-4 py-3 text-[11px]">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Store Status</span>
-            <span
-              className={`inline-flex items-center gap-1.5 font-semibold ${
-                hasData ? 'text-emerald-400' : 'text-amber-400'
-              }`}
-            >
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  hasData ? 'bg-emerald-400' : 'bg-amber-400'
-                }`}
-              />
-              {hasData ? 'Datasets Active' : 'Awaiting Ingest'}
-            </span>
-          </div>
-          <div className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-500">
-            <Sparkles className="h-3 w-3 text-orange-400" />
-            <span>17 Scientific Sections Configured</span>
-          </div>
-        </div>
-      </aside>
-    </>
   )
 }
