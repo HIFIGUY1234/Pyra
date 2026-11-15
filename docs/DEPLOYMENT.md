@@ -81,7 +81,7 @@ docker compose up --build     # UI + API on http://localhost:8080
 
 | Asset | Backup | Recovery |
 |---|---|---|
-| `data/pyroscope.db` (users, alerts, audit and notification logs) | `sqlite3 data/pyroscope.db ".backup data/backups/pyroscope-$(date +%F).db"`. `python -m app.migrate` also backs up before any schema change. | Stop the API, copy the backup over `data/pyroscope.db`, start the API, check `/api/health`. |
+| `data/runtime/pyroscope.db` (runtime DB: users, alerts, audit and notification logs; git-ignored) | `sqlite3 data/runtime/pyroscope.db ".backup data/backups/pyroscope-$(date +%F).db"`. `python -m app.migrate` also backs up before any schema change. | Stop the API, copy the backup over `data/runtime/pyroscope.db`, start the API, check `/api/health`. |
 | PostgreSQL | `pg_dump -Fc` | `pg_restore` |
 | FIRMS archives (`*.zip`) | Git LFS (SHA-256 in `data/processed/archive_checksums.json`) | `python -m app.pipeline --recover-lfs`. The download is accepted only if size and SHA-256 match the pointer. |
 | Parquet summaries, forecast model | Derived data | `python -m app.pipeline --skip-weather` (add `--retrain` for the model) |
@@ -108,3 +108,28 @@ Target architecture: Vercel (frontend), Supabase (PostgreSQL + Storage), persist
 container. See [VERCEL_SUPABASE_ARCHITECTURE.md](VERCEL_SUPABASE_ARCHITECTURE.md), [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md),
 [SUPABASE_SETUP.md](SUPABASE_SETUP.md), [BACKGROUND_WORKERS.md](BACKGROUND_WORKERS.md). `docker compose` now starts a
 `worker` service and sets `PYROSCOPE_EMBEDDED_WORKER=0` on the API.
+
+
+## Data directory, processed dataset and readiness
+
+* **One data root.** Every module reads `app.config.DATA`: `PYROSCOPE_DATA_DIR` if set, otherwise `<repo>/data`.
+  Processed artefacts live in `<DATA>/processed`, archives in the repo root or `<DATA>/raw`.
+* **Seed vs runtime database.** `data/pyroscope.db` is the tracked, credential-free demo seed and is never written by the
+  application. The default runtime DB is `<DATA>/runtime/pyroscope.db` (git-ignored), copied from the seed on first use or
+  created empty by `init_db`. The admin password from `PYROSCOPE_ADMIN_PASSWORD` is only ever hashed into the runtime DB.
+* **Bundled dataset.** The root `Dockerfile` copies `data/processed` (with `manifest.json`: schema/processing version,
+  creation time, coverage, source archives and the SHA-256 of every file) into `/app/seed/processed`. On boot the API installs
+  it into `<DATA>/processed` only when that directory holds no dataset (or an older copy of the same seed); every file is
+  checksum-verified in a temp directory and published with an atomic rename. A dataset built by the pipeline is never replaced.
+  Result is logged as `[seed] installed|skipped|failed` and shown in `GET /api/data/readiness`.
+* **Readiness.** `GET /api/data/readiness` validates the core artefacts (Parquet footers/schemas, spans JSON) and reports
+  READY / PARTIAL / MISSING / CORRUPT / LFS_NOT_RECOVERED / PROCESSING / FAILED plus the next valid action. `/api/health` is
+  `degraded` until the dataset validates. `python -m app.dataset check|manifest|seed` does the same from the CLI.
+* **After changing `data/processed`** run `python -m app.dataset manifest` and commit `manifest.json` (CI checks it).
+
+### Render
+
+The live API (`pyra-cf95.onrender.com`) answered `has_data:false` because the image never contained the data: `.dockerignore`
+excluded `data/` entirely and no disk is attached. Use `render.yaml` (root `Dockerfile`, repo-root context). Without a disk the
+bundled dataset is re-installed from the image at every boot (a few seconds) and the SQLite DB is ephemeral; for persistence attach
+a disk writable by uid 10001 and set `PYROSCOPE_DATA_DIR` to its mount path (see the comments in `render.yaml`).

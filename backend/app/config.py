@@ -22,8 +22,16 @@ def _load_dotenv(path: Path):
 
 
 _load_dotenv(ROOT / ".env")
-DATA = ROOT / "data"
+# Single data root shared by every module (API, worker, CLI). Default: <repo>/data. On a persistent host point
+# PYROSCOPE_DATA_DIR at the mounted disk (e.g. /var/data); the image's bundled processed dataset is installed
+# there on first boot by app.dataset (never over an existing dataset).
+DATA = Path(os.getenv("PYROSCOPE_DATA_DIR") or ROOT / "data").resolve()
 PROCESSED = DATA / "processed"
+RAW = DATA / "raw"
+# Directories searched for FIRMS archives (DL_FIRE_*.zip): the repository root and <data>/raw.
+ARCHIVE_DIRS = (ROOT, RAW)
+# Read-only processed dataset bundled into the Docker image (see Dockerfile); absent in a source checkout.
+SEED_PROCESSED = Path(os.getenv("PYROSCOPE_SEED_DIR") or ROOT / "seed" / "processed")
 HOTSPOTS = PROCESSED / "hotspots"
 UPLOADS = DATA / "uploads"
 AUX = DATA / "auxiliary"
@@ -33,7 +41,25 @@ MODELS = PROCESSED / "models"
 for _p in (PROCESSED, HOTSPOTS, UPLOADS, AUX, REPORTS, MODELS):
     _p.mkdir(parents=True, exist_ok=True)
 
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{(DATA / 'pyroscope.db').as_posix()}")
+# data/pyroscope.db is the tracked, credential-free DEMO SEED. The application never writes to it: the default
+# runtime database is a git-ignored copy under <data>/runtime/, created from the seed on first use (or empty, and
+# initialised by db_sync.init_db, when there is no seed). Admin credentials only ever land in the runtime copy.
+SEED_DB = DATA / "pyroscope.db"
+RUNTIME_DB = DATA / "runtime" / "pyroscope.db"
+
+
+def _default_database_url() -> str:
+    if not RUNTIME_DB.exists():
+        RUNTIME_DB.parent.mkdir(parents=True, exist_ok=True)
+        if SEED_DB.exists() and SEED_DB.stat().st_size > 1000:      # skip an un-pulled LFS pointer / empty file
+            import shutil
+            tmp = RUNTIME_DB.with_suffix(".db.tmp")
+            shutil.copyfile(SEED_DB, tmp)
+            os.replace(tmp, RUNTIME_DB)
+    return f"sqlite:///{RUNTIME_DB.as_posix()}"
+
+
+DATABASE_URL = os.getenv("DATABASE_URL") or _default_database_url()
 
 # ---- spatial grid (global, so uploads outside India still index correctly) ----
 GRID_DEG = 0.25

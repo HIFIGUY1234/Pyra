@@ -25,7 +25,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from . import models as M
-from .config import DATA, ROOT
+from .config import ROOT, RUNTIME_DB
 from .storage import BUCKETS
 
 MIGRATIONS = ROOT / "supabase" / "migrations"
@@ -128,7 +128,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("schema-sql")
     c = sub.add_parser("copy")
-    c.add_argument("--source", default=f"sqlite:///{(DATA / 'pyroscope.db').as_posix()}")
+    c.add_argument("--source", default=f"sqlite:///{RUNTIME_DB.as_posix()}")
     c.add_argument("--target", required=True)
     c.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)

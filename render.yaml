@@ -2,7 +2,7 @@ services:
   - type: web
     name: pyroscope-backend
     env: docker
-    dockerfilePath: backend/Dockerfile
+    dockerfilePath: ./Dockerfile        # repo-root build context: bundles data/processed as the seed dataset
     dockerContext: .
     plan: standard
     healthCheckPath: /api/health
@@ -11,5 +11,11 @@ services:
         value: "1"
       - key: PYROSCOPE_NOTIFY_PROVIDER
         value: simulated
+      # Persistent data (processed dataset, SQLite runtime DB, reports). Without a disk the bundled dataset is
+      # re-installed from the image on every boot and the SQLite DB is lost on redeploy. To persist, attach a disk
+      # writable by uid 10001 and point PYROSCOPE_DATA_DIR at it, e.g.
+      #   disk: { name: pyroscope-data, mountPath: /var/data, sizeGB: 5 }   (service level)
+      #   - key: PYROSCOPE_DATA_DIR
+      #     value: /var/data
       - key: PYROSCOPE_CORS_ORIGIN_REGEX
         value: "^https://.*\\.vercel\\.app$"

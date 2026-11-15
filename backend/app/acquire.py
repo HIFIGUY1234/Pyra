@@ -19,9 +19,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import AOI_BBOX, PROCESSED, ROOT
+from .config import AOI_BBOX, PROCESSED, RAW, ROOT
 
-RAW = ROOT / "data" / "raw"
 RAW.mkdir(parents=True, exist_ok=True)
 REPORT_JSON = PROCESSED / "ingestion_report.json"
 REPORT_MD = PROCESSED / "ingestion_report.md"
@@ -305,7 +304,8 @@ def vnp14_to_csv(granule_dir: str | Path, satellite: str | None = None, out: Pat
 # --------------------------------------------------------------------------- inventory report
 def build_report() -> dict:
     from .ingest import discover_sources, load_registry
-    archives = [archive_status(z) for z in sorted(list(ROOT.glob("*.zip")) + list(RAW.glob("*.zip")))]
+    from .config import ARCHIVE_DIRS
+    archives = [archive_status(z) for z in sorted(z for d in ARCHIVE_DIRS for z in d.glob("*.zip"))]
     reg = load_registry()
     loaded: dict[str, dict] = {}
     products: dict[str, set] = {}

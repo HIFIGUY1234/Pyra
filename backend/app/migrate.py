@@ -34,7 +34,7 @@ def backup() -> Path | None:
     p = sqlite_path()
     if not p or not p.exists():
         return None
-    bdir = BACKUPS if p.parent == DATA else p.parent / "backups"   # keep backups beside the database they protect
+    bdir = BACKUPS if p.parent in (DATA, DATA / "runtime") else p.parent / "backups"   # keep backups beside the database they protect
     bdir.mkdir(parents=True, exist_ok=True)
     dest = bdir / f"{p.stem}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.db"
     shutil.copy2(p, dest)

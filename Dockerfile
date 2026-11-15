@@ -8,6 +8,10 @@ COPY backend/requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY backend/app ./app
+# Read-only copy of the committed processed dataset (Parquet summaries, aggregates, hotspots, models + manifest).
+# On boot app.dataset installs it into PYROSCOPE_DATA_DIR (default /app/data) only when that holds no dataset,
+# after verifying every file's SHA-256 against data/processed/manifest.json. Archives and the DB are not baked in.
+COPY data/processed /app/seed/processed
 RUN useradd --create-home --uid 10001 pyro && mkdir -p /app/data /app/docs && chown -R pyro /app
 USER pyro
 

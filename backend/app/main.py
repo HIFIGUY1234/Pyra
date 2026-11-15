@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 
-from . import acquire, alerts, bridge, operational, analytics, db_sync, gis_layers, notify, security, forecast, geo, grid, harmonize, ingest, reports, risk, store
+from . import acquire, alerts, bridge, dataset, operational, analytics, db_sync, gis_layers, notify, security, forecast, geo, grid, harmonize, ingest, reports, risk, store
 from . import models as M
 from .config import (ANOMALY_TYPES, PROCESSED, REPORTS, SAT_INSTRUMENT, SAT_LABEL, SATELLITES, UPLOADS, VIIRS_CONF_SCORE,
                      VIIRS_REFERENCE)
@@ -32,6 +32,8 @@ async def _lifespan(_app):
     _production_config_guard()
     from . import jobs
     jobs.start_embedded_worker()       # dev convenience; production sets PYROSCOPE_EMBEDDED_WORKER=0 and runs app.worker
+    # Empty data dir (fresh persistent disk / container) + image-bundled processed dataset -> verified one-time install.
+    dataset.install_seed_in_background(on_done=_reload_dataset_caches)
     yield
 
 
@@ -315,7 +317,16 @@ def auth_password(body: PasswordBody, a: Actor = Depends(actor)):
 
 def need_data():
     if not store.has_data():
-        raise HTTPException(409, "No processed data yet. Use Data Management -> Load Repository Dataset.")
+        r = dataset.readiness(JOB)
+        raise HTTPException(409, {"code": "DATASET_NOT_READY", "status": r["status"],
+                                  "message": "No processed satellite dataset is available yet. " + r["next_action"]["message"],
+                                  "next_action": r["next_action"]})
+
+
+def _reload_dataset_caches():
+    store.clear_caches()
+    harmonize.clear()
+    analytics.clear()
 
 
 def _ref(product: Optional[str]) -> str:
@@ -350,9 +361,12 @@ def health():
         db_ok, db_err = False, type(exc).__name__
     du = shutil.disk_usage(str(PROCESSED))
     free_gb = du.free / 1e9
-    status = "ok" if db_ok else "degraded"
+    core = dataset.evaluate()
+    # A reachable database is not the same as available science data: "degraded" until the dataset validates.
+    status = "ok" if db_ok and core["ready"] else "degraded"
     from . import system_config
-    return {"status": status, "has_data": store.has_data(), "forecast": forecast.available(),
+    return {"status": status, "has_data": core["ready"], "forecast": forecast.available(),
+            "data": {"status": dataset.readiness_status(core, JOB), "ready": core["ready"]},
             "database": {"ok": db_ok, "error": db_err}, "storage": {"free_gb": round(free_gb, 2), "low": free_gb < 2.0},
             "admin_bootstrap": system_config.admin_bootstrap_state(), "auth_mode": security.auth_mode()}
 
@@ -496,15 +510,41 @@ JOB = {"state": "idle", "step": None, "log": [], "started": None, "finished": No
 _job_lock = threading.Lock()
 
 
-def _run_job(only_new: bool, retrain: bool, rebuild_geo: bool):
+def _validate_existing(log):
+    """Load Repository Dataset when the processed dataset already validates: no historical rebuild."""
+    JOB.update(step="Validating the processed dataset")
+    r = dataset.evaluate()
+    if not r["ready"]:
+        raise RuntimeError(f"processed dataset is {r['status']}: {r['problems'] or r['missing']}")
+    JOB.update(step="Reloading application caches")
+    _reload_dataset_caches()
+    JOB.update(step="Verifying calendar access")
+    cal = analytics.calendar("country", analytics.data_end().year)
+    log(f"calendar check: {cal['region']} {cal['year']}, {len(cal['days'])} days")
+    with M.Session() as s:
+        empty = s.scalar(select(M.DailyFireActivity.id).limit(1)) is None
+    if empty:
+        JOB.update(step="Writing database tables (fresh database)")
+        db_sync.sync_all(log=log)
+    log("processed dataset READY (validated, not rebuilt)")
+
+
+def _run_job(only_new: bool, retrain: bool, rebuild_geo: bool, mode: str = "rebuild"):
     def log(*a):
         JOB["log"] = (JOB["log"] + [" ".join(str(x) for x in a)])[-60:]
     try:
+        if mode == "validate":
+            _validate_existing(log)
+            JOB.update(state="done", step="Complete", finished=datetime.now(timezone.utc).isoformat(), error=None)
+            return
         JOB.update(step="Discovering and standardising datasets")
         res = ingest.process_all(only_new=only_new, log=log)
         errs = {k: v["error"] for k, v in res.items() if v.get("error")}
         if errs:
             log(f"skipped: {errs}")
+        if not any(f for f in ingest.AGG_DIR.glob("*.parquet") if not f.name.endswith(".lst.parquet")):
+            raise RuntimeError("no source was ingested (" + ("; ".join(f"{k}: {v}" for k, v in errs.items())[:600] or "no sources found")
+                               + "). Existing processed outputs were left untouched.")
         if rebuild_geo or not geo.CELLS_PATH.exists():
             JOB.update(step="Building grid, boundaries and land cover")
             geo.build_cells()
@@ -518,6 +558,12 @@ def _run_job(only_new: bool, retrain: bool, rebuild_geo: bool):
         JOB.update(step="Fitting harmonization and writing database tables")
         db_sync.sync_all(log=log)
         analytics.clear()
+        JOB.update(step="Validating outputs")
+        dataset.clear_cache()
+        r = dataset.evaluate()
+        if not r["ready"]:
+            raise RuntimeError(f"outputs failed validation: {r['status']} {r['problems'] or r['missing']}")
+        dataset.write_manifest(provenance="pipeline")
         JOB.update(state="done", step="Complete", finished=datetime.now(timezone.utc).isoformat(), error=None)
     except Exception as exc:
         JOB.update(state="failed", error=f"{type(exc).__name__}: {exc}", finished=datetime.now(timezone.utc).isoformat())
@@ -526,17 +572,32 @@ def _run_job(only_new: bool, retrain: bool, rebuild_geo: bool):
         _job_lock.release()
 
 
-def _start_job(only_new, retrain, rebuild_geo=False):
+def _start_job(only_new, retrain, rebuild_geo=False, mode="rebuild"):
+    if dataset.SEED_STATE.get("state") == "installing":
+        raise HTTPException(409, "The bundled processed dataset is being installed; try again shortly.")
+    if mode == "rebuild":
+        arch = dataset.archive_report()
+        if not arch["ingestable"]:   # never start an ingestion over pointer stubs / corrupt / absent archives
+            lfs = arch["lfs_pointers"] > 0
+            raise HTTPException(409, {
+                "code": "LFS_NOT_RECOVERED" if lfs else ("ARCHIVES_CORRUPT" if arch["corrupt"] else "NO_ARCHIVES"),
+                "message": ("Git LFS archives have not been downloaded. Run `git lfs pull` on the server, or use "
+                            "Recover Git LFS archives (POST /api/data/recover-lfs)." if lfs else
+                            "No valid FIRMS archive or uploaded CSV is available to ingest."),
+                "archives": [{k: i.get(k) for k in ("file", "status", "bytes", "expected_bytes", "message")} for i in arch["items"]]})
     if not _job_lock.acquire(blocking=False):
         raise HTTPException(409, "A processing job is already running.")
-    JOB.update(state="running", step="Starting", log=[], started=datetime.now(timezone.utc).isoformat(), finished=None, error=None)
-    threading.Thread(target=_run_job, args=(only_new, retrain, rebuild_geo), daemon=True).start()
-    return ok({"started": True, "job": JOB})
+    JOB.update(state="running", step="Starting", log=[], started=datetime.now(timezone.utc).isoformat(), finished=None, error=None, mode=mode)
+    threading.Thread(target=_run_job, args=(only_new, retrain, rebuild_geo, mode), daemon=True).start()
+    return ok({"started": True, "mode": mode, "job": JOB})
 
 
 @app.post("/api/data/load-repo", dependencies=[Depends(limited("processing"))])
-def load_repo(retrain: bool = False, a: Actor = Depends(require())):
-    """Scan the repository for FIRMS archives/CSVs, ingest them and rebuild every derived product."""
+def load_repo(retrain: bool = False, force: bool = False, a: Actor = Depends(require())):
+    """Load the repository dataset. A processed dataset that already validates is checked and reloaded (no rebuild);
+    `force=true` or `retrain=true` re-ingests the archives. Pointer-only / corrupt archives are refused up front."""
+    if store.has_data() and not force and not retrain:
+        return _start_job(only_new=False, retrain=False, mode="validate")
     return _start_job(only_new=False, retrain=retrain)
 
 
@@ -544,6 +605,12 @@ def load_repo(retrain: bool = False, a: Actor = Depends(require())):
 def process(retrain: bool = False, a: Actor = Depends(require())):
     """Ingest only new sources (e.g. fresh uploads), then rebuild summaries and calibrations."""
     return _start_job(only_new=True, retrain=retrain)
+
+
+@app.get("/api/data/readiness")
+def data_readiness(a: Actor = Depends(actor)):
+    """Processed-dataset readiness and the next valid action. Filesystem paths and sizes only for administrators."""
+    return ok(dataset.readiness(JOB, admin=a.role == "admin") | {"can_administer": a.role == "admin"})
 
 
 @app.get("/api/data/status")
@@ -595,7 +662,10 @@ def data_recover_lfs(a: Actor = Depends(require())):
     """Replace Git LFS pointer stubs with the real archives (SHA-256 verified against the pointer)."""
     res = acquire.recover_lfs()
     acquire.build_report()
-    return ok({"results": res})
+    failed = [r for r in res if r["status"] not in ("recovered", "already_present")]
+    return ok({"results": res, "ok": not failed and bool(res), "failed": [r["file"] for r in failed],
+               "next": "Load Repository Dataset" if not failed and res else
+                       ("No archives found" if not res else "Recovery incomplete: see failed files; nothing was replaced unverified")})
 
 
 @app.get("/api/data/quality")

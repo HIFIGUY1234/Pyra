@@ -19,7 +19,7 @@ import pyarrow.dataset as pads
 import pyarrow.parquet as pq
 
 from . import grid
-from .config import (CLASS_NAMES, HOTSPOTS, MODIS_CONF_BINS, PROCESSED, ROOT, SAT_INSTRUMENT, UPLOADS,
+from .config import (ARCHIVE_DIRS, CLASS_NAMES, HOTSPOTS, MODIS_CONF_BINS, PROCESSED, RAW, ROOT, SAT_INSTRUMENT, UPLOADS,
                      VIIRS_CONF_SCORE)
 
 AGG_DIR = PROCESSED / "agg"
@@ -49,7 +49,7 @@ def discover_sources() -> list[dict]:
     """Repository archives (DL_FIRE_*.zip or loose CSVs) plus user uploads."""
     out = []
     from .acquire import lfs_pointer
-    for z in sorted(list(ROOT.glob("*.zip")) + list((ROOT / "data" / "raw").glob("*.zip"))):
+    for z in sorted(z for d in ARCHIVE_DIRS for z in d.glob("*.zip")):
         ptr = lfs_pointer(z)
         if ptr:
             out.append({"key": z.stem, "origin": "repository", "container": str(z), "member": None, "bytes": 0, "lfs_pointer": ptr,
@@ -66,7 +66,7 @@ def discover_sources() -> list[dict]:
             # e.g. a Git LFS pointer file that was never pulled
             out.append({"key": z.stem, "origin": "repository", "container": str(z), "member": None, "bytes": 0,
                         "error": "Not a valid zip (Git LFS pointer? run `git lfs pull`)"})
-    for c in sorted(list(ROOT.glob("fire_*.csv")) + list((ROOT / "data" / "raw").glob("*.csv"))):
+    for c in sorted(list(ROOT.glob("fire_*.csv")) + list(RAW.glob("*.csv"))):
         side = c.with_suffix(".json")
         out.append({"key": c.stem, "origin": "repository", "container": str(c), "member": None, "bytes": c.stat().st_size,
                     "hint": json.loads(side.read_text()) if side.exists() else {}})

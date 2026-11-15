@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 
 import numpy as np
@@ -19,6 +20,13 @@ OUTSIDE = "Outside mapped boundaries"
 DN = {"D": 0, "N": 1, "U": 0}
 
 
+def _atomic_parquet(df: pd.DataFrame, path):
+    """Write beside the target and rename, so readers never see a partially written summary."""
+    tmp = path.with_name(f".{path.name}.tmp")
+    df.to_parquet(tmp, index=False)
+    os.replace(tmp, path)
+
+
 def build_summaries(log=print) -> dict:
     """Combine per-source daily aggregates into the stores every dashboard reads."""
     files = [f for f in AGG_DIR.glob("*.parquet") if not f.name.endswith(".lst.parquet")]
@@ -28,7 +36,7 @@ def build_summaries(log=print) -> dict:
     daily = daily.sort_values(["acq_date", "cell_id"]).reset_index(drop=True)
     daily["satellite"] = daily["satellite"].astype("category")
     daily["daynight"] = daily["daynight"].astype("category")
-    daily.to_parquet(DAILY, index=False)
+    _atomic_parquet(daily, DAILY)
     log(f"[store] daily_cell rows: {len(daily):,}")
 
     d = daily.assign(ym=daily["acq_date"].dt.year * 100 + daily["acq_date"].dt.month)
@@ -37,7 +45,7 @@ def build_summaries(log=print) -> dict:
     agg["frp_max"] = "max"
     monthly = d.groupby(keys, observed=True).agg(agg).reset_index()
     monthly["days"] = d.groupby(keys, observed=True)["acq_date"].nunique().to_numpy()
-    monthly.to_parquet(MONTHLY, index=False)
+    _atomic_parquet(monthly, MONTHLY)
     log(f"[store] monthly_cell rows: {len(monthly):,}")
 
     nat = daily.groupby(["satellite", "acq_date"], observed=True).agg(n=("n", "sum"), typed=("n_typed", "sum")).reset_index()
@@ -59,7 +67,9 @@ def build_summaries(log=print) -> dict:
             "days_with_detections": int(len(g)), "zero_detection_days": [str(x.date()) for x in zero],
             "last_typed": str(typed.max().date()) if len(typed) else None, "detections": int(g["n"].sum()),
         }
-    SPANS.write_text(json.dumps(spans, indent=1))
+    _tmp = SPANS.with_name(".spans.json.tmp")
+    _tmp.write_text(json.dumps(spans, indent=1))
+    os.replace(_tmp, SPANS)
     lst = [pd.read_parquet(f) for f in AGG_DIR.glob("*.lst.parquet")]
     if lst:
         pd.concat(lst).groupby(["satellite", "daynight", "lst_bin"]).n.sum().reset_index().to_parquet(LST, index=False)
@@ -144,10 +154,14 @@ def states() -> list[str]:
 
 
 def has_data() -> bool:
-    return DAILY.exists() and MONTHLY.exists() and SPANS.exists()
+    """True only when every core artefact (daily/monthly summaries, spans, cells, districts) exists and validates."""
+    from . import dataset
+    return dataset.core_ready()
 
 
 def clear_caches():
+    from . import dataset
+    dataset.clear_cache()
     for f in (cells, daily, monthly, spans, districts, states, month_axis, coverage, region_cells, cell_static, orbit):
         f.cache_clear()
     from .gis_layers import clear as _gclear
