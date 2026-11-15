@@ -284,7 +284,7 @@ def _log(msg: str):
     log_.info(msg)
 
 
-def install_seed(target: Path | None = None, seed: Path | None = None, log=_log) -> dict:
+def install_seed(target: Path | None = None, seed: Path | None = None, log=_log, source: str = "image seed") -> dict:
     """Install the bundled processed dataset into `target` when it holds no dataset (or an older copy of the seed)."""
     target, seed = Path(target or PROCESSED), Path(seed or SEED_PROCESSED)
 
@@ -315,7 +315,7 @@ def install_seed(target: Path | None = None, seed: Path | None = None, log=_log)
         if time.time() - lock.stat().st_mtime < 3600:
             return done("skipped", "another process is installing the seed")
         lock.unlink(missing_ok=True)
-        return install_seed(target, seed, log)
+        return install_seed(target, seed, log, source)
     SEED_STATE.update(state="installing", detail=f"copying {len(sm['files'])} files")
     tmp = target.parent / f".processed.seed-{os.getpid()}"
     try:
@@ -325,7 +325,7 @@ def install_seed(target: Path | None = None, seed: Path | None = None, log=_log)
         if bad:
             shutil.rmtree(tmp, ignore_errors=True)
             return done("failed", f"seed copy failed verification ({len(bad)} files), nothing installed: {bad[:5]}")
-        sm = sm | {"installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "installed_from": "image seed"}
+        sm = sm | {"installed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "installed_from": source}
         (tmp / MANIFEST).write_text(json.dumps(sm, indent=1), newline="\n")
         if target.exists():
             if _has_files(target):
@@ -389,7 +389,7 @@ def install_remote_seed(target: Path | None = None, base_url: str | None = None,
             SEED_STATE["detail"] = f"downloading {i}/{len(files)}: {rel}"
             _fetch(f"{base_url}/{rel}", staging / rel, session)
         log(f"[seed] downloaded {len(files)} files from the repository (commit {BUILD_COMMIT or 'main'}); verifying")
-        res = install_seed(target, staging, log=log)
+        res = install_seed(target, staging, log=log, source=f"repository download ({BUILD_COMMIT or 'main'})")
         SEED_STATE["source"] = "remote"
         return res | {"source": "remote"}
     except Exception as exc:
