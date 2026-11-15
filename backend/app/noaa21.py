@@ -189,7 +189,7 @@ def study() -> dict:
            "criteria": "adopt only if better than identity AND national ratio by >= 1 WAPE point on both splits, |bias| <= 5 %, "
                        "national band coverage >= 80 %, test >= 12 months and >= 10,000 reference detections"}
     try:
-        OUT.write_text(json.dumps(out, indent=1, default=str), encoding="utf-8")
+        OUT.write_text(json.dumps(out, indent=1, default=str), encoding="utf-8", newline="\n")
     except OSError:
         pass
     return out

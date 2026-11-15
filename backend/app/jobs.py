@@ -94,7 +94,8 @@ def _runner(kind: str, params: dict, job_id: int):
             progress(f"downloading {len(g)} {sat} granules")
             out[sat] = viirs750.download(g, log=quiet)
         progress("converting")
-        viirs750.convert()
+        conv = viirs750.convert()
+        out["conversion"] = conv.name if conv else "NO_FIRE_PIXELS_IN_AOI"
         return out
     if kind == "linear_gis":
         from . import linear_gis

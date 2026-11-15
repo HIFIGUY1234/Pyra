@@ -174,6 +174,8 @@ def clear_caches():
 @lru_cache(maxsize=1)
 def month_axis() -> pd.PeriodIndex:
     sp = spans()
+    if not sp:                      # no processed dataset: an empty axis, never a min() over nothing
+        return pd.PeriodIndex([], freq="M")
     first = min(pd.Timestamp(v["first"]) for v in sp.values())
     last = max(pd.Timestamp(v["last"]) for v in sp.values())
     return pd.period_range(first, last, freq="M")

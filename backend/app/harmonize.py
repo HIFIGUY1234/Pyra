@@ -452,7 +452,9 @@ def products() -> dict:
                     "calibration_target": st == VIIRS_REFERENCE or st.endswith("750m")})
     has750 = any(o["product_type"] == "750m" for o in out)
     return {"streams": out, "viirs_750m": "loaded" if has750 else "unavailable",
-            "viirs_750m_message": None if has750 else ("No VIIRS 750 m (VNP14/VJ114) records are loaded. FIRMS distributes only the 375 m product; "
+            "dataset_ready": store.has_data(),
+            "viirs_750m_message": None if has750 else ("No authentic VIIRS 750 m granules have been loaded. The 375 m FIRMS records remain available as a "
+                                                       "separate product. FIRMS distributes only the 375 m product; "
                                                        "750 m Level-2 swath granules come from LAADS DAAC. Convert them with `python -m app.acquire vnp14` "
                                                        "or upload a CSV marked product 750m. Until then calibration targets S-NPP 375 m only.")}
 

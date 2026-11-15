@@ -359,6 +359,9 @@ def convert(paths: list[Path] | None = None, bbox=AOI_BBOX, out: Path | None = N
     w, s, e, n = bbox
     df = df[df["longitude"].between(w, e) & df["latitude"].between(s, n)]
     df = df.drop_duplicates(["granule", "latitude", "longitude"])
+    if df.empty:                     # no CSV with a fabricated date range / empty satellite name
+        log("[750m] NO_FIRE_PIXELS_IN_AOI: granules hold fire pixels, none inside the study area")
+        return None
     sats = "_".join(sorted(df["satellite"].str.replace(" ", "").str.lower().unique()))
     out = out or RAW / f"viirs750_{sats}_{df['acq_date'].min()}_{df['acq_date'].max()}.csv"
     df.to_csv(out, index=False)
