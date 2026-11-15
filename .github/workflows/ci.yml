@@ -209,6 +209,25 @@ jobs:
           python3 -c "import json,sys; h=json.load(open('/tmp/health.json')); sys.exit(0 if h['database']['ok'] else 1)"
           curl -fsS http://127.0.0.1:8080/api/orbits/status > /dev/null && echo "orbits ok"
           curl -fsS http://127.0.0.1:8080/api/exposure/layers > /dev/null && echo "exposure ok"
+          # The committed processed dataset must be READY (a reachable DB alone is not enough) and the calendar must serve it.
+          curl -fsS http://127.0.0.1:8080/api/data/readiness | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['status'], r['satellites']); sys.exit(0 if r['status']=='READY' else 1)"
+          curl -fsS "http://127.0.0.1:8080/api/calendar?region=country&year=2024" | python3 -c "import json,sys; c=json.load(sys.stdin); assert len(c['days'])==366; print('calendar ok')"
+          docker compose ps worker --format '{{.State}}' | grep -q running && echo "worker running"
+      - name: Image-only boot (Render-like, no bind mount) installs the bundled dataset into an empty data dir
+        run: |
+          docker build -t pyroscope-api-seedtest .
+          docker run -d --name seedtest -p 8090:8000 -e PYROSCOPE_DATA_DIR=/tmp/pyroscope-data pyroscope-api-seedtest
+          for i in $(seq 1 60); do
+            s=$(curl -fsS http://127.0.0.1:8090/api/data/readiness 2>/dev/null | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['status'], r['seed']['state'])" || true)
+            echo "$s"; case "$s" in READY*) break;; esac; sleep 5
+          done
+          curl -fsS http://127.0.0.1:8090/api/data/readiness | python3 -c "import json,sys; r=json.load(sys.stdin); sys.exit(0 if r['status']=='READY' and r['seed']['state']=='installed' else 1)"
+          curl -fsS "http://127.0.0.1:8090/api/calendar?region=country&year=2024" > /dev/null && echo "calendar served from the installed seed"
+          docker restart seedtest
+          for i in $(seq 1 24); do curl -fsS http://127.0.0.1:8090/api/data/readiness 2>/dev/null | grep -q '"state":"skipped"' && break; sleep 5; done
+          curl -fsS http://127.0.0.1:8090/api/data/readiness | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['seed']); sys.exit(0 if r['status']=='READY' and r['seed']['state']=='skipped' else 1)"
+          docker logs seedtest 2>&1 | grep "\[seed\]"
+          docker rm -f seedtest
       - name: Images carry no credentials
         run: |
           for img in $(docker compose images -q); do
