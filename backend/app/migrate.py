@@ -85,7 +85,8 @@ def upgrade(dry_run: bool = False, log=print) -> dict:
         for i in todo["new_indexes"]:
             if i.table.name not in todo["new_tables"]:
                 i.create(conn, checkfirst=True)
-        conn.execute(text("CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, applied_at VARCHAR(40), summary TEXT)"))
+        pk = "SERIAL PRIMARY KEY" if M.engine.dialect.name == "postgresql" else "INTEGER PRIMARY KEY"
+        conn.execute(text(f"CREATE TABLE IF NOT EXISTS schema_migrations (id {pk}, applied_at VARCHAR(40), summary TEXT)"))
         conn.execute(text("INSERT INTO schema_migrations (applied_at, summary) VALUES (:a, :s)"),
                      {"a": datetime.now(timezone.utc).isoformat(timespec="seconds"), "s": str({k: v for k, v in summary.items() if k != 'backup'})})
     return summary

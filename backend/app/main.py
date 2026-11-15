@@ -30,13 +30,19 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def _lifespan(_app):
     _production_config_guard()
+    from . import jobs
+    jobs.start_embedded_worker()       # dev convenience; production sets PYROSCOPE_EMBEDDED_WORKER=0 and runs app.worker
     yield
 
 
 app = FastAPI(title="PyroScope API", version="1.0.0", lifespan=_lifespan,
               description="MODIS-VIIRS hot-spot harmonization, calibrated 7-day hotspot probability and authority alert routing.")
 _origins = [o.strip() for o in os.getenv("PYROSCOPE_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type", "X-User"])
+# Vercel preview deployments get per-branch hostnames: allow them with an explicit regex, e.g.
+# PYROSCOPE_CORS_ORIGIN_REGEX=^https://pyroscope-[a-z0-9-]+-myteam\.vercel\.app$  (never a bare wildcard)
+_origin_regex = os.getenv("PYROSCOPE_CORS_ORIGIN_REGEX") or None
+app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_origin_regex=_origin_regex, allow_methods=["GET", "POST", "PUT", "DELETE"],
+                   allow_headers=["Authorization", "Content-Type", "X-User"])
 db_sync.init_db()
 
 
@@ -883,20 +889,22 @@ def viirs750_search(satellite: str = Query("NOAA-21"), start: str = Query(...), 
 
 # --------------------------------------------------------------------------- background data jobs
 class JobBody(BaseModel):
-    kind: str
+    kind: str = Field(max_length=60)
     params: dict = Field(default_factory=dict)
+    idempotency_key: Optional[str] = Field(default=None, max_length=160)
 
 
 @app.get("/api/jobs")
-def jobs_list(a: Actor = Depends(require("gov_officer", "analyst"))):
+def jobs_list(limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0), status: Optional[str] = Query(None, max_length=20),
+              kind: Optional[str] = Query(None, max_length=60), a: Actor = Depends(require("gov_officer", "analyst"))):
     from . import jobs
-    return ok({"items": jobs.listing(), "kinds": jobs.KINDS})
+    return ok({"items": jobs.listing(limit, offset, status, kind), "kinds": jobs.KINDS, "limit": limit, "offset": offset})
 
 
 @app.post("/api/jobs", dependencies=[Depends(limited("processing"))])
 def jobs_submit(body: JobBody, a: Actor = Depends(require())):
     from . import jobs
-    return ok(jobs.submit(body.kind, body.params, a.username))
+    return ok(jobs.submit(body.kind, body.params, a.username, idempotency_key=body.idempotency_key))
 
 
 @app.get("/api/jobs/{job_id}")
@@ -1589,3 +1597,6 @@ def reports_download(report_id: int, a: Actor = Depends(actor)):
     if REPORTS.resolve() not in path.parents or not path.exists():
         raise HTTPException(404, "report file missing")
     return FileResponse(path, filename=name, media_type="application/pdf" if name.endswith(".pdf") else "text/csv")
+
+
+from . import routes_ext  # noqa: E402,F401  (registers the fire-intelligence / deployment routes on `app`)

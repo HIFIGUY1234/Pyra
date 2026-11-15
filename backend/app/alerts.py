@@ -414,3 +414,86 @@ def list_alerts(alert_type=None, status=None, state=None, land_use=None, tier=No
         for r in rows:
             counts[r.status] = counts.get(r.status, 0) + 1
         return {"total": len(rows), "status_counts": counts, "items": [serialize(r) for r in rows[offset: offset + limit]]}
+
+
+# --------------------------------------------------------------------------- advisories from the fire-intelligence products
+ADVISORY_TYPES = {
+    "FIRE_EVENT_ADVISORY": "Grouped Fire Event (unverified satellite evidence)",
+    "SMOKE_TRANSPORT_ADVISORY": "Smoke Transport Advisory (modelled trajectories, no concentrations)",
+    "EMISSIONS_ESTIMATE_NOTICE": "Estimated Emissions Notice (experimental estimate)",
+    "BURNED_AREA_NOTICE": "Estimated Burned Area Notice (satellite product)",
+}
+NOT_ISSUABLE = {"OFFICIAL_EMERGENCY_WARNING": "Official emergency warnings are issued only by the competent authority, never by PyroScope.",
+                "MODELLED_PM25_EXPOSURE": "No PM2.5 concentration model is installed; PM2.5 exposure advisories cannot be created.",
+                "VERIFIED_FIRE_INCIDENT": "An incident becomes verified only through the 'verify' action on a detection alert by an authorised officer."}
+
+
+def create_advisory(kind: str, ref: str, actor: str, actor_role: str, note: str | None = None) -> dict:
+    """Create a DRAFT advisory that needs human review; nothing is delivered until an authorised user approves it
+    (act(...,'approve')). ref = event id (FIRE_EVENT_ADVISORY), smoke run id (SMOKE_TRANSPORT_ADVISORY),
+    event id (EMISSIONS_ESTIMATE_NOTICE) or 'PRODUCT:YYYY-MM' (BURNED_AREA_NOTICE)."""
+    if kind in NOT_ISSUABLE:
+        raise PermissionError(NOT_ISSUABLE[kind])
+    if kind not in ADVISORY_TYPES:
+        raise ValueError(f"kind must be one of {list(ADVISORY_TYPES)}")
+    from . import events as EV
+    now_utc = datetime.now(timezone.utc)
+    if kind in ("FIRE_EVENT_ADVISORY", "EMISSIONS_ESTIMATE_NOTICE"):
+        e = EV.get(ref)
+        lat, lon = e["lat"], e["lon"]
+        body = {"event_id": ref, "status": e["status"], "first_detection": e["first_detection"], "last_detection": e["last_detection"],
+                "detections": e["n_obs"], "platforms": e["platforms"], "footprint_km2": e["footprint_km2"],
+                "footprint_note": "observation footprint, not a fire perimeter; spread or damage is NOT implied",
+                "confidence_mean": e["confidence_mean"], "evidence": e["evidence"], "peak_frp_mw": e["peak_frp_mw"]}
+        if kind == "EMISSIONS_ESTIMATE_NOTICE":
+            from . import emissions as EM
+            per = EM._per()
+            row = per[per["event_id"] == ref]
+            if row.empty:
+                raise KeyError(f"no emission estimate for {ref}; run the emissions job")
+            r0 = row.iloc[0]
+            body["emissions_kg"] = {sp: {"central": float(r0[f"{sp}_kg"]), "low": float(r0[f"{sp}_kg_low"]), "high": float(r0[f"{sp}_kg_high"])} for sp in EM.SPECIES}
+            body["label"] = EM.LABEL
+        uncertainty = "Satellite thermal anomalies grouped by PyroScope; NOT INDEPENDENTLY VALIDATED against incident records."
+        name_ref = ref
+    elif kind == "SMOKE_TRANSPORT_ADVISORY":
+        from . import smoke
+        r = smoke.get(ref)
+        lat, lon = r["sources"][0]["lat"], r["sources"][0]["lon"]
+        body = {"smoke_run_id": ref, "start_utc": r["start_utc"], "hours": r["hours"], "sources": [x["event_id"] for x in r["sources"]],
+                "exposure": r["exposure"], "label": r["label"], "pm25": r["pm25"]}
+        uncertainty = "Kinematic trajectories at two bracketing levels; no concentrations; injection height unknown."
+        name_ref = ref
+    else:
+        from . import burned_area
+        product, _, ym = ref.partition(":")
+        y, m = (int(x) for x in ym.split("-"))
+        meta = burned_area.coverage()
+        rows = [x for x in meta["months"] if x["product"] == product and x["year"] == y and x["month"] == m]
+        if not rows:
+            raise KeyError(f"{ref} is not processed")
+        lat, lon = 22.0, 82.0
+        body = {"product": product, "month": ym, **rows[0]}
+        uncertainty = "Satellite burned-area product; small or short burns below 500 m are often missed."
+        name_ref = ref
+    j = resolve_jurisdiction(lat=lat, lon=lon) if kind != "BURNED_AREA_NOTICE" else {"routing_status": "NATIONAL_SUMMARY"}
+    aid = _aid("ADV", kind, ref)
+    with M.Session() as s:
+        if s.scalar(select(M.Alert.id).where(M.Alert.alert_id == aid)):
+            raise PermissionError(f"an advisory for {ref} already exists ({aid})")
+        payload = {"alert_id": aid, "alert_type": kind, "classification": ADVISORY_TYPES[kind], "source": body,
+                   "uncertainty": uncertainty, "jurisdiction": {k: j.get(k) for k in ("state", "district", "district_id", "land_use")},
+                   "possible_responsible_authority": j.get("authorities", []), "routing": {k: j.get(k) for k in ("routing_status", "message", "resolved")},
+                   "human_review_required": True, "public_warning": False,
+                   "generated_at_utc": now_utc.isoformat(timespec="seconds"),
+                   "recommended_action": "Review the evidence; request field verification. Approval only forwards this advisory to the "
+                                         "responsible authority - it is not a public or emergency warning."}
+        a = M.Alert(alert_id=aid, alert_type=kind, classification=ADVISORY_TYPES[kind], status="PENDING_HUMAN_REVIEW",
+                    routing_status=j.get("routing_status"), dedupe_key=f"{kind}|{ref}", region_id=f"advisory:{name_ref}",
+                    region_name=f"{j.get('district') or ''} {j.get('state') or ''}".strip() or name_ref, state=j.get("state"),
+                    district_id=j.get("district_id"), land_use=j.get("land_use"), issue_date=now_utc.date(), priority=1, payload=payload)
+        s.add(a)
+        s.add(M.AlertEscalation(alert=a, action="DRAFTED", to_status=a.status, actor=actor, actor_role=actor_role, note=note))
+        _audit(s, actor, actor_role, "ADVISORY_DRAFTED", "alert", aid, {"kind": kind, "ref": ref})
+        s.commit()
+        return serialize(a, full=True)

@@ -8,6 +8,7 @@ services:
     environment:
       PYROSCOPE_REPORTS_DIR: /app/data/reports
       PYROSCOPE_TRUST_PROXY: "1"     # only nginx reaches the backend; use its X-Forwarded-For for rate limits
+      PYROSCOPE_EMBEDDED_WORKER: "0" # heavy jobs run in the separate `worker` service below
     volumes:
       - ./data:/app/data            # archives, Parquet, SQLite database, reports (persistent)
       - ./docs:/app/docs            # generated scientific report
@@ -16,6 +17,21 @@ services:
       - ./DL_FIRE_SV-C2_846940.zip:/app/DL_FIRE_SV-C2_846940.zip:ro
       - ./DL_FIRE_J1V-C2_846938.zip:/app/DL_FIRE_J1V-C2_846938.zip:ro
       - ./DL_FIRE_J2V-C2_846939.zip:/app/DL_FIRE_J2V-C2_846939.zip:ro
+    restart: unless-stopped
+
+  worker:
+    # Persistent background worker: claims jobs from the data_jobs table (leases, heartbeats, retries).
+    build: { context: ., dockerfile: backend/Dockerfile }
+    command: ["python", "-m", "app.worker"]
+    env_file: [.env]
+    environment:
+      PYROSCOPE_REPORTS_DIR: /app/data/reports
+    volumes:
+      - ./data:/app/data
+      - ./docs:/app/docs
+    depends_on:
+      backend: { condition: service_healthy }   # the API creates / migrates the schema first
+    healthcheck: { disable: true }
     restart: unless-stopped
 
   frontend:

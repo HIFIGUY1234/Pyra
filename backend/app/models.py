@@ -8,6 +8,7 @@ detection alerts.
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy import (JSON, Boolean, Column, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text,
@@ -17,7 +18,42 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from .config import DATABASE_URL
 
 Base = declarative_base()
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {})
+
+
+def normalise_url(url: str) -> str:
+    """postgres:// and postgresql:// -> postgresql+psycopg:// (psycopg 3); other URLs unchanged."""
+    for pre in ("postgres://", "postgresql://"):
+        if url.startswith(pre):
+            return "postgresql+psycopg://" + url[len(pre):]
+    return url
+
+
+def is_transaction_pooler(url: str) -> bool:
+    """Supabase transaction pooler (Supavisor, port 6543) or PYROSCOPE_DB_POOL=transaction."""
+    mode = os.getenv("PYROSCOPE_DB_POOL", "auto").lower()
+    if mode in ("transaction", "session", "direct"):
+        return mode == "transaction"
+    from sqlalchemy.engine import make_url
+    try:
+        return make_url(url).port == 6543
+    except Exception:
+        return False
+
+
+def make_engine(url: str):
+    """SQLite (local default), PostgreSQL / Supabase direct or session pooler (bounded QueuePool with pre-ping),
+    Supabase transaction pooler (NullPool + no server-side prepared statements, which transaction pooling breaks)."""
+    url = normalise_url(url)
+    if url.startswith("sqlite"):
+        return create_engine(url, connect_args={"check_same_thread": False})
+    if is_transaction_pooler(url):
+        from sqlalchemy.pool import NullPool
+        return create_engine(url, poolclass=NullPool, connect_args={"prepare_threshold": None})
+    return create_engine(url, pool_size=int(os.getenv("PYROSCOPE_DB_POOL_SIZE", "5")), max_overflow=int(os.getenv("PYROSCOPE_DB_MAX_OVERFLOW", "5")),
+                         pool_pre_ping=True, pool_recycle=1800)
+
+
+engine = make_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine, expire_on_commit=False)
 
 
@@ -331,16 +367,26 @@ class OperationalSelection(Base):
 
 
 class DataJob(Base):
-    """Background data-acquisition / processing job (visible state, cooperative cancellation)."""
+    """Durable background job (DB-leased queue, see app.jobs). Legacy rows may carry status DONE (= SUCCEEDED)."""
     __tablename__ = "data_jobs"
     id = Column(Integer, primary_key=True)
     kind = Column(String(60), nullable=False, index=True)
     params = Column(JSON)
-    status = Column(String(20), nullable=False, default="QUEUED", index=True)   # QUEUED RUNNING DONE FAILED CANCELLED
+    status = Column(String(20), nullable=False, default="QUEUED", index=True)   # QUEUED RUNNING RETRYING SUCCEEDED FAILED CANCELLED
     progress = Column(JSON)
+    stage = Column(String(120))
     error = Column(Text)
+    error_code = Column(String(60))
+    result = Column(JSON)
     requested_by = Column(String(60))
     cancel_requested = Column(Boolean, default=False)
+    attempts = Column(Integer, default=0)
+    max_attempts = Column(Integer, default=3)
+    next_run_at = Column(DateTime)
+    lease_expires_at = Column(DateTime)
+    heartbeat_at = Column(DateTime)
+    worker_id = Column(String(120))
+    idempotency_key = Column(String(160), index=True)
     created_at = Column(DateTime, default=now, index=True)
     started_at = Column(DateTime)
     finished_at = Column(DateTime)
@@ -393,6 +439,68 @@ class AuditLog(Base):
     at = Column(DateTime, default=now, index=True)
     actor = Column(String(60)); actor_role = Column(String(40)); action = Column(String(60), index=True)
     entity = Column(String(40)); entity_id = Column(String(60)); detail = Column(JSON)
+
+
+class FireEvent(Base):
+    """Space-time fire event delineated from linked active-fire detections (app.events). Footprint = observation footprint."""
+    __tablename__ = "fire_events"
+    id = Column(Integer, primary_key=True)
+    event_id = Column(String(32), unique=True, nullable=False)
+    status = Column(String(20), index=True)
+    first_detection = Column(DateTime, index=True); last_detection = Column(DateTime, index=True)
+    est_start_earliest = Column(DateTime); est_end_latest = Column(DateTime)
+    n_obs = Column(Integer, index=True); n_days = Column(Integer)
+    platforms = Column(JSON); sensor_families = Column(JSON)
+    lat = Column(Float); lon = Column(Float)
+    west = Column(Float); south = Column(Float); east = Column(Float); north = Column(Float)
+    footprint_km2 = Column(Float); footprint_centres_km2 = Column(Float); footprint_geojson = Column(JSON)
+    peak_frp_mw = Column(Float); sum_frp_mw = Column(Float); fre_mj_low = Column(Float); fre_mj_high = Column(Float)
+    confidence_mean = Column(Float); confidence_counts = Column(JSON); evidence = Column(String(60))
+    multi_sensor_day_share = Column(Float)
+    land_use = Column(String(40)); state = Column(String(80), index=True); district_id = Column(String(60))
+    day_count = Column(Integer); night_count = Column(Integer)
+    gap_days = Column(Float); sensor_days_since_last = Column(Integer); end_basis = Column(Text)
+    growth = Column(JSON); timeline = Column(JSON)
+    merged_into = Column(String(32)); split_from = Column(String(32)); truncated_start = Column(Boolean, default=False)
+    method = Column(String(40)); updated_at = Column(DateTime, default=now)
+
+
+class FireEventHistory(Base):
+    """Identity history of a fire event: CREATED, UPDATED, MERGED (into related), SPLIT (off related)."""
+    __tablename__ = "fire_event_history"
+    id = Column(Integer, primary_key=True)
+    event_id = Column(String(32), index=True, nullable=False)
+    action = Column(String(20), nullable=False)
+    related_event_id = Column(String(32))
+    detail = Column(JSON)
+    at = Column(DateTime, default=now)
+
+
+class ReferenceIncident(Base):
+    """Official fire-incident record imported (authorised CSV) for external validation. Never generated by PyroScope."""
+    __tablename__ = "reference_incidents"
+    id = Column(Integer, primary_key=True)
+    incident_id = Column(String(80), nullable=False)
+    dataset = Column(String(200), nullable=False, index=True)
+    licence = Column(String(200), nullable=False)
+    authority = Column(String(200))
+    start_date = Column(DateTime, index=True, nullable=False); end_date = Column(DateTime)
+    latitude = Column(Float, nullable=False); longitude = Column(Float, nullable=False)
+    state = Column(String(80)); district = Column(String(120)); area_ha = Column(Float); incident_type = Column(String(80))
+    imported_by = Column(String(60)); imported_at = Column(DateTime, default=now)
+    __table_args__ = (UniqueConstraint("dataset", "incident_id"),)
+
+
+class StorageObject(Base):
+    """Registry of files placed in object storage (local or Supabase): bucket, key, SHA-256, size."""
+    __tablename__ = "storage_objects"
+    id = Column(Integer, primary_key=True)
+    bucket = Column(String(63), nullable=False, index=True)
+    key = Column(String(500), nullable=False)
+    sha256 = Column(String(64)); bytes = Column(Integer); content_type = Column(String(120))
+    backend = Column(String(20)); meta = Column(JSON)
+    created_by = Column(String(60)); created_at = Column(DateTime, default=now)
+    __table_args__ = (UniqueConstraint("bucket", "key"),)
 
 
 Index("ix_alert_generated", Alert.generated_at)

@@ -88,6 +88,9 @@ def validate(env=None) -> dict:
     if prod:
         if not origins:
             issues.append(_issue("error", "PYROSCOPE_CORS_ORIGINS", "set the exact https origin(s) of the frontend"))
+        rx = e.get("PYROSCOPE_CORS_ORIGIN_REGEX") or ""
+        if rx and (not rx.startswith("^https://") or not rx.endswith("$") or ".*" in rx or rx.count(".+") > 0):
+            issues.append(_issue("error", "PYROSCOPE_CORS_ORIGIN_REGEX", "must be anchored (^https://...$) and must not contain .* or .+"))
         for o in origins:
             if o == "*" or "*" in o:
                 issues.append(_issue("error", "PYROSCOPE_CORS_ORIGINS", "wildcard origins are not allowed in production"))
@@ -149,6 +152,18 @@ def credentials(env=None) -> list[dict]:
          "needed_for": "scripted FIRMS refresh (archives can also be added manually)"},
         {"integration": "Verified authority contacts", "variables": ["(admin UI / POST /api/authorities)"],
          "status": "CONFIGURED" if _verified_contacts() else "NOT_CONFIGURED", "needed_for": "any external advisory delivery"},
+        {"integration": "LAADS DAAC licence (burned area, VIIRS 750 m)", "variables": ["EARTHDATA_TOKEN + licence accepted in the Earthdata profile"],
+         "status": st(bool(e.get("EARTHDATA_TOKEN"))), "needed_for": "MCD64A1 / VNP64A1 / VNP14 downloads (token alone is not enough; see last job error)"},
+        {"integration": "Supabase PostgreSQL", "variables": ["DATABASE_URL (postgresql://...pooler.supabase.com:6543/postgres?sslmode=require)"],
+         "status": st((e.get("DATABASE_URL") or "").startswith(("postgres://", "postgresql://", "postgresql+psycopg://"))),
+         "needed_for": "managed PostgreSQL instead of the local SQLite file"},
+        {"integration": "Supabase Storage", "variables": ["PYROSCOPE_STORAGE=supabase", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+         "status": st(bool(e.get("SUPABASE_URL") and e.get("SUPABASE_SERVICE_ROLE_KEY"))) if (e.get("PYROSCOPE_STORAGE") or "local") == "supabase" else "NOT_CONFIGURED",
+         "needed_for": "object storage for archives, granules, Parquet, models and reports (backend only; never in the browser)"},
+        {"integration": "MOSDAC (INSAT fire / smoke)", "variables": ["(registered account; authorised export imported via /api/geostationary/import)"],
+         "status": "NOT_CONFIGURED", "needed_for": "geostationary fire observations"},
+        {"integration": "Ground PM2.5 (CPCB / OpenAQ)", "variables": ["OPENAQ_API_KEY or DATA_GOV_IN_API_KEY"],
+         "status": st(bool(e.get("OPENAQ_API_KEY") or e.get("DATA_GOV_IN_API_KEY"))), "needed_for": "independent smoke / PM2.5 validation"},
     ]
 
 

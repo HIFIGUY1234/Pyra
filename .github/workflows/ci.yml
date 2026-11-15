@@ -86,6 +86,67 @@ jobs:
       - name: Dependency audit (all dependencies, moderate and above)
         run: npm audit --audit-level=moderate
 
+  postgres:
+    name: PostgreSQL / Supabase migrations, RLS, data copy and job claims
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only-disposable
+          POSTGRES_DB: pyroscope_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Committed Supabase SQL matches the models
+        working-directory: backend
+        run: |
+          python -m app.pg_migrate schema-sql
+          git diff --exit-code ../supabase/migrations
+      - name: Migrations, RLS (anon denied), SQLite -> PostgreSQL copy with reconciliation, atomic job claims
+        working-directory: backend
+        env:
+          PYROSCOPE_TEST_PG_URL: postgresql://postgres:ci-only-disposable@127.0.0.1:5432/pyroscope_test
+        run: python -m pytest tests/test_ultimate.py -q -k "postgres or supabase"
+
+  vercel-build:
+    name: Vercel-style frontend build (external API origin)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Build exactly as Vercel does (vercel.json buildCommand / outputDirectory)
+        env:
+          VITE_API_BASE_URL: https://api.pyroscope.example.org
+        run: |
+          node -e "const v=require('./vercel.json'); if(v.framework!=='vite'||v.outputDirectory!=='dist') process.exit(1)"
+          npm run build
+          test -f dist/index.html
+          grep -rq "https://api.pyroscope.example.org" dist/assets && echo "API origin baked in from VITE_API_BASE_URL"
+          if grep -rEi "service_role|SUPABASE_SERVICE|EARTHDATA_TOKEN" dist; then echo "secret-like value in the bundle"; exit 1; fi
+
   e2e:
     name: Browser end-to-end journeys (Playwright)
     runs-on: ubuntu-latest

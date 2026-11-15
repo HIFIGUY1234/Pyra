@@ -59,3 +59,9 @@ frontend/playwright-report/
 data/auxiliary/population/*.tif
 data/auxiliary/population/*.part
 data/raw/viirs750/
+# large downloaded / derived intermediates (kept out of git; manifests + derived layers are committed)
+data/raw/
+data/auxiliary/linear/*.pbf
+data/auxiliary/linear/*.part
+data/auxiliary/linear/nodes.idx
+data/object_store/
