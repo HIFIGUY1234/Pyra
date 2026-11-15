@@ -62,7 +62,11 @@ def init_db():
         if pw:
             adm = s.scalar(select(M.User).where(M.User.username == "admin"))
             if adm is not None:
-                adm.password_hash = security.hash_password(pw)
+                if not security.verify_password(pw, adm.password_hash):
+                    # new or rotated password: store its hash and end every session issued under the old one
+                    adm.password_hash = security.hash_password(pw)
+                    for ses in s.scalars(select(M.UserSession).where(M.UserSession.user_id == adm.id, M.UserSession.revoked_at.is_(None))):
+                        ses.revoked_at = M.now()
                 adm.is_demo = False
                 adm.failed_logins = 0
                 adm.locked_until = None

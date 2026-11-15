@@ -82,3 +82,14 @@ Where something is missing, the gap is stated.
 * CORS for Vercel previews uses an anchored regex (`PYROSCOPE_CORS_ORIGIN_REGEX`); `.*`/`.+` are rejected in production.
 * Job errors are redacted before storage; Earthdata tokens never appear in API output or logs.
 * `vercel-build` CI fails if a secret-like name appears in the frontend bundle.
+
+
+## Demo seed database
+
+`data/pyroscope.db` is a tracked demo seed: demo personas, roles, reference and derived tables, **no password hashes, no
+sessions**. The application never opens it for writing; the runtime database is `<data>/runtime/pyroscope.db` (git-ignored),
+so a developer's `PYROSCOPE_ADMIN_PASSWORD` can no longer leak into a commit. `test_committed_database_carries_no_credentials`
+and `test_seed_db_has_no_session_secrets_or_hash_bytes` (which also scans freed pages) guard it. If the seed ever needs
+re-sanitising: set `password_hash`, `locked_until`, `last_login_at` to NULL, `failed_logins` to 0, delete `user_sessions`,
+then `VACUUM INTO` a new file (an in-place UPDATE leaves the old hash in free pages). On boot, `init_db` re-hashes the admin
+password only when `PYROSCOPE_ADMIN_PASSWORD` differs from the stored one, and then revokes every existing admin session.
