@@ -372,3 +372,100 @@ def test_production_without_admin_password_fails_closed():
     v = system_config.validate({"PYROSCOPE_AUTH_MODE": "production", "PYROSCOPE_CORS_ORIGINS": "https://x.example.org"})
     assert v["mode"] == "production" and not v["ok"]
     assert any(i["key"] == "PYROSCOPE_ADMIN_PASSWORD" and i["level"] == "error" for i in v["issues"])
+
+
+# --------------------------------------------------------------------------- empty-data guards, remote seed, version
+def test_products_and_viirs_status_without_dataset(monkeypatch):
+    """No spans: empty month axis and an 'unavailable' 750 m status, never `min() arg is an empty sequence`."""
+    from app import harmonize
+    monkeypatch.setattr(store, "spans", lambda: {})
+    store.month_axis.cache_clear(); store.coverage.cache_clear()
+    try:
+        assert len(store.month_axis()) == 0
+        p = harmonize.products()
+        assert p["streams"] == [] and p["viirs_750m"] == "unavailable"
+        assert "No authentic VIIRS 750 m granules have been loaded" in p["viirs_750m_message"]
+        r = c.get("/api/viirs750/status", headers=ANALYST)
+        assert r.status_code == 200 and r.json()["products"]["viirs_750m"] == "unavailable"
+    finally:
+        store.month_axis.cache_clear(); store.coverage.cache_clear()
+
+
+@repo_data
+def test_viirs_status_real_data_lists_375m_streams_only():
+    r = c.get("/api/viirs750/status", headers=ANALYST).json()
+    st = {s["stream"]: s["product_type"] for s in r["products"]["streams"]}
+    assert st.get("Suomi NPP") == "375m" and all(v == "375m" for v in st.values())
+    assert r["products"]["viirs_750m"] == "unavailable" and "granules_downloaded" in r
+
+
+def test_converter_returns_none_when_no_pixels_in_aoi(monkeypatch, tmp_path):
+    from app import viirs750
+    g = tmp_path / "g.nc"
+    g.write_bytes(b"x")
+    px = pd.DataFrame({"latitude": [60.0], "longitude": [10.0], "acq_date": ["2024-01-01"], "satellite": ["NOAA-21"], "granule": ["g"]})
+    monkeypatch.setattr(viirs750, "granule_pixels", lambda p: px)
+    monkeypatch.setattr(viirs750, "RAW", tmp_path)
+    assert viirs750.convert([g], log=lambda *a: None) is None
+    assert not list(tmp_path.glob("viirs750_*.csv"))           # no CSV with a fabricated date range
+
+
+class _Resp:
+    def __init__(self, body: bytes, code=200):
+        self.body, self.code = body, code
+
+    def raise_for_status(self):
+        if self.code != 200:
+            raise RuntimeError(f"HTTP {self.code}")
+
+    def iter_content(self, n):
+        yield self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _Session:
+    def __init__(self, files: dict):
+        self.files = files
+
+    def get(self, url, **k):
+        name = url.split("/processed/", 1)[1]
+        return _Resp(self.files[name]) if name in self.files else _Resp(b"", 404)
+
+
+def test_remote_seed_installs_verified_dataset(tmp_path):
+    src = _write_core(tmp_path / "src")
+    m = dataset.write_manifest(src, provenance="repository-seed")
+    files = {rel: (src / rel).read_bytes() for rel in m["files"]} | {"manifest.json": (src / "manifest.json").read_bytes()}
+    target = tmp_path / "data" / "processed"
+    r = dataset.install_remote_seed(target, "https://example.invalid/x/data/processed", session=_Session(files), log=lambda *a: None)
+    assert r["state"] == "installed" and r["source"] == "remote" and dataset.evaluate(target)["ready"]
+    assert not [p for p in target.parent.iterdir() if p.name.startswith(".")]   # staging + temp copy removed
+
+
+def test_remote_seed_refuses_tampered_file(tmp_path):
+    src = _write_core(tmp_path / "src")
+    m = dataset.write_manifest(src, provenance="repository-seed")
+    files = {rel: (src / rel).read_bytes() for rel in m["files"]} | {"manifest.json": (src / "manifest.json").read_bytes()}
+    files["cells.parquet"] = files["cells.parquet"][:-10] + b"0123456789"
+    target = tmp_path / "data" / "processed"
+    r = dataset.install_remote_seed(target, "https://example.invalid/x/data/processed", session=_Session(files), log=lambda *a: None)
+    assert r["state"] == "failed" and not dataset.evaluate(target)["ready"]
+
+
+def test_remote_seed_never_touches_existing_dataset(tmp_path):
+    target = _write_core(tmp_path / "data" / "processed")
+    r = dataset.install_remote_seed(target, "https://example.invalid/x", session=_Session({}), log=lambda *a: None)
+    assert r["state"] == "skipped"
+
+
+def test_version_endpoint_is_public_and_safe():
+    v = c.get("/api/version").json()
+    assert {"commit", "image", "dataset", "seed", "api_version"} <= set(v)
+    assert v["dataset"]["ready"] == store.has_data()
+    assert not any(k in json.dumps(v).lower() for k in ("password", "token", "secret", "database_url"))
+    assert "build" in c.get("/api/health").json()
