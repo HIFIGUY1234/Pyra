@@ -68,3 +68,4 @@ data/auxiliary/linear/*.part
 data/auxiliary/linear/nodes.idx
 data/object_store/
 frontend/e2e-screens/
+data/runtime/
