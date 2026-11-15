@@ -45,6 +45,7 @@ import { AppShell } from './shell'
 import { OverviewDashboardPage } from './overview'
 import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
 import { ExposurePanel } from './completion_final'
+import { DatasetSteps } from './readiness'
 import { BurnedAreaPage, DeploymentPage, EmissionsPage, ExternalValidationPage, FireEventDetailPage, FireEventsPage, GeostationaryPage, JobsPage, SmokePage } from './intel'
 import { ExposurePage, ForecastModelsPage, OrbitsPage, ReferencePage, ScoringPanel, SensorPage, SystemConfigPage, Viirs375Page, Viirs750Page } from './final_ops'
 import type { Alert, AlertList, CriticalItem, CriticalRegions, DataQuality, DataStatus, EvaluateResult, JobResponse, ReportCreated, ReportList, ReportRow, ThresholdResponse, UploadResult } from './types'
@@ -1123,7 +1124,9 @@ const UPLOAD_SATELLITE_OPTIONS = [
 ]
 
 function DataManagementPage() {
-  const { reloadMeta } = React.useContext(AppCtx)
+  const { reloadMeta, role } = React.useContext(AppCtx)
+  const isAdmin = role === 'admin'
+  const [forceRebuild, setForceRebuild] = useState(false)
   const { data: statusData, reload: reloadStatus } = useApi<DataStatus>('/api/data/status')
 
   const [loadRepoBusy, setLoadRepoBusy] = useState(false)
@@ -1155,7 +1158,7 @@ function DataManagementPage() {
     setLoadRepoError(null)
     try {
       const res = await api<JobResponse>(
-        `/api/data/load-repo${retrainFlag ? '?retrain=true' : ''}`,
+        `/api/data/load-repo?retrain=${retrainFlag}&force=${forceRebuild}`,
         { method: 'POST', body: {} }
       )
       setLoadRepoResponse(res)
@@ -1224,6 +1227,8 @@ function DataManagementPage() {
         <ProvenanceBadge type="Actual Observation" />
       </div>
 
+      <DatasetSteps onChanged={reloadMeta} />
+
       {/* Data management */}
       <Card>
         <CardHeader
@@ -1241,10 +1246,15 @@ function DataManagementPage() {
                   1. Load Repository Datasets
                 </h4>
                 <p className="mt-1 text-xs text-slate-400">
-                  Triggers <code>POST /api/data/load-repo</code> to ingest discovered MODIS &amp; VIIRS archives and build harmonized series.
+                  Triggers <code>POST /api/data/load-repo</code>. When the processed dataset already validates it is re-checked and reloaded
+                  (no historical rebuild); otherwise discovered MODIS &amp; VIIRS archives are ingested. Git LFS pointer stubs are refused up front.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
+              {!isAdmin ? <p className="text-xs text-slate-400">Dataset administration requires an authorised administrator.</p> : <div className="flex flex-wrap items-center gap-3">
+                <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+                  <input type="checkbox" checked={forceRebuild} onChange={(e) => setForceRebuild(e.target.checked)} />
+                  Force full rebuild from archives
+                </label>
                 <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1263,7 +1273,7 @@ function DataManagementPage() {
                     ? 'Ingestion Job Running...'
                     : 'Load Repository Datasets'}
                 </Button>
-              </div>
+              </div>}
             </div>
 
             {loadRepoError && (

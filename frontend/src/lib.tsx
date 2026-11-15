@@ -72,7 +72,9 @@ const authHeaders = (): Record<string, string> =>
 export class ApiError extends Error {
   status: number
   retryAfter: number | null
-  constructor(status: number, message: string, retryAfter: number | null = null) { super(message); this.status = status; this.retryAfter = retryAfter }
+  /** Structured `detail` object from the API (e.g. { code, message, next_action }), when the server sent one. */
+  detail: Record<string, unknown> | null
+  constructor(status: number, message: string, retryAfter: number | null = null, detail: Record<string, unknown> | null = null) { super(message); this.status = status; this.retryAfter = retryAfter; this.detail = detail }
 }
 /** Fired when the server rejects the current Bearer token (expired, revoked, account disabled). */
 export const SESSION_EXPIRED_EVENT = 'pyro:session-expired'
@@ -95,9 +97,11 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
   }
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`
-    try { const j = await r.json(); msg = typeof j.detail === 'string' ? j.detail : Array.isArray(j.detail) ? j.detail.map((d: { loc?: (string | number)[]; msg: string }) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ') : JSON.stringify(j) } catch { /* keep status text */ }
+    let detail: Record<string, unknown> | null = null
+    try { const j = await r.json(); if (j.detail && typeof j.detail === 'object' && !Array.isArray(j.detail)) detail = j.detail
+      msg = typeof j.detail === 'string' ? j.detail : detail && typeof detail.message === 'string' ? detail.message : Array.isArray(j.detail) ? j.detail.map((d: { loc?: (string | number)[]; msg: string }) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ') : JSON.stringify(j) } catch { /* keep status text */ }
     const ra = Number(r.headers.get('Retry-After'))
-    throw new ApiError(r.status, msg, Number.isFinite(ra) && ra > 0 ? ra : null)
+    throw new ApiError(r.status, msg, Number.isFinite(ra) && ra > 0 ? ra : null, detail)
   }
   return r.json()
 }
@@ -115,16 +119,18 @@ export function useApi<T = unknown>(path: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // HTTP status of the last failure (0 = network / backend unreachable); null when the last request succeeded.
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const seq = useRef(0)
   const load = useCallback(() => {
     if (!path) { setData(null); return }
     const id = ++seq.current
-    setLoading(true); setError(null)
-    api<T>(path).then((d) => { if (id === seq.current) setData(d) }).catch((e) => { if (id === seq.current) { setError(e.message); setData(null) } }).finally(() => { if (id === seq.current) setLoading(false) })
+    setLoading(true); setError(null); setErrorStatus(null)
+    api<T>(path).then((d) => { if (id === seq.current) setData(d) }).catch((e) => { if (id === seq.current) { setError(e.message); setErrorStatus(e instanceof ApiError ? e.status : 0); setData(null) } }).finally(() => { if (id === seq.current) setLoading(false) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, ...deps])
   useEffect(load, [load])
-  return { data, error, loading, reload: load }
+  return { data, error, errorStatus, loading, reload: load }
 }
 
 /* ------------------------------------------------------------------ primitives */
