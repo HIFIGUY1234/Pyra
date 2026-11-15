@@ -81,6 +81,7 @@ import { AnomaliesPage, CalendarPage, HarmonizerPage, MorningGapPage, TrendsPage
 import { AuthControl, CoverageCard, InventoryCard, LoginGate } from './completion'
 import { ForecastPage, GovernmentPage, LiveMapPage, ObservationsPage, OrganisationPage } from './ops'
 import { ExposurePanel } from './completion_final'
+import { BurnedAreaPage, DeploymentPage, EmissionsPage, ExternalValidationPage, FireEventDetailPage, FireEventsPage, GeostationaryPage, JobsPage, SmokePage } from './intel'
 import { ExposurePage, ForecastModelsPage, OrbitsPage, ReferencePage, ScoringPanel, SensorPage, SystemConfigPage, Viirs375Page, Viirs750Page } from './final_ops'
 import type { Alert, AlertList, AuthMe, CriticalItem, CriticalRegions, DashboardSummary, DataQuality, DataStatus, EvaluateResult, JobResponse, ReportCreated, ReportList, ReportRow, SatelliteSummary, ThresholdResponse, UploadResult } from './types'
 
@@ -105,6 +106,12 @@ export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
   { idx: '10', path: '/forecast', label: 'Regional Fire Forecast', group: 'Analytics & Forecast', icon: <Sparkles className="h-4 w-4" /> },
   { idx: '10a', path: '/forecast/models', label: 'Forecast Models by Sensor', group: 'Analytics & Forecast', icon: <Cpu className="h-4 w-4" /> },
   { idx: '11', path: '/critical-regions', label: 'Critical Regions', group: 'Analytics & Forecast', icon: <Flame className="h-4 w-4" /> },
+  { idx: 'F1', path: '/events', label: 'Fire Events', group: 'Fire Intelligence', icon: <Flame className="h-4 w-4" /> },
+  { idx: 'F2', path: '/geostationary', label: 'Geostationary & Diurnal', group: 'Fire Intelligence', icon: <Satellite className="h-4 w-4" /> },
+  { idx: 'F3', path: '/burned-area', label: 'Burned-Area Mapping', group: 'Fire Intelligence', icon: <Layers className="h-4 w-4" /> },
+  { idx: 'F4', path: '/emissions', label: 'Emissions Estimation', group: 'Fire Intelligence', icon: <Activity className="h-4 w-4" /> },
+  { idx: 'F5', path: '/smoke', label: 'Smoke Transport', group: 'Fire Intelligence', icon: <Compass className="h-4 w-4" /> },
+  { idx: 'F6', path: '/external-validation', label: 'External Validation', group: 'Fire Intelligence', icon: <ShieldCheck className="h-4 w-4" /> },
   { idx: '12', path: '/observations', label: 'Observation Intelligence', group: 'Analytics & Forecast', icon: <Compass className="h-4 w-4" /> },
   { idx: '12a', path: '/orbits', label: 'Orbital Opportunities', group: 'Analytics & Forecast', icon: <Orbit className="h-4 w-4" /> },
   { idx: '12b', path: '/exposure/population', label: 'Population Exposure', group: 'Analytics & Forecast', icon: <Users className="h-4 w-4" /> },
@@ -116,6 +123,8 @@ export const PYROSCOPE_SECTIONS: NavSectionItem[] = [
   { idx: '17', path: '/data', label: 'Data Management', group: 'Governance & Data', icon: <Database className="h-4 w-4" /> },
   { idx: '18', path: '/data/quality', label: 'Data Quality Report', group: 'Governance & Data', icon: <BarChart3 className="h-4 w-4" /> },
   { idx: '19', path: '/reports', label: 'Reports & Exports', group: 'Governance & Data', icon: <FileText className="h-4 w-4" /> },
+  { idx: '20a', path: '/jobs', label: 'Background Jobs', group: 'Governance & Data', icon: <RefreshCw className="h-4 w-4" /> },
+  { idx: '20b', path: '/deployment', label: 'Deployment Health', group: 'Governance & Data', icon: <Cpu className="h-4 w-4" /> },
   { idx: '20', path: '/system', label: 'System Configuration', group: 'Governance & Data', icon: <Settings className="h-4 w-4" /> },
 ]
 
@@ -2627,6 +2636,15 @@ function ArgonShell() {
                 <Route path="/observations" element={<ObservationsPage />} />
                 <Route path="/government" element={<GovernmentPage />} />
                 <Route path="/organisation" element={<OrganisationPage />} />
+                <Route path="/events" element={<FireEventsPage />} />
+                <Route path="/events/:id" element={<FireEventDetailPage />} />
+                <Route path="/geostationary" element={<GeostationaryPage />} />
+                <Route path="/burned-area" element={<BurnedAreaPage />} />
+                <Route path="/emissions" element={<EmissionsPage />} />
+                <Route path="/smoke" element={<SmokePage />} />
+                <Route path="/external-validation" element={<ExternalValidationPage />} />
+                <Route path="/jobs" element={<JobsPage />} />
+                <Route path="/deployment" element={<DeploymentPage />} />
                 <Route path="*" element={<OverviewDashboardPage />} />
               </Routes>
               </LoginGate>

@@ -44,10 +44,15 @@ export const getAuthToken = () => authToken
 export const setAuthToken = (t: string | null) => { authToken = t; if (t) sessionStorage.setItem('pyro_token', t); else sessionStorage.removeItem('pyro_token') }
 const authHeaders = (): Record<string, string> => (authToken ? { Authorization: `Bearer ${authToken}` } : { 'X-User': currentUser })
 
+// Backend origin. Empty = same origin (Vite dev proxy / nginx). On Vercel set VITE_API_BASE_URL to the persistent API
+// (e.g. https://api.example.org); it is a public build-time value and must never carry a secret.
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
+export const apiUrl = (path: string) => (/^https?:\/\//.test(path) ? path : `${API_BASE}${path}`)
+
 export async function api<T = unknown>(path: string, opts: { method?: string; body?: unknown; form?: FormData } = {}): Promise<T> {
   const headers: Record<string, string> = authHeaders()
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
-  const r = await fetch(path, { method: opts.method || (opts.body !== undefined || opts.form ? 'POST' : 'GET'), headers, body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined) })
+  const r = await fetch(apiUrl(path), { method: opts.method || (opts.body !== undefined || opts.form ? 'POST' : 'GET'), headers, body: opts.form ?? (opts.body !== undefined ? JSON.stringify(opts.body) : undefined) })
   if (r.status === 401 && authToken && path !== '/api/auth/login') setAuthToken(null)   // expired / revoked session
   if (!r.ok) {
     let msg = `${r.status} ${r.statusText}`
@@ -58,7 +63,7 @@ export async function api<T = unknown>(path: string, opts: { method?: string; bo
 }
 
 export async function download(path: string, filename: string) {
-  const r = await fetch(path, { headers: authHeaders() })
+  const r = await fetch(apiUrl(path), { headers: authHeaders() })
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
   const url = URL.createObjectURL(await r.blob())
   const a = document.createElement('a')
