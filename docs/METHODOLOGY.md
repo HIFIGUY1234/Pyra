@@ -161,3 +161,10 @@ loaded (`POST /api/geo/exposure`); otherwise they are reported unavailable (weig
 ([INFRASTRUCTURE_EXPOSURE.md](INFRASTRUCTURE_EXPOSURE.md)). Hotspot exposure de-duplicates detections to ~375 m locations,
 then counts people (fine-grid cells whose centre is within the radius) and facilities (haversine via a KD-tree) within
 5/10/25 km. These are proximity counts — not predictions of harm — and are uncertain by roughly one fine cell (~5 km) at the radius edge.
+
+## Extended products (2026-11)
+
+The methods below are documented separately and never feed back into the harmonized record:
+[fire events](FIRE_EVENT_DELINEATION.md) - [burned area](BURNED_AREA_METHODOLOGY.md) - [emissions](EMISSIONS_METHODOLOGY.md) -
+[smoke / PM2.5](SMOKE_PM25_METHODOLOGY.md) - [geostationary fusion](GEOSTATIONARY_FUSION.md) -
+[independent validation](INDEPENDENT_VALIDATION.md). The 2012 seam verdict remains PARTIAL (recomputed 2026-11-15).

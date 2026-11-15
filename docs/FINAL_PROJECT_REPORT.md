@@ -133,3 +133,12 @@ cd ../frontend && npm ci && npm test && npm run build && npm run e2e
 ```
 
 Fixed random seed (`RNG_SEED = 20261114`). Archive SHA-256s are in `data/processed/archive_checksums.json`, and every number in the science report is computed when the report is generated.
+
+## 2026-11-15 update: fire intelligence and Vercel/Supabase readiness
+
+Superseding status for everything added on branch `feature/pyroscope-ultimate-completion` is in
+[ULTIMATE_FINAL_COMPLETION_REPORT.md](ULTIMATE_FINAL_COMPLETION_REPORT.md): fire events (8,948 India events, 25-31 Oct 2026),
+FRP/FRE emission estimates, experimental smoke trajectories, burned-area pipeline (blocked by the LAADS licence),
+geostationary registry/import, independent-validation framework (PyroScope 13.0% WAPE vs constant ratio 32.0%),
+authentic WorldPop area-weighted rebuild, durable job queue + worker, object storage, PostgreSQL/Supabase migrations
+with RLS and a Vercel frontend configuration. Core harmonization results and the PARTIAL seam verdict are unchanged.

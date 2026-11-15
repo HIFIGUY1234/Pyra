@@ -85,3 +85,12 @@ Statuses: DONE AND TESTED · IMPLEMENTED BUT NOT FULLY VALIDATED · PARTIAL · B
 `EARTHDATA_TOKEN` (750 m) · SMTP or webhook provider settings + verified contacts (real delivery) · production `PYROSCOPE_ADMIN_PASSWORD` · optional `FIRMS_MAP_KEY`.
 
 Remaining work and exact unblock steps: [FINAL_REMAINING_TASKS.md](FINAL_REMAINING_TASKS.md).
+
+## 2026-11-15 update: fire intelligence and Vercel/Supabase readiness
+
+Superseding status for everything added on branch `feature/pyroscope-ultimate-completion` is in
+[ULTIMATE_FINAL_COMPLETION_REPORT.md](ULTIMATE_FINAL_COMPLETION_REPORT.md): fire events (8,948 India events, 25-31 Oct 2026),
+FRP/FRE emission estimates, experimental smoke trajectories, burned-area pipeline (blocked by the LAADS licence),
+geostationary registry/import, independent-validation framework (PyroScope 13.0% WAPE vs constant ratio 32.0%),
+authentic WorldPop area-weighted rebuild, durable job queue + worker, object storage, PostgreSQL/Supabase migrations
+with RLS and a Vercel frontend configuration. Core harmonization results and the PARTIAL seam verdict are unchanged.

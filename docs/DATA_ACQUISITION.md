@@ -161,3 +161,17 @@ Totals are conserved to float precision (tested on synthetic GeoTIFFs).
 
 NOAA-20 and NOAA-21 forecast labels use only standard-processing rows from each sensor's operational start
 (NOAA-20 2018-04-01, NOAA-21 2024-01-17); NRT rows are excluded. See [OPERATIONAL_SENSOR_TRANSITION.md](OPERATIONAL_SENSOR_TRANSITION.md).
+
+## Status update 2026-11-15
+
+* **WorldPop 2020 (authentic, rebuilt):** `ind_ppp_2020_1km_Aggregated_UNadj.tif` downloaded (SHA-256 `27d08e3e...c911`),
+  CRS EPSG:4326, exact affine transform from the file, area-weighted allocation by spherical pixel area: total
+  1,380,004,385 people, conservation error 1.7e-16; vs pixel-centre baseline median cell change 0.27 %, p95 1.9 %,
+  608 of 4,898 cells change >1 %, 85 >5 % (half-pixel offset documented as `grid_aligned: false`).
+* **Geofabrik India PBF:** downloaded locally (1.72 GB, MD5-verified by `linear_gis.acquire`); layer build status in
+  [ULTIMATE_FINAL_COMPLETION_REPORT.md](ULTIMATE_FINAL_COMPLETION_REPORT.md).
+* **Earthdata:** `EARTHDATA_TOKEN` is valid, but LAADS file downloads redirect to the licence page and LP DAAC cloud to
+  OAuth: accept the LAADS licence and authorise LP DAAC (see FINAL_MANUAL_SETUP.md). VIIRS 750 m (VNP14/VJ114/VJ214 v002,
+  verified in CMR) and MCD64A1 061 / VNP64A1 002 remain undownloaded until then.
+* **GFED4 emission factors:** `data/auxiliary/emissions/GFED4_Emission_Factors.txt` (SHA-256 `5f68c5c4...83b2`).
+* **GFS winds:** Open-Meteo GFS API (no key; 600 location-calls/min free tier).

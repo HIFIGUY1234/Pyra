@@ -101,3 +101,10 @@ docker compose up --build     # UI + API on http://localhost:8080
 | Full downstream pipeline (no new ingest) | 54 s | — |
 
 The map never asks for all observations at once: hotspots are filtered and capped server-side, and the grid-cell layer is aggregated.
+
+## Vercel + Supabase deployment (2026-11)
+
+Target architecture: Vercel (frontend), Supabase (PostgreSQL + Storage), persistent FastAPI container, separate worker
+container. See [VERCEL_SUPABASE_ARCHITECTURE.md](VERCEL_SUPABASE_ARCHITECTURE.md), [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md),
+[SUPABASE_SETUP.md](SUPABASE_SETUP.md), [BACKGROUND_WORKERS.md](BACKGROUND_WORKERS.md). `docker compose` now starts a
+`worker` service and sets `PYROSCOPE_EMBEDDED_WORKER=0` on the API.

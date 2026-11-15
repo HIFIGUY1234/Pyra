@@ -22,6 +22,14 @@ probability with a human-in-the-loop authority alert workflow (India focus).
 | [docs/ORBIT_PREDICTION.md](docs/ORBIT_PREDICTION.md) | SGP4 overpass prediction and its validation against actual detections |
 | [docs/END_TO_END_TESTING.md](docs/END_TO_END_TESTING.md) | Playwright browser journeys |
 | [docs/FINAL_REMAINING_TASKS.md](docs/FINAL_REMAINING_TASKS.md) | What is still blocked and exactly how to unblock it |
+| [docs/ULTIMATE_FINAL_COMPLETION_REPORT.md](docs/ULTIMATE_FINAL_COMPLETION_REPORT.md) | Final acceptance matrix (fire intelligence, Vercel/Supabase, tests, blockers) |
+| [docs/FIRE_EVENT_DELINEATION.md](docs/FIRE_EVENT_DELINEATION.md) | Space-time fire events from linked detections (IDs, merge/split, status) |
+| [docs/BURNED_AREA_METHODOLOGY.md](docs/BURNED_AREA_METHODOLOGY.md) / [docs/EMISSIONS_METHODOLOGY.md](docs/EMISSIONS_METHODOLOGY.md) | MCD64A1/VNP64A1 burned area; FRP/FRE and burned-area emission estimates |
+| [docs/SMOKE_PM25_METHODOLOGY.md](docs/SMOKE_PM25_METHODOLOGY.md) | Experimental smoke trajectories (GFS), exposure near the path; PM2.5 status |
+| [docs/GEOSTATIONARY_FUSION.md](docs/GEOSTATIONARY_FUSION.md) | INSAT / Meteosat-IODC research, authorised import, diurnal sampling, agreement classes |
+| [docs/INDEPENDENT_VALIDATION.md](docs/INDEPENDENT_VALIDATION.md) | Reference sources with independence assessment; harmonization vs baselines |
+| [docs/VERCEL_SUPABASE_ARCHITECTURE.md](docs/VERCEL_SUPABASE_ARCHITECTURE.md), [VERCEL_DEPLOYMENT](docs/VERCEL_DEPLOYMENT.md), [SUPABASE_SETUP](docs/SUPABASE_SETUP.md), [SUPABASE_MIGRATIONS](docs/SUPABASE_MIGRATIONS.md), [BACKGROUND_WORKERS](docs/BACKGROUND_WORKERS.md) | Deployment: Vercel frontend, Supabase PostgreSQL + Storage, persistent API + worker |
+| [docs/FINAL_MANUAL_SETUP.md](docs/FINAL_MANUAL_SETUP.md) | Exact steps that need your accounts / credentials |
 | `data/processed/ingestion_report.md` | Generated inventory: what is loaded, what is missing |
 
 ## Datasets in this repository (Git LFS)
@@ -122,3 +130,18 @@ probability; land use decides who responds, not why it burned.
 
 Data: NASA FIRMS (MODIS C6.1, VIIRS C2), NASA POWER, NASA MCD12Q1 via GIBS, geoBoundaries, WorldPop (CC BY 4.0),
 © OpenStreetMap contributors (ODbL), CelesTrak.
+
+## Extended PyroScope (fire intelligence)
+
+The core NASA result (harmonized MODIS-VIIRS record + Burning Activity Calendar) is unchanged. On top of it:
+
+* **Fire events** - detections linked into space-time events with stable IDs, merge/split history and evidence-based
+  status (no CONTAINED; ENDED needs observing opportunities). Demo DB: India 25-31 Oct 2026, 8,948 events.
+* **Emissions (estimated)** - FRP/FRE mass balance with Monte Carlo uncertainty (Wooster 2005 CR, GFED4 EFs).
+* **Smoke transport (experimental)** - forward trajectories with GFS winds at two bracketing levels; people near the
+  path. No PM2.5 concentrations (no dispersion model installed).
+* **Burned area** - MCD64A1/VNP64A1 pipeline (blocked until the Earthdata account accepts the LAADS licence).
+* **Geostationary** - verified provider registry, authorised INSAT/Meteosat import, diurnal sampling, agreement classes.
+* **External validation** - independence-labelled sources; PyroScope WAPE 13.0 % vs constant ratio 32.0 % on 59 held-out months.
+* **Durable jobs + worker** (`python -m app.worker`), **object storage** (local / Supabase), **PostgreSQL / Supabase**
+  migrations with RLS, **Vercel** frontend config (`VITE_API_BASE_URL`).

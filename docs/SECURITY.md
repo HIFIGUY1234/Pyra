@@ -69,3 +69,16 @@ Where something is missing, the gap is stated.
 * CORS is restricted by `PYROSCOPE_CORS_ORIGINS`. Set the exact production origin.
 * The in-process rate limiter does not share state across workers or hosts.
 * Audit retention is manual (endpoint / function); no scheduler runs it.
+
+## Additions (2026-11)
+
+* New write endpoints are admin-only (`/api/geostationary/import`, `/api/external-validation/incidents`, job submission) or
+  analyst/officer (`/api/advisories`); uploads are size-limited (50 MB) and extension-checked; provenance is mandatory.
+* Advisories are drafts (`PENDING_HUMAN_REVIEW`); delivery happens only through the existing approval action.
+  `OFFICIAL_EMERGENCY_WARNING`, `MODELLED_PM25_EXPOSURE` and direct `VERIFIED_FIRE_INCIDENT` creation are refused (409).
+* Object keys are validated (no `..`, absolute paths, backslashes; bucket allow-list); local downloads are confined to the
+  bucket directory; Supabase URL must be https; the service-role key is backend-only and never returned.
+* Supabase: RLS on every table with no policies; `anon`/`authenticated` privileges revoked (tested on PostgreSQL).
+* CORS for Vercel previews uses an anchored regex (`PYROSCOPE_CORS_ORIGIN_REGEX`); `.*`/`.+` are rejected in production.
+* Job errors are redacted before storage; Earthdata tokens never appear in API output or logs.
+* `vercel-build` CI fails if a secret-like name appears in the frontend bundle.

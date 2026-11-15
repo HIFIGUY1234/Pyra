@@ -29,3 +29,15 @@ calibration cache is warm; the first fit takes about 4 s.
 **If asked about exposure:** WorldPop 2020 (1.38 billion people in the AOI) and 11 OSM facility categories. Roads, rail and power lines are implemented from Geofabrik PBF; until the extract is built they are shown as not loaded.
 **If asked about S-NPP retirement:** open **Reference sensor** (`/reference`). S-NPP is the historical reference; NOAA-21 is the operational reference chosen by criteria C1–C6 (NOAA-20 also passes). Each has its own model (`/forecast/models`). Bridges to the S-NPP scale were tested and none passed, so the page says NOT_BRIDGED and the series are not spliced.
 **If asked about readiness:** `/system` shows which credentials are configured (never their values) and the production configuration check.
+
+## Extension segment (2 minutes, after the core demo)
+
+1. **Fire Events** (`/events`): "A hotspot is a detection, not a fire." Sort by detections; open the largest Punjab event:
+   footprint = detected pixels (not a perimeter), multi-sensor timeline, status rule (no CONTAINED; ENDED needs
+   observing opportunities).
+2. **Emissions**: PM2.5 for 25-31 Oct 2026 ~3.5 kt (90 % 2.1-7.5 kt) - labelled ESTIMATED; show inputs and what is not
+   in the uncertainty.
+3. **Smoke Transport**: trajectories at 10 m and 850 hPa; "this is a path, not a concentration - no PM2.5 forecast".
+4. **External Validation**: PyroScope 13.0 % WAPE vs constant ratio 32.0 % vs raw MODIS 85.1 % on 59 held-out months;
+   which references are and are not independent.
+5. **Background Jobs**: a burned-area job failing with `BLOCKED_BY_CREDENTIALS` (LAADS licence) - an honest blocker, not a fake map.
