@@ -93,7 +93,7 @@ def ok(data):
     return JSONResponse(content=json.loads(json.dumps(_clean(data), cls=NpEncoder)))
 
 
-PUBLIC_PATHS = {"/api/health", "/api/meta", "/api/auth/login", "/docs", "/openapi.json"}
+PUBLIC_PATHS = {"/api/health", "/api/version", "/api/meta", "/api/auth/login", "/docs", "/openapi.json"}
 
 
 @app.middleware("http")
@@ -366,9 +366,16 @@ def health():
     status = "ok" if db_ok and core["ready"] else "degraded"
     from . import system_config
     return {"status": status, "has_data": core["ready"], "forecast": forecast.available(),
-            "data": {"status": dataset.readiness_status(core, JOB), "ready": core["ready"]},
+            "data": {"status": dataset.readiness_status(core, JOB), "ready": core["ready"], "seed": dataset.SEED_STATE.get("state")},
+            "build": {k: dataset.build_info()[k] for k in ("commit", "image")},
             "database": {"ok": db_ok, "error": db_err}, "storage": {"free_gb": round(free_gb, 2), "low": free_gb < 2.0},
             "admin_bootstrap": system_config.admin_bootstrap_state(), "auth_mode": security.auth_mode()}
+
+
+@app.get("/api/version")
+def version():
+    """Which backend build and which dataset are serving this deployment. Named safe values only, never the environment."""
+    return ok(dataset.build_info() | {"api_version": app.version})
 
 
 @app.get("/api/system/config")

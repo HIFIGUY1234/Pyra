@@ -1,7 +1,7 @@
 # PyroScope API - Root Dockerfile (build context: repo root)
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PYROSCOPE_IMAGE=root-with-seed
 WORKDIR /app/backend
 
 COPY backend/requirements.txt .

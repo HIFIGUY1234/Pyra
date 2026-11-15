@@ -26,6 +26,14 @@ from pathlib import Path
 
 from .config import ARCHIVE_DIRS, PROCESSED, SEED_PROCESSED, UPLOADS
 
+# Build identity: Render sets RENDER_GIT_COMMIT at runtime; other hosts may set PYROSCOPE_BUILD_SHA.
+BUILD_COMMIT = os.getenv("PYROSCOPE_BUILD_SHA") or os.getenv("RENDER_GIT_COMMIT") or None
+IMAGE = os.getenv("PYROSCOPE_IMAGE") or "source-checkout"   # set in the Dockerfiles: root-with-seed | api-only
+# Fallback seed source when the image carries no bundled dataset (e.g. a host building backend/Dockerfile): the committed
+# data/processed of the SAME commit, every file SHA-256-verified against that commit's manifest. "off" disables it.
+SEED_URL = os.getenv("PYROSCOPE_SEED_URL") or (
+    f"https://raw.githubusercontent.com/HIFIGUY1234/Pyra/{BUILD_COMMIT or 'main'}/data/processed")
+
 log_ = logging.getLogger("pyroscope.dataset")
 
 SCHEMA_VERSION = 1
@@ -339,9 +347,81 @@ def install_seed(target: Path | None = None, seed: Path | None = None, log=_log)
         lock.unlink(missing_ok=True)
 
 
+def _fetch(url: str, dest: Path, session, retries: int = 4):
+    last = None
+    for attempt in range(retries):
+        try:
+            with session.get(url, stream=True, timeout=120) as r:
+                r.raise_for_status()
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                with open(dest, "wb") as fh:
+                    for chunk in r.iter_content(1 << 20):
+                        fh.write(chunk)
+            return
+        except Exception as exc:          # transient network errors: retry with back-off
+            last = exc
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"download failed: {url.rsplit('/', 1)[-1]}: {type(last).__name__}")
+
+
+def install_remote_seed(target: Path | None = None, base_url: str | None = None, session=None, log=_log) -> dict:
+    """Download the committed processed dataset (manifest first) into a temp dir beside `target`, verify every file's
+    size and SHA-256 against the manifest, then install it with the same rules as the bundled seed."""
+    target, base_url = Path(target or PROCESSED), (base_url or SEED_URL).rstrip("/")
+    if base_url.lower() == "off":
+        return {"state": "not_applicable", "detail": "no bundled seed and remote seed disabled (PYROSCOPE_SEED_URL=off)"}
+    cur = evaluate(target)
+    if cur["status"] != MISSING:
+        SEED_STATE.update(state="skipped", detail=f"target holds a {cur['status']} dataset; remote seed not needed")
+        return dict(SEED_STATE)
+    import requests
+    session = session or requests.Session()
+    staging = target.parent / f".remote-seed-{os.getpid()}"
+    shutil.rmtree(staging, ignore_errors=True)
+    SEED_STATE.update(state="installing", detail="downloading manifest", source="remote")
+    try:
+        _fetch(f"{base_url}/{MANIFEST}", staging / MANIFEST, session)
+        m = json.loads((staging / MANIFEST).read_text())
+        files = m.get("files") or {}
+        if not files:
+            raise RuntimeError("remote manifest lists no files")
+        for i, rel in enumerate(sorted(files), 1):
+            SEED_STATE["detail"] = f"downloading {i}/{len(files)}: {rel}"
+            _fetch(f"{base_url}/{rel}", staging / rel, session)
+        log(f"[seed] downloaded {len(files)} files from the repository (commit {BUILD_COMMIT or 'main'}); verifying")
+        res = install_seed(target, staging, log=log)
+        SEED_STATE["source"] = "remote"
+        return res | {"source": "remote"}
+    except Exception as exc:
+        SEED_STATE.update(state="failed", detail=f"remote seed: {exc}", at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        log(f"[seed] failed: remote seed: {exc}")
+        return dict(SEED_STATE)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def build_info() -> dict:
+    man = load_manifest()
+    core = evaluate()
+    return {"commit": BUILD_COMMIT, "image": IMAGE, "bundled_seed": SEED_PROCESSED.is_dir(),
+            "dataset": {"status": readiness_status(core, None), "ready": core["ready"],
+                        "processing_version": (man or {}).get("processing_version"), "manifest_created_at": (man or {}).get("created_at"),
+                        "provenance": (man or {}).get("provenance"), "installed_at": (man or {}).get("installed_at")},
+            "seed": {k: SEED_STATE.get(k) for k in ("state", "detail", "at", "source")}}
+
+
 def install_seed_in_background(on_done=None):
     if not SEED_PROCESSED.is_dir():
-        SEED_STATE.update(state="not_applicable", detail="no bundled seed dataset (source checkout)")
+        if evaluate()["status"] != MISSING:
+            SEED_STATE.update(state="not_applicable", detail="no bundled seed dataset; existing data directory used")
+            return
+
+        def remote():
+            res = install_remote_seed()
+            if on_done and res.get("state") == "installed":
+                on_done()
+        SEED_STATE.update(state="checking", detail="no bundled seed in this image; fetching the verified dataset of this commit")
+        threading.Thread(target=remote, name="pyroscope-remote-seed", daemon=True).start()
         return
 
     def run():

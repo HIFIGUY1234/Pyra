@@ -1,7 +1,7 @@
 # PyroScope API - Backend Dockerfile (build context: backend/). API only: no bundled dataset (use the root Dockerfile for that)
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PYROSCOPE_IMAGE=api-only
 WORKDIR /app/backend
 
 COPY requirements.txt .
