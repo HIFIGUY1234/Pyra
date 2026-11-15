@@ -1,13 +1,13 @@
-# PyroScope API. Data (archives, Parquet, SQLite) is mounted at /app/data - never baked into the image.
+# PyroScope API - Backend Dockerfile (build context: backend/)
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 WORKDIR /app/backend
 
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY backend/app ./app
+COPY app ./app
 RUN useradd --create-home --uid 10001 pyro && mkdir -p /app/data /app/docs && chown -R pyro /app
 USER pyro
 
