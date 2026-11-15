@@ -1,11 +1,11 @@
 {
  "kind": "population",
- "rows": 4885,
+ "rows": 4898,
  "rejected_rows": 0,
  "source": "WorldPop Global 2000-2020 1 km UN-adjusted population counts, India, 2020",
  "licence": "CC BY 4.0 (WorldPop, www.worldpop.org; doi:10.5258/SOTON/WP00671)",
  "source_date": "2020",
- "uploaded_by": "pipeline (population.build)",
- "uploaded_at": "2026-11-14T18:19:31+00:00",
+ "uploaded_by": "pipeline (population.build area_weighted)",
+ "uploaded_at": "2026-11-15T05:21:34+00:00",
  "url": "https://data.worldpop.org/GIS/Population/Global_2000_2020_1km_UNadj/2020/IND/ind_ppp_2020_1km_Aggregated_UNadj.tif"
 }

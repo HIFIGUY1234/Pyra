@@ -1,0 +1,35 @@
+[
+ {
+  "run_at": "2026-11-15T05:57:37+00:00",
+  "method": "pyroscope-events-1.0",
+  "start": "2026-10-25",
+  "end": "2026-10-31",
+  "bbox": null,
+  "detections": 31837,
+  "events": 8948,
+  "data_through": "2026-10-31T22:25:00",
+  "status_counts": {
+   "ENDED": 6002,
+   "POSSIBLY_INACTIVE": 1877,
+   "DETECTED": 845,
+   "ACTIVE": 200,
+   "UNVERIFIED": 24
+  },
+  "multi_sensor_events": 1328,
+  "single_detection_events": 6312,
+  "history_entries": 0,
+  "seconds": 25.6,
+  "parameters": {
+   "persistence_days": {
+    "Agricultural": 1.0,
+    "Municipal/Urban": 1.0,
+    "Forest": 3.0,
+    "Other": 3.0
+   },
+   "default_persistence_days": 3.0,
+   "link_distance": "r_i + r_j, r = 0.5*sqrt(scan^2+track^2) km",
+   "end_min_sensor_days": 6,
+   "excluded": "FIRMS type 1 (volcano), 2 (static/industrial), 3 (offshore)"
+  }
+ }
+]

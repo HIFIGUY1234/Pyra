@@ -13,13 +13,34 @@
  "sha256": "27d08e3eabf59f63a2147901c25c046d584c3295f9ceb4c4cf08a902a5bec911",
  "bytes": 18313124,
  "pixel_deg": 0.0083333333,
+ "transform": [
+  0.0083333333,
+  0.0,
+  68.18208306817596,
+  0.0,
+  -0.0083333333,
+  35.50791671762816
+ ],
  "grid_aligned": false,
- "assignment": "pixel centre (each pixel counted once)",
+ "assignment": "area-weighted: each pixel split over the cells it overlaps by exact spherical area (pixel edges from the affine transform)",
  "total_population_in_aoi": 1380004385,
- "cells_0p25": 4885,
- "cells_partial_coverage": 1360,
+ "conservation_rel_error": 1.727665373323604e-16,
+ "cells_0p25": 4898,
+ "cells_partial_coverage": 1359,
  "fine_grid_deg": 0.05,
- "fine_cells": 113736,
- "processed_at": "2026-11-14T18:19:27+00:00",
- "processing_seconds": 3.8
+ "fine_cells": 114109,
+ "sensitivity_vs_pixel_centre": {
+  "cells": 4898,
+  "total_centre": 1380004385.0094864,
+  "total_area_weighted": 1380004385.0094864,
+  "total_rel_diff": 0.0,
+  "median_cell_rel_diff": 0.002683090927540756,
+  "p95_cell_rel_diff": 0.019082799832737564,
+  "max_cell_rel_diff": 1.0,
+  "cells_changed_over_1pct": 608,
+  "cells_changed_over_5pct": 85
+ },
+ "uncertainty": "Residual uncertainty is the WorldPop model itself (not quantified here) plus within-pixel distribution: area weighting assumes people are spread uniformly inside each ~1 km pixel.",
+ "processed_at": "2026-11-15T05:21:22+00:00",
+ "processing_seconds": 25.0
 }

@@ -1,0 +1,116 @@
+{
+ "label": "ESTIMATED - EXPERIMENTAL - NOT INDEPENDENTLY VALIDATED - not an official emissions inventory",
+ "method": "FRP/FRE mass balance (Wooster 2005 CR; GFED4 EF)",
+ "start": "2026-10-25",
+ "end": "2026-10-31",
+ "events": 8948,
+ "events_without_frp": 0,
+ "n_draws": 1000,
+ "totals_tonnes": {
+  "dry_matter": {
+   "median": 535798.6674015613,
+   "p05": 317465.9357666563,
+   "p95": 1153217.8058021986
+  },
+  "PM2.5": {
+   "median": 3485.012153896477,
+   "p05": 2061.7986134712437,
+   "p95": 7488.995108557637
+  },
+  "CO": {
+   "median": 50658.46969383594,
+   "p05": 30049.043584471157,
+   "p95": 108935.28778761992
+  },
+  "CO2": {
+   "median": 859952.9762721073,
+   "p05": 509279.1235992377,
+   "p95": 1851246.6938445226
+  },
+  "CH4": {
+   "median": 2723.880222483161,
+   "p05": 1616.4263096016955,
+   "p95": 5850.597336184689
+  }
+ },
+ "inputs": {
+  "combustion_factor_kg_per_MJ": {
+   "mean": 0.368,
+   "sd": 0.015,
+   "source": "Wooster et al. 2005, JGR 110, D24311"
+  },
+  "emission_factors": {
+   "file": "GFED4_Emission_Factors.txt",
+   "sha256": "5f68c5c4ffdb7d81d3d2fefa662dcad9dd66f2b4097350a08a045523626383b2",
+   "source": "https://www.geo.vu.nl/~gwerf/GFED/GFED4/ancill/GFED4_Emission_Factors.txt",
+   "basis": "GFED4 table, mostly Akagi et al. 2011",
+   "species": [
+    "PM2.5",
+    "CO",
+    "CO2",
+    "CH4"
+   ],
+   "values_g_per_kg": {
+    "PM2.5": {
+     "SAVA": 7.17,
+     "BORF": 15.3,
+     "TEMF": 12.9,
+     "DEFO": 9.1,
+     "PEAT": 9.1,
+     "AGRI": 6.26
+    },
+    "CO": {
+     "SAVA": 63.0,
+     "BORF": 127.0,
+     "TEMF": 88.0,
+     "DEFO": 93.0,
+     "PEAT": 210.0,
+     "AGRI": 102.0
+    },
+    "CO2": {
+     "SAVA": 1686.0,
+     "BORF": 1489.0,
+     "TEMF": 1647.0,
+     "DEFO": 1643.0,
+     "PEAT": 1703.0,
+     "AGRI": 1585.0
+    },
+    "CH4": {
+     "SAVA": 1.94,
+     "BORF": 5.96,
+     "TEMF": 3.36,
+     "DEFO": 5.07,
+     "PEAT": 20.8,
+     "AGRI": 5.82
+    }
+   }
+  },
+  "biome_mapping": {
+   "Agricultural": [
+    "AGRI"
+   ],
+   "Forest": [
+    "SAVA",
+    "DEFO"
+   ],
+   "Other": [
+    "SAVA"
+   ],
+   "Municipal/Urban": [
+    "AGRI",
+    "SAVA"
+   ]
+  },
+  "fre_bracket_isolated_pass_hours": [
+   0.5,
+   6.0
+  ]
+ },
+ "uncertainty_not_included": [
+  "within-biome emission-factor variability (not in the GFED table)",
+  "FRP omission of small/cool fires below the detection limit",
+  "cloud-obscured burning",
+  "land-cover misclassification beyond the biome choice"
+ ],
+ "computed_at": "2026-11-15T05:58:12+00:00"
+}
