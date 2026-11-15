@@ -64,6 +64,8 @@ def init_db():
             if adm is not None and not adm.password_hash:
                 adm.password_hash = security.hash_password(pw)
                 adm.is_demo = False
+                if adm.display_name == DEMO_USERS[0][1]:   # now a real account: drop the "(demo persona)" seed label
+                    adm.display_name = "Administrator"
         s.commit()
 
 

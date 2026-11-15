@@ -248,7 +248,12 @@ def auth_logout(authorization: Optional[str] = Header(default=None), a: Actor = 
 
 @app.get("/api/auth/me")
 def auth_me(a: Actor = Depends(actor)):
-    return ok({**a.model_dump(), "auth_mode": security.auth_mode(),
+    org_name = None
+    if a.organisation_id is not None:
+        with M.Session() as s:
+            org = s.get(M.Organisation, a.organisation_id)
+            org_name = org.name if org else None
+    return ok({**a.model_dump(), "organisation_name": org_name, "auth_mode": security.auth_mode(),
                "warning": None if a.auth == "token" else "Development persona (X-User header). Not authentication; disabled when PYROSCOPE_AUTH_MODE=production."})
 
 
