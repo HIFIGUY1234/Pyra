@@ -203,9 +203,9 @@ test('E - operational transition, sensor products, 750 m and system readiness (n
 
   await page.goto('/system')
   await heading(page, 'System configuration')
-  await expect(page.getByText('Credential readiness')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 3, name: 'Credential readiness', exact: true })).toBeVisible()
   await expect(page.getByText('NASA Earthdata (VIIRS 750 m)')).toBeVisible()
-  await expect(page.getByText('Notification setup checklist')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 3, name: 'Notification setup checklist', exact: true })).toBeVisible()
   await shot(page, 'system-config')
   const r = await page.request.get('/api/system/credentials', { headers: { 'X-User': 'admin' } })
   expect(await r.text()).not.toContain('E2e-Admin-Passw0rd')

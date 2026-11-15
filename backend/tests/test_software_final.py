@@ -26,6 +26,7 @@ def test_750m_credential_status_never_reveals_secrets(monkeypatch, tmp_path):
     monkeypatch.setattr(viirs750, "ACCESS_STATE", tmp_path / "state.json")
     monkeypatch.setattr(viirs750, "GRANULE_DIR", tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))      # Path.home() on Windows
     monkeypatch.delenv("EARTHDATA_TOKEN", raising=False)
     st = c.get("/api/viirs750/credentials").json()
     assert st["state"] == "NOT_CONFIGURED" and st["method"] is None
