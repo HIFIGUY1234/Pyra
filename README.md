@@ -13,8 +13,12 @@ PyroScope addresses the NASA Space Apps Challenge 2026 task **"Harmonization of 
 ![React 18](https://img.shields.io/badge/React-18-61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6)
 
-> [!IMPORTANT]
-> **CI note:** The latest observed `main` run reports 226 passed / 1 failed / 1 skipped for the backend suite. The failing test (`test_committed_database_carries_no_credentials`) is a guard that detected a password hash in the tracked `data/pyroscope.db`; the row was restored to the committed state and the test exists to prevent recurrence. PostgreSQL, frontend, and dependency-audit jobs passed. Docker and Playwright were skipped in that run.
+> [!WARNING]
+> **Deployment status: PyroScope currently runs correctly only on a local machine.**
+> The hosted link (https://pyra-zeta.vercel.app) loads the interface, but the connected backend on Render does not yet
+> serve the processed satellite dataset, so data pages show "Satellite dataset is not installed on the connected backend"
+> instead of the harmonized timeline, calendar and forecasts. Run it locally to see the full application with the real
+> MODIS–VIIRS data — see **[Run Locally](#quick-start)** below.
 
 ---
 
@@ -429,6 +433,10 @@ Pyra/
 
 ## Quick Start
 
+> **Run Locally.** This is currently the supported way to use PyroScope (the hosted link does not load the dataset yet).
+> The processed MODIS–VIIRS dataset is already committed in `data/processed/`, so steps 1, 3 and 4 are enough to get a
+> fully working app at **http://localhost:5173**. Step 2 is only needed to rebuild the dataset from the raw archives.
+
 ### Prerequisites
 
 - Python **3.11** (`.python-version` pins this)
@@ -442,7 +450,7 @@ git clone https://github.com/HIFIGUY1234/Pyra.git
 cd Pyra
 ```
 
-### 2. Recover the FIRMS Data Archives
+### 2. Recover the FIRMS Data Archives (optional — only to rebuild from raw archives)
 
 The five `DL_FIRE_*.zip` files are Git LFS objects. A plain clone gives 133-byte pointer files; PyroScope detects them and says so.
 
@@ -492,6 +500,15 @@ uvicorn app.main:app --port 8000
 
 > Processed Parquet summaries and a trained model are committed in `data/processed/`, so the API serves data immediately after `pip install` even before re-running the pipeline.
 
+Check that the dataset is detected (should print `"status": "READY"`):
+```bash
+curl http://localhost:8000/api/data/readiness     # or open it in a browser
+```
+
+> The tracked `data/pyroscope.db` is a credential-free demo seed. On first start the API copies it to
+> `data/runtime/pyroscope.db` (git-ignored) and uses that copy. To enable password login for the `admin` account set
+> `PYROSCOPE_ADMIN_PASSWORD` in `.env`; otherwise use the demo personas selectable in the top bar.
+
 ### 4. Frontend
 
 ```bash
@@ -499,6 +516,10 @@ cd frontend
 npm ci
 npm run dev      # → http://localhost:5173 (proxies /api to :8000)
 ```
+
+Keep the backend (step 3) running in a second terminal, then open **http://localhost:5173**. Pick a demo persona in the
+top bar (e.g. *Administrator* or *Analyst*) and open **Burning Activity Calendar** or **MODIS–VIIRS Harmonizer** to see the
+real data. **Data Management** shows the dataset readiness checklist.
 
 ### 5. Docker (all services, port 8080)
 
